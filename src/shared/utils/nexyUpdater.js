@@ -22,7 +22,12 @@ export function getNexyAsset(assets, platform, arch = 'x64') {
             ['x64', 'arm64'].includes(arch) &&
             name.endsWith(`_${arch}.AppImage`) &&
             /^Nexy_.+_(x64|arm64)\.AppImage$/i.test(name);
-        if (!isWindowsSetup && !isLinuxAppImage) {
+        const isMacDiskImage =
+            platform === 'darwin' &&
+            ['x64', 'arm64'].includes(arch) &&
+            name.endsWith(`_${arch}.dmg`) &&
+            /^Nexy_.+_(x64|arm64)\.dmg$/i.test(name);
+        if (!isWindowsSetup && !isLinuxAppImage && !isMacDiskImage) {
             continue;
         }
         const url = asset.browser_download_url;
@@ -39,6 +44,25 @@ export function getNexyAsset(assets, platform, arch = 'x64') {
         };
     }
     return { downloadUrl: '', hashString: '', size: 0 };
+}
+
+export function getNexyReleasePage(release) {
+    if (typeof release?.html_url === 'string') {
+        try {
+            const url = new URL(release.html_url);
+            if (
+                url.protocol === 'https:' &&
+                url.hostname === 'github.com' &&
+                url.pathname.startsWith('/valzzu/Nexy/releases/tag/')
+            )
+                return url.href;
+        } catch {
+            /* Fall back to the known repository below. */
+        }
+    }
+    return typeof release?.tag_name === 'string' && release.tag_name
+        ? `https://github.com/valzzu/Nexy/releases/tag/${encodeURIComponent(release.tag_name)}`
+        : 'https://github.com/valzzu/Nexy/releases';
 }
 
 export function getNexyReleases(data, channel, platform, arch) {

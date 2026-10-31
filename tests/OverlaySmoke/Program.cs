@@ -1,4 +1,5 @@
 using System;
+using System.Threading;
 using System.Runtime.InteropServices;
 using System.Threading.Tasks;
 using Valve.VR;
@@ -7,6 +8,15 @@ using Vortice.Direct3D11;
 using Vortice.DXGI;
 using VRCX;
 using static Vortice.Direct3D11.D3D11;
+
+if (args.Length > 0 && args[0] == "--helper")
+{
+    Thread.Sleep(Timeout.Infinite);
+    return;
+}
+
+OverlayRegionTests.Run();
+SteamLaunchTests.Run();
 
 static void Check(bool condition, string message)
 {
@@ -82,3 +92,5 @@ if (OperatingSystem.IsWindows())
     }
     Console.WriteLine("Shared D3D11 texture opened on a second device; BGRA pixels verified by GPU readback");
 }
+
+NativeLifecycleTests.Run();

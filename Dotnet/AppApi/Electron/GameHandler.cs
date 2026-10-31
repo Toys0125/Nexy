@@ -82,20 +82,7 @@ namespace VRCX
                 try
                 {
                     var steamExecutable = Path.Join(_steamPath, "steam.exe");
-                    if (File.Exists(steamExecutable))
-                    {
-                        Process.Start(new ProcessStartInfo(steamExecutable, $"-applaunch 438100 {arguments}")
-                        {
-                            UseShellExecute = false
-                        })?.Dispose();
-                        return true;
-                    }
-
-                    // Steam's protocol handler works without an explicitly configured installation path.
-                    Process.Start(new ProcessStartInfo("steam://rungameid/438100")
-                    {
-                        UseShellExecute = true
-                    })?.Dispose();
+                    Process.Start(SteamLaunch.WindowsStartInfo(steamExecutable, arguments))?.Dispose();
                     return true;
                 }
                 catch (Exception ex)

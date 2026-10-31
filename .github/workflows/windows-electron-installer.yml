@@ -14,6 +14,19 @@ permissions:
   contents: read
 
 jobs:
+  linux-overlay-pixels:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: '10.0.x'
+      - name: Install software OpenGL test dependencies
+        run: sudo apt-get update && sudo apt-get install -y xvfb libgl1-mesa-dri libglx-mesa0 libx11-6
+      - name: Verify OpenGL wrist and HMD pixels under Xvfb
+        env:
+          LIBGL_ALWAYS_SOFTWARE: '1'
+        run: xvfb-run --auto-servernum dotnet run --project tests/OverlaySmoke -p:Configuration=Release -p:Platform=x64 --runtime linux-x64
   build-installer:
     runs-on: windows-latest
     defaults:
@@ -32,6 +45,8 @@ jobs:
         run: npm ci
       - name: Check Electron desktop APIs and protocol queue
         run: npm run test:electron
+      - name: Validate Windows shortcut path comparisons
+        run: ./tests/electron/installer-paths.test.ps1
       - name: Check renderer JavaScript types
         run: npm run typecheck:js
       - name: Build Windows .NET bridge

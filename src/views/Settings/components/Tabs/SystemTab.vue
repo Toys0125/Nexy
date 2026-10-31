@@ -44,7 +44,6 @@
             </div>
         </SettingsGroup>
 
-        <!-- Nexy has no release feed yet, so the updater (and VRCX's changelog) stay hidden -->
         <SettingsGroup v-if="!noUpdater" :title="t('view.settings.general.vrcx_updater.header')">
             <div class="flex gap-2">
                 <Button size="sm" variant="outline" @click="showChangeLogDialog">{{
@@ -68,7 +67,7 @@
                             <SelectItem value="Notify">{{
                                 t('view.settings.general.vrcx_updater.auto_update_notify')
                             }}</SelectItem>
-                            <SelectItem value="Auto Download">{{
+                            <SelectItem v-if="canInstallUpdates" value="Auto Download">{{
                                 t('view.settings.general.vrcx_updater.auto_update_download')
                             }}</SelectItem>
                         </SelectContent>
@@ -214,7 +213,8 @@
         promptProxySettings
     } = generalSettingsStore;
 
-    const { appVersion, autoUpdateVRCX, latestAppVersion, noUpdater } = storeToRefs(vrcxUpdaterStore);
+    const { appVersion, autoUpdateVRCX, latestAppVersion, noUpdater, canInstallUpdates } =
+        storeToRefs(vrcxUpdaterStore);
     const { setAutoUpdateVRCX, checkForVRCXUpdate, showVRCXUpdateDialog, showChangeLogDialog } = vrcxUpdaterStore;
 
     const ossDialog = ref(false);

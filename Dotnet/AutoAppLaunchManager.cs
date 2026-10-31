@@ -20,7 +20,7 @@ namespace VRCX
     {
         public static AutoAppLaunchManager Instance { get; private set; }
         private static readonly Logger logger = LogManager.GetCurrentClassLogger();
-        public static readonly string VRChatProcessName = "VRChat";
+        public static readonly string GameProcessName = "NexVR";
 
         public bool Enabled = false;
         /// <summary> Whether or not to kill child processes when VRChat closes. </summary>
@@ -70,7 +70,9 @@ namespace VRCX
             Instance = new AutoAppLaunchManager();
         }
 
-        public AutoAppLaunchManager()
+        public AutoAppLaunchManager() : this(ProcessMonitor.Instance) { }
+
+        internal AutoAppLaunchManager(ProcessMonitor monitor)
         {
             AppShortcutDirectory = Path.Join(Program.AppDataDirectory, "startup");
             AppShortcutDesktop = Path.Join(AppShortcutDirectory, "desktop");
@@ -80,8 +82,8 @@ namespace VRCX
             Directory.CreateDirectory(AppShortcutDesktop);
             Directory.CreateDirectory(AppShortcutVR);
 
-            ProcessMonitor.Instance.ProcessStarted += OnProcessStarted;
-            ProcessMonitor.Instance.ProcessExited += OnProcessExited;
+            monitor.ProcessStarted += OnProcessStarted;
+            monitor.ProcessExited += OnProcessExited;
 
             childUpdateTimer = new Timer();
             childUpdateTimer.Interval = 60000;
@@ -90,7 +92,7 @@ namespace VRCX
 
         private void OnProcessExited(MonitoredProcess monitoredProcess)
         {
-            if (!monitoredProcess.HasName(VRChatProcessName))
+            if (!monitoredProcess.HasName(GameProcessName))
                 return;
 
             lock (startedProcesses)
@@ -109,7 +111,7 @@ namespace VRCX
         [SupportedOSPlatform("windows")]
         private void OnProcessStarted(MonitoredProcess monitoredProcess)
         {
-            if (!Enabled || !monitoredProcess.HasName(VRChatProcessName) || monitoredProcess.Process.StartTime < startTime)
+            if (!OperatingSystem.IsWindows() || !Enabled || !monitoredProcess.HasName(GameProcessName) || monitoredProcess.Process.StartTime < startTime)
                 return;
 
             // Start auto start processes
@@ -186,28 +188,29 @@ namespace VRCX
             List<int> pids = new List<int>();
 
             IntPtr snapshot = CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0);
-            if (snapshot == IntPtr.Zero)
+            if (snapshot == IntPtr.Zero || snapshot == new IntPtr(-1))
             {
                 return pids;
             }
 
-            PROCESSENTRY32 procEntry = new PROCESSENTRY32();
-            procEntry.dwSize = (uint)Marshal.SizeOf(typeof(PROCESSENTRY32));
-
-            if (Process32First(snapshot, ref procEntry))
+            try
             {
-                do
+                PROCESSENTRY32 procEntry = new PROCESSENTRY32();
+                procEntry.dwSize = (uint)Marshal.SizeOf(typeof(PROCESSENTRY32));
+                if (Process32First(snapshot, ref procEntry))
                 {
-                    if (procEntry.th32ParentProcessID == pid)
+                    do
                     {
-                        pids.Add((int)procEntry.th32ProcessID);
-
-                        if (recursive) // Recursively find child processes
-                            pids.AddRange(FindChildProcesses((int)procEntry.th32ProcessID));
+                        if (procEntry.th32ParentProcessID == pid)
+                        {
+                            pids.Add((int)procEntry.th32ProcessID);
+                            if (recursive) pids.AddRange(FindChildProcesses((int)procEntry.th32ProcessID));
+                        }
                     }
+                    while (Process32Next(snapshot, ref procEntry));
                 }
-                while (Process32Next(snapshot, ref procEntry));
             }
+            finally { WinApi.CloseHandle(snapshot); }
 
             return pids;
         }

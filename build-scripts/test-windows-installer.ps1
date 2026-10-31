@@ -3,6 +3,7 @@ param(
 )
 
 $ErrorActionPreference = 'Stop'
+. (Join-Path $PSScriptRoot 'installer-paths.ps1')
 $setupPath = (Resolve-Path -LiteralPath $Installer).Path
 $testRoot = Join-Path $env:TEMP ('Nexy-Installer-Test-' + [guid]::NewGuid().ToString('N'))
 New-Item -ItemType Directory -Path $testRoot | Out-Null
@@ -21,9 +22,11 @@ function Assert-Installed([string]$InstallDirectory) {
     $shortcutPath = Join-Path ([Environment]::GetFolderPath('CommonPrograms')) 'Nexy.lnk'
     if (-not (Test-Path -LiteralPath $shortcutPath)) { throw 'Missing Start menu shortcut' }
     $shortcut = (New-Object -ComObject WScript.Shell).CreateShortcut($shortcutPath)
-    if ($shortcut.TargetPath -ne (Join-Path $InstallDirectory 'Nexy.exe')) { throw 'Shortcut targets the wrong installation' }
+    Assert-NexyExecutableTarget -Actual $shortcut.TargetPath -Expected (Join-Path $InstallDirectory 'Nexy.exe') -Source 'Start menu shortcut'
     $protocol = (Get-ItemProperty 'Registry::HKEY_LOCAL_MACHINE\Software\Classes\nexy\shell\open\command').'(default)'
-    if (-not $protocol.Contains((Join-Path $InstallDirectory 'Nexy.exe'))) { throw 'Protocol targets the wrong installation' }
+    Write-Host "Registered protocol command: $protocol"
+    if ($protocol -notmatch '^"([^"]+)"') { throw "Protocol has an invalid executable command: $protocol" }
+    Assert-NexyExecutableTarget -Actual $Matches[1] -Expected (Join-Path $InstallDirectory 'Nexy.exe') -Source 'Protocol'
 }
 
 function Install-Nexy([string]$InstallDirectory, [bool]$ExplicitDirectory = $true) {
@@ -52,7 +55,7 @@ foreach ($view in @([Microsoft.Win32.RegistryView]::Registry32, [Microsoft.Win32
     } finally { $base.Dispose() }
 }
 if (Get-ChildItem 'HKLM:\Software\Microsoft\Windows\CurrentVersion\Uninstall' | Where-Object {
-    (Get-ItemProperty $_.PSPath).DisplayName -eq 'Nexy'
+    (Get-ItemProperty $_.PSPath).DisplayName -match '^Nexy(?:\s|$)'
 }) { throw 'Refusing to overwrite an existing Electron Nexy installation' }
 
 $fresh = Join-Path $testRoot 'Fresh install with spaces'

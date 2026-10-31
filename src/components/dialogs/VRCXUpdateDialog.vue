@@ -62,17 +62,27 @@
             </div>
 
             <DialogFooter>
+                <Button
+                    v-if="!canInstallUpdates"
+                    variant="default"
+                    :disabled="checkingForVRCXUpdate"
+                    @click="openReleasePage()">
+                    {{ t('dialog.vrcx_updater.github_releases') }}
+                </Button>
                 <Button variant="secondary" class="mr-2" v-if="updateInProgress" @click="cancelUpdate">
                     {{ t('dialog.vrcx_updater.cancel') }}
                 </Button>
                 <Button
                     variant="default"
-                    v-if="VRCXUpdateDialog.release !== pendingVRCXInstall"
+                    v-if="canInstallUpdates && VRCXUpdateDialog.release !== pendingVRCXInstall"
                     :disabled="updateInProgress"
                     @click="installVRCXUpdate">
                     {{ t('dialog.vrcx_updater.download') }}
                 </Button>
-                <Button variant="default" v-if="!updateInProgress && pendingVRCXInstall" @click="restartVRCX(true)">
+                <Button
+                    variant="default"
+                    v-if="canInstallUpdates && !updateInProgress && pendingVRCXInstall"
+                    @click="restartVRCX(true)">
                     {{ t('dialog.vrcx_updater.install') }}
                 </Button>
             </DialogFooter>
@@ -100,12 +110,14 @@
         appVersion,
         branch,
         checkingForVRCXUpdate,
+        canInstallUpdates,
         VRCXUpdateDialog,
         pendingVRCXInstall,
         updateInProgress,
         updateProgress
     } = storeToRefs(VRCXUpdaterStore);
-    const { installVRCXUpdate, loadBranchVersions, restartVRCX, updateProgressText, cancelUpdate } = VRCXUpdaterStore;
+    const { installVRCXUpdate, openReleasePage, loadBranchVersions, restartVRCX, updateProgressText, cancelUpdate } =
+        VRCXUpdaterStore;
 
     const { t } = useI18n();
 
