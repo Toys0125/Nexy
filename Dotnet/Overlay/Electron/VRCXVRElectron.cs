@@ -138,23 +138,6 @@ namespace VRCX
             return OverlayFrames.Take(frameBuffer) ? frameBuffer : null;
         }
 
-        private static void FlipImageVertically(ref byte[] imageData, int width, int height)
-        {
-            int stride = width * 4; // 4 bytes per pixel (RGBA)
-            byte[] tempRow = new byte[stride];
-
-            for (int y = 0; y < height / 2; y++)
-            {
-                int topIndex = y * stride;
-                int bottomIndex = (height - 1 - y) * stride;
-
-                // Swap rows
-                Buffer.BlockCopy(imageData, topIndex, tempRow, 0, stride);
-                Buffer.BlockCopy(imageData, bottomIndex, imageData, topIndex, stride);
-                Buffer.BlockCopy(tempRow, 0, imageData, bottomIndex, stride);
-            }
-        }
-
         private void ThreadLoop()
         {
             var e = new VREvent_t();
@@ -224,7 +207,7 @@ namespace VRCX
                     var frame = GetLatestOverlayFrame();
                     if (frame != null)
                     {
-                        if (OperatingSystem.IsLinux()) FlipImageVertically(ref frame, SHARED_FRAME_WIDTH, SHARED_FRAME_HEIGHT);
+                        OverlayTextureLayout.PrepareFrame(frame, OperatingSystem.IsLinux());
                         _frameBufferValid = true;
                     }
                     // SteamVR can restart while Chromium has no new paint damage.
@@ -751,15 +734,7 @@ namespace VRCX
         private EVROverlayError ShowTexture(CVROverlay overlay, ulong handle, bool wrist, ref bool visible)
         {
             if (!_hasTexture) return EVROverlayError.None;
-            var top = wrist ? 0f : (float)WRIST_FRAME_HEIGHT / SHARED_FRAME_HEIGHT;
-            var bottom = wrist ? (float)WRIST_FRAME_HEIGHT / SHARED_FRAME_HEIGHT : 1f;
-            var bounds = new VRTextureBounds_t
-            {
-                uMin = 0f,
-                uMax = wrist ? 0.5f : 1f,
-                vMin = OperatingSystem.IsWindows() ? top : 1f - bottom,
-                vMax = OperatingSystem.IsWindows() ? bottom : 1f - top
-            };
+            var bounds = OverlayTextureLayout.Bounds(wrist, OperatingSystem.IsLinux());
             var err = overlay.SetOverlayTextureBounds(handle, ref bounds);
             if (err != EVROverlayError.None) return err;
             var texture = _overlayTextureWriter.AsTextureT();

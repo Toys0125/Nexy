@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, test } from 'vitest';
-import { getNexyAsset, getNexyReleases, isNexyReleaseNewer } from '../nexyUpdater';
+import { getNexyAsset, getNexyReleases, getNexyReleasePage, isNexyReleaseNewer } from '../nexyUpdater';
 
 const url = (name) => `https://github.com/valzzu/Nexy/releases/download/v2026.11.1/${name}`;
 const asset = (name, overrides = {}) => ({
@@ -46,6 +46,23 @@ describe('Nexy release updater', () => {
         expect(getNexyAsset(assets, 'linux', 'arm64').downloadUrl).toBe(url('Nexy_2026.11.1_arm64.AppImage'));
         expect(getNexyAsset(assets, 'linux', 'x64').downloadUrl).toBe(url('Nexy_2026.11.1_x64.AppImage'));
         expect(getNexyAsset(assets, 'darwin', 'x64').downloadUrl).toBe('');
+    });
+    test('discovers macOS DMGs for manual release notifications', () => {
+        const dmg = asset('Nexy_2026.11.1_arm64.dmg');
+        expect(getNexyAsset([dmg], 'darwin', 'arm64').downloadUrl).toBe(url(dmg.name));
+        expect(getNexyAsset([dmg], 'darwin', 'x64').downloadUrl).toBe('');
+        expect(
+            getNexyReleases([release('Nexy 2026.11.1', { assets: [dmg] })], 'Stable', 'darwin', 'arm64')
+        ).toHaveLength(1);
+    });
+    test('manual release links remain on the Nexy GitHub repository', () => {
+        expect(getNexyReleasePage({ html_url: 'https://github.com/valzzu/Nexy/releases/tag/v1' })).toBe(
+            'https://github.com/valzzu/Nexy/releases/tag/v1'
+        );
+        expect(getNexyReleasePage({ html_url: 'https://evil.test/setup.exe', tag_name: 'v1/a' })).toBe(
+            'https://github.com/valzzu/Nexy/releases/tag/v1%2Fa'
+        );
+        expect(getNexyReleasePage({ html_url: 'javascript:alert(1)' })).toBe('https://github.com/valzzu/Nexy/releases');
     });
     test('separates stable and nightly, ignores drafts and incompatible releases', () => {
         const stable = release('Nexy 2026.11.1');

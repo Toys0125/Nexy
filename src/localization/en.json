@@ -2816,6 +2816,7 @@
         },
         "vrcx_updater": {
             "header": "Nexy Updater",
+            "github_releases": "GitHub Releases",
             "latest_version": "Nexy is up to date.",
             "ready_for_update": "Ready for install, restart Nexy to apply.",
             "branch_stable": "Stable",

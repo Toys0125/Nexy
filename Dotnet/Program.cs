@@ -138,6 +138,14 @@ namespace VRCX
 
             AppApiInstance = new AppApiElectron();
 
+            if (OperatingSystem.IsWindows())
+            {
+                // Subscribe companion-app handlers before polling can emit the
+                // first game event. The monitor relies on Windows process APIs.
+                AutoAppLaunchManager.Instance.Init();
+                ProcessMonitor.Instance.Init();
+            }
+
             VRCXVRInstance = new VRCXVRElectron();
             VRCXVRInstance.Init();
         }
@@ -148,6 +156,11 @@ namespace VRCX
     {
         public void Exit()
         {
+            if (OperatingSystem.IsWindows())
+            {
+                ProcessMonitor.Instance.Exit();
+                AutoAppLaunchManager.Instance.Exit();
+            }
             Program.VRCXVRInstance?.Exit();
             SystemMonitorElectron.Instance?.Exit();
             LogManager.Shutdown();
