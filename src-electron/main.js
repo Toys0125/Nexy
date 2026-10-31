@@ -19,6 +19,9 @@ const fs = require('fs');
 const os = require('os');
 const { createDesktopApi } = require('./desktop-api');
 const { createLaunchCommands } = require('./launch-commands');
+const { createRendererSecurity } = require('./renderer-security');
+const { pathToFileURL } = require('node:url');
+const rendererIpc = createRendererSecurity(ipcMain);
 
 //app.disableHardwareAcceleration();
 
@@ -151,7 +154,7 @@ interopApi.getDotNetObject('LogWatcher').Init();
 interopApi.getDotNetObject('SystemMonitorElectron').Init();
 interopApi.getDotNetObject('AppApiVrElectron').Init();
 
-ipcMain.handle('callDotNetMethod', (_event, className, methodName, args) => {
+rendererIpc.handle('callDotNetMethod', (_event, className, methodName, args) => {
     if (className === 'AppApiElectron' && methodName === 'SetVR') return updateVr(...args);
     if (className === 'AppApiElectron' && Object.hasOwn(desktopApi, methodName)) {
         return desktopApi[methodName](...args);
@@ -177,14 +180,14 @@ function flushLaunchCommands() {
     launchCommands.flush((command) => mainWindow.webContents.send('launch-command', command));
 }
 
-ipcMain.on('app:launchCommandsReady', (event) => {
+rendererIpc.on('app:launchCommandsReady', (event) => {
     if (event.sender !== mainWindow?.webContents) return;
     launchCommands.setReady(true);
     flushLaunchCommands();
 });
 
-ipcMain.handle('dialog:openFile', (_event, ...args) => desktopApi.OpenFileSelectorDialog(...args));
-ipcMain.handle('dialog:openDirectory', (_event, ...args) => desktopApi.OpenFolderSelectorDialog(...args));
+rendererIpc.handle('dialog:openFile', (_event, ...args) => desktopApi.OpenFileSelectorDialog(...args));
+rendererIpc.handle('dialog:openDirectory', (_event, ...args) => desktopApi.OpenFolderSelectorDialog(...args));
 
 function showNotification(title, body = '', icon = '') {
     if (!ElectronNotification.isSupported()) return;
@@ -207,7 +210,7 @@ function showNotification(title, body = '', icon = '') {
     notification.on('click', () => desktopApi.FocusWindow());
     notification.show();
 }
-ipcMain.handle('notification:showNotification', (_event, ...args) => showNotification(...args));
+rendererIpc.handle('notification:showNotification', (_event, ...args) => showNotification(...args));
 
 function restartApp() {
     if (process.platform === 'linux') {
@@ -225,7 +228,7 @@ function restartApp() {
         app.quit();
     }
 }
-ipcMain.handle('app:restart', restartApp);
+rendererIpc.handle('app:restart', restartApp);
 
 const desktopApi = createDesktopApi({
     app,
@@ -245,7 +248,7 @@ const desktopApi = createDesktopApi({
 });
 if (process.platform === 'win32') app.setAppUserModelId('app.nexy');
 
-ipcMain.handle('app:getOverlayWindow', () => {
+rendererIpc.handle('app:getOverlayWindow', () => {
     if (overlayWindow && overlayWindow.webContents) {
         return !overlayWindow.webContents.isLoading() && overlayWindow.webContents.isPainting();
     }
@@ -266,26 +269,26 @@ function updateVr(active, hmdOverlay, wristOverlay, menuButton, overlayHand) {
     }
     interopApi.getDotNetObject('AppApiElectron').SetVR(active, hmdOverlay, wristOverlay, menuButton, overlayHand);
 }
-ipcMain.handle('app:updateVr', (_event, ...args) => updateVr(...args));
+rendererIpc.handle('app:updateVr', (_event, ...args) => updateVr(...args));
 
-ipcMain.handle('app:getArch', () => {
+rendererIpc.handle('app:getArch', () => {
     return process.arch.toString();
 });
-ipcMain.handle('app:getClipboardText', () => {
+rendererIpc.handle('app:getClipboardText', () => {
     return clipboard.readText();
 });
 
-ipcMain.handle('app:copyImageToClipboard', (_event, imagePath) => desktopApi.CopyImageToClipboard(imagePath));
-ipcMain.handle('app:focusWindow', () => desktopApi.FocusWindow());
-ipcMain.handle('app:flashWindow', () => desktopApi.FlashWindow());
-ipcMain.handle('app:setStartup', (_event, enabled) => desktopApi.SetStartup(enabled));
-ipcMain.handle('app:openCalendarFile', (_event, content) => desktopApi.OpenCalendarFile(content));
+rendererIpc.handle('app:copyImageToClipboard', (_event, imagePath) => desktopApi.CopyImageToClipboard(imagePath));
+rendererIpc.handle('app:focusWindow', () => desktopApi.FocusWindow());
+rendererIpc.handle('app:flashWindow', () => desktopApi.FlashWindow());
+rendererIpc.handle('app:setStartup', (_event, enabled) => desktopApi.SetStartup(enabled));
+rendererIpc.handle('app:openCalendarFile', (_event, content) => desktopApi.OpenCalendarFile(content));
 
-ipcMain.handle('app:getNoUpdater', () => {
+rendererIpc.handle('app:getNoUpdater', () => {
     return noUpdater;
 });
 
-ipcMain.handle('app:setTrayIconNotification', (_event, notify) => {
+rendererIpc.handle('app:setTrayIconNotification', (_event, notify) => {
     setTrayIconNotification(notify);
 });
 
@@ -295,7 +298,7 @@ function sendSystemTheme() {
     }
 }
 
-ipcMain.handle('app:setThemeSource', (_event, source) => {
+rendererIpc.handle('app:setThemeSource', (_event, source) => {
     if (!['system', 'light', 'dark'].includes(source)) {
         return;
     }
@@ -327,6 +330,9 @@ function createWindow() {
         autoHideMenuBar: true,
         titleBarStyle: 'hiddenInset',
         webPreferences: {
+            contextIsolation: true,
+            nodeIntegration: false,
+            sandbox: true,
             preload: path.join(__dirname, 'preload.js')
         }
     });
@@ -334,11 +340,11 @@ function createWindow() {
     mainWindow.webContents.setUserAgent(version);
     mainWindow.webContents.on('did-start-loading', () => launchCommands.setReady(false));
     const indexPath = path.join(rootDir, 'build/html/index.html');
-    mainWindow.loadFile(indexPath);
+    rendererIpc.protectWindow(mainWindow, debug ? 'http://localhost:9000/index.html' : pathToFileURL(indexPath).href);
     if (debug) {
         mainWindow.loadURL('http://localhost:9000/index.html');
         mainWindow.webContents.openDevTools();
-    }
+    } else mainWindow.loadFile(indexPath);
 
     // add proxy config, doesn't work, thanks electron
     // const proxy = VRCXStorage.Get('VRCX_Proxy');
@@ -444,6 +450,9 @@ function createOverlayWindowOffscreen() {
         frame: false,
         show: false,
         webPreferences: {
+            contextIsolation: true,
+            nodeIntegration: false,
+            sandbox: true,
             partition: 'vrcx-vr-overlay',
             offscreen: true,
             backgroundThrottling: false,
@@ -463,6 +472,10 @@ function createOverlayWindowOffscreen() {
     overlayWindow.webContents.on('did-finish-load', () => mainWindow?.webContents.send('vr-overlay-ready'));
     overlayWindow.webContents.once('render-process-gone', () => disposeOverlay());
     overlayWindow.webContents.setUserAgent(version);
+    rendererIpc.protectWindow(
+        overlayWindow,
+        debug ? 'http://localhost:9000/vr.html' : pathToFileURL(path.join(rootDir, 'build/html/vr.html')).href
+    );
     if (debug) overlayWindow.loadURL('http://localhost:9000/vr.html');
     else overlayWindow.loadFile(path.join(rootDir, 'build/html/vr.html'));
 
