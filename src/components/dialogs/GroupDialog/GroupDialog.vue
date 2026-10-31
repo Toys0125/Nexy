@@ -804,7 +804,9 @@
         visible: false,
         title: '',
         text: '',
-        groupId: ''
+        groupId: '',
+        // bumped on every open, so a post still in flight from an earlier draft can't close this one
+        openId: 0
     });
 
     watch(
@@ -962,6 +964,7 @@
         D.title = '';
         D.text = '';
         D.groupId = groupId;
+        D.openId += 1;
         D.visible = true;
     }
 

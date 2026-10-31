@@ -89,13 +89,17 @@
             return;
         }
         posting.value = true;
+        const openId = D.openId;
         groupRequest
             .createGroupPost({ groupId: D.groupId, title: D.title?.trim() || '', text })
             .then((args) => {
                 handleGroupPost(args);
                 toast.success(t('dialog.group.announcements.posted'));
-                // close only once it's posted, so a failed post keeps the draft for a retry
-                D.visible = false;
+                // close only once it's posted, so a failed post keeps the draft for a retry,
+                // and only if this is still the draft that was posted
+                if (D.openId === openId) {
+                    D.visible = false;
+                }
             })
             .catch(() => toast.error(t('dialog.group.announcements.post_failed')))
             .finally(() => {
