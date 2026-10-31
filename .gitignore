@@ -2,6 +2,7 @@ node_modules/
 build/
 obj/
 obj1/
+tests/OverlaySmoke/bin/
 .idea/
 *.log
 *.DotSettings.user

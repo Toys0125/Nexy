@@ -1,9 +1,12 @@
 /* eslint-env node */
+const { windowsSigning } = require('./build-scripts/windows-signing');
+const signing = process.platform === 'win32' ? windowsSigning() : {};
 /**
  * @type {import('electron-builder').Configuration}
  * @see https://www.electron.build/configuration/configuration
  */
 module.exports = {
+    ...signing,
     appId: 'app.nexy',
     productName: 'Nexy',
     icon: 'images/Nexy.png',
@@ -88,9 +91,11 @@ module.exports = {
         minimumSystemVersion: '14.0'
     },
     win: {
+        ...signing.win,
         artifactName: 'Nexy_Version.${ext}',
         target: ['nsis', 'zip'],
-        icon: 'images/Nexy.ico'
+        icon: 'images/Nexy.ico',
+        signExts: ['VRCX-Electron.dll']
     },
     nsis: {
         artifactName: 'Nexy_Version.exe',

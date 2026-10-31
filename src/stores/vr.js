@@ -27,6 +27,7 @@ export const useVrStore = defineStore('Vr', () => {
     const gameLogStore = useGameLogStore();
     const userStore = useUserStore();
     const sharedFeedStore = useSharedFeedStore();
+    if (LINUX) window.electron?.onVrOverlayReady?.(() => vrInit());
 
     watch(
         () => watchState.isFriendsLoaded,
@@ -177,14 +178,6 @@ export const useVrStore = defineStore('Vr', () => {
         }
 
         if (LINUX) {
-            window.electron.updateVr(
-                newState.active,
-                newState.hmdOverlay,
-                newState.wristOverlay,
-                newState.menuButton,
-                newState.overlayHand
-            );
-
             vrInit(); // sometimes this runs before the overlay is ready
         }
     }

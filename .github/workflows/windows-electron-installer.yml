@@ -1,6 +1,8 @@
 name: Windows Electron Installer
 
 on:
+  pull_request:
+    branches: [master]
   push:
     branches:
       - feat/electron-only-migration
@@ -28,12 +30,39 @@ jobs:
           dotnet-version: '10.0.x'
       - name: Install Node dependencies
         run: npm ci
+      - name: Check Electron desktop APIs and protocol queue
+        run: npm run test:electron
+      - name: Check renderer JavaScript types
+        run: npm run typecheck:js
       - name: Build Windows .NET bridge
         run: dotnet build Dotnet/VRCX-Electron.csproj -p:Configuration=Release -p:Platform=x64 --runtime win-x64
+      - name: Validate overlay frames and shared Direct3D textures
+        run: npm run test:overlay
+      - name: Smoke-test Electron preload, native bridge and offscreen rendering
+        run: npm run test:electron:runtime
       - name: Build frontend
         run: npm run prod
       - name: Build NSIS installer and portable ZIP
+        env:
+          NEXY_WINDOWS_SIGNING: ${{ github.event_name != 'pull_request' && vars.NEXY_WINDOWS_SIGNING || 'none' }}
+          NEXY_AZURE_SIGNING_ENDPOINT: ${{ vars.NEXY_AZURE_SIGNING_ENDPOINT }}
+          NEXY_AZURE_SIGNING_ACCOUNT: ${{ vars.NEXY_AZURE_SIGNING_ACCOUNT }}
+          NEXY_AZURE_SIGNING_PROFILE: ${{ vars.NEXY_AZURE_SIGNING_PROFILE }}
+          NEXY_SIGNING_PUBLISHER: ${{ vars.NEXY_SIGNING_PUBLISHER }}
+          AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+          AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
+          AZURE_CLIENT_SECRET: ${{ secrets.AZURE_CLIENT_SECRET }}
+          WIN_CSC_LINK: ${{ secrets.WIN_CSC_LINK }}
+          WIN_CSC_KEY_PASSWORD: ${{ secrets.WIN_CSC_KEY_PASSWORD }}
         run: npm run build-electron
+      - name: Verify configured release signatures
+        if: github.event_name != 'pull_request' && (vars.NEXY_WINDOWS_SIGNING == 'azure' || vars.NEXY_WINDOWS_SIGNING == 'pfx')
+        run: |
+          $version = (Get-Content Version -Raw).Trim()
+          foreach ($file in @("build/Nexy_${version}_Setup_x64.exe", 'build/win-unpacked/Nexy.exe', 'build/win-unpacked/resources/app.asar.unpacked/build/Electron/VRCX-Electron.dll')) {
+            $signature = Get-AuthenticodeSignature -LiteralPath $file
+            if ($signature.Status -ne 'Valid') { throw "Invalid signature: $file ($($signature.Status))" }
+          }
       - name: Validate output files and portable package contents
         run: |
           $version = (Get-Content Version -Raw).Trim()
@@ -50,6 +79,7 @@ jobs:
             'resources/app.asar',
             'resources/app.asar.unpacked/build/Electron/VRCX-Electron.cjs',
             'resources/app.asar.unpacked/build/Electron/VRCX-Electron.dll',
+            'resources/app.asar.unpacked/build/Electron/Vortice.Direct3D11.dll',
             'resources/dotnet-runtime/dotnet.exe'
           )
           foreach ($file in $required) {
@@ -59,32 +89,10 @@ jobs:
           }
           Get-FileHash $setup -Algorithm SHA256
           Get-FileHash $portable -Algorithm SHA256
-      - name: Smoke-test NSIS silent install and uninstall
+      - name: Smoke-test fresh install and legacy custom-directory upgrades
         run: |
           $version = (Get-Content Version -Raw).Trim()
-          $setup = (Resolve-Path "build/Nexy_${version}_Setup_x64.exe").Path
-          $installDir = Join-Path $env:TEMP 'NexyElectronInstallSmoke'
-          if (Test-Path $installDir) {
-            Remove-Item $installDir -Recurse -Force
-          }
-          $installerProcess = Start-Process -FilePath $setup -ArgumentList @('/S', "/D=$installDir") -Wait -PassThru
-          if ($installerProcess.ExitCode -ne 0) {
-            throw "Silent NSIS installation failed with exit code $($installerProcess.ExitCode)"
-          }
-          foreach ($path in @('Nexy.exe', 'resources/app.asar', 'resources/dotnet-runtime/dotnet.exe')) {
-            if (-not (Test-Path (Join-Path $installDir $path))) {
-              throw "Installed application is missing $path"
-            }
-          }
-          $uninstaller = Join-Path $installDir 'Uninstall Nexy.exe'
-          if (-not (Test-Path $uninstaller)) {
-            throw "Electron NSIS uninstaller was not created"
-          }
-          $uninstallProcess = Start-Process -FilePath $uninstaller -ArgumentList @('/S') -Wait -PassThru
-          if ($uninstallProcess.ExitCode -ne 0) {
-            throw "Silent NSIS uninstallation failed with exit code $($uninstallProcess.ExitCode)"
-          }
-          Write-Host 'NSIS silent installation and uninstallation succeeded'
+          ./build-scripts/test-windows-installer.ps1 -Installer "build/Nexy_${version}_Setup_x64.exe"
       - uses: actions/upload-artifact@v7
         if: always()
         with:

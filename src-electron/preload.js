@@ -65,6 +65,7 @@ contextBridge.exposeInMainWorld('electron', {
     onWindowStateChange: (callback) => registerManagedListener('setWindowState', callback),
     onBrowserFocus: (callback) => registerManagedListener('onBrowserFocus', callback),
     onBrowserBlur: (callback) => registerManagedListener('onBrowserBlur', callback),
+    onVrOverlayReady: (callback) => registerManagedListener('vr-overlay-ready', callback),
     desktopNotification: (title, body, icon) => ipcRenderer.invoke('notification:showNotification', title, body, icon),
     restartApp: () => ipcRenderer.invoke('app:restart'),
     getOverlayWindow: () => ipcRenderer.invoke('app:getOverlayWindow'),
@@ -73,7 +74,13 @@ contextBridge.exposeInMainWorld('electron', {
     ipcRenderer: {
         on(channel, func) {
             if (validChannels.includes(channel)) {
-                return registerManagedListener(channel, (_event, ...args) => func(...args), `ipcRenderer:${channel}`);
+                const dispose = registerManagedListener(
+                    channel,
+                    (_event, ...args) => func(...args),
+                    `ipcRenderer:${channel}`
+                );
+                if (channel === 'launch-command') ipcRenderer.send('app:launchCommandsReady');
+                return dispose;
             }
 
             return undefined;

@@ -82,6 +82,7 @@ export const useVrcxStore = defineStore('Vrcx', () => {
     const proxyServer = ref('');
     const appStartAt = Date.now();
     const isBrowserFocused = ref(true);
+    const pendingLaunchCommands = [];
 
     async function init() {
         try {
@@ -89,7 +90,8 @@ export const useVrcxStore = defineStore('Vrcx', () => {
                 try {
                     window.electron.ipcRenderer.on('launch-command', (command) => {
                         if (command) {
-                            eventLaunchCommand(command);
+                            if (watchState.isLoggedIn) eventLaunchCommand(command);
+                            else pendingLaunchCommands.push(command);
                         }
                     });
 
@@ -513,6 +515,7 @@ export const useVrcxStore = defineStore('Vrcx', () => {
     );
 
     async function startupLaunchCommand() {
+        while (pendingLaunchCommands.length) eventLaunchCommand(pendingLaunchCommands.shift());
         const command = await AppApi.GetLaunchCommand();
         if (!command) {
             return;

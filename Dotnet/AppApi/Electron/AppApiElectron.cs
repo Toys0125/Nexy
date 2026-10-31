@@ -1,5 +1,4 @@
 using System;
-using System.Diagnostics;
 using System.IO;
 using System.Threading.Tasks;
 using NLog;
@@ -10,44 +9,33 @@ namespace VRCX
     {
         private static readonly Logger logger = LogManager.GetCurrentClassLogger();
 
-        public override void ShowDevTools()
-        {
-        }
+        // These methods belong to Electron's main process. Its AppApiElectron
+        // dispatcher intercepts them before .NET invocation (desktop-api.js).
+        // Fail explicitly if a new caller bypasses that dispatcher.
+        private static NotSupportedException DesktopOnly() =>
+            new("This desktop method must be called through Electron's desktop API dispatcher.");
+
+        public override void ShowDevTools() => throw DesktopOnly();
+        public override void SetZoom(double zoomLevel) => throw DesktopOnly();
+        public override Task<double> GetZoom() => throw DesktopOnly();
+        public override void DesktopNotification(string BoldText, string Text = "", string Image = "") => throw DesktopOnly();
+        public override void RestartApplication(bool isUpgrade) => throw DesktopOnly();
+        public override void FocusWindow() => throw DesktopOnly();
+        public override void ChangeTheme(int value) => throw DesktopOnly();
+        public override void DoFunny() => throw DesktopOnly();
+        public override string GetClipboard() => throw DesktopOnly();
+        public override void SetStartup(bool enabled) => throw DesktopOnly();
+        public override void CopyImageToClipboard(string path) => throw DesktopOnly();
+        public override void FlashWindow() => throw DesktopOnly();
+        public override void SetUserAgent() => throw DesktopOnly();
+        public override void SetTrayIconNotification(bool notify) => throw DesktopOnly();
+        public override void OpenCalendarFile(string icsContent) => throw DesktopOnly();
+
+        public override bool CheckForUpdateExe() => false;
 
         public override void SetVR(bool active, bool hmdOverlay, bool wristOverlay, bool menuButton, int overlayHand)
         {
-            // The native VR compositor still uses the Linux OpenGL/shm transport.
-            // Do not start that renderer on Windows until the D3D texture transport is ported.
-            if (OperatingSystem.IsWindows())
-            {
-                if (active)
-                    logger.Warn("Electron VR overlay is not yet supported on Windows");
-                return;
-            }
-
             Program.VRCXVRInstance.SetActive(active, hmdOverlay, wristOverlay, menuButton, overlayHand);
-        }
-
-        public override void SetZoom(double zoomLevel)
-        {
-        }
-
-        public override async Task<double> GetZoom()
-        {
-            return 1;
-        }
-
-        public override void DesktopNotification(string BoldText, string Text = "", string Image = "")
-        {
-        }
-
-        public override void RestartApplication(bool isUpgrade)
-        {
-        }
-
-        public override bool CheckForUpdateExe()
-        {
-            return false;
         }
 
         public override void ExecuteVrOverlayFunction(string function, string json)
@@ -55,95 +43,13 @@ namespace VRCX
             Program.VRCXVRInstance.ExecuteVrOverlayFunction(function, json);
         }
 
-        public override void FocusWindow()
+        // ImageSharp handles clipboard formats unsupported by Electron's loader.
+        public string DecodeClipboardImage(string path)
         {
-        }
-
-        public override void ChangeTheme(int value)
-        {
-        }
-
-        public override void DoFunny()
-        {
-        }
-
-        public override string GetClipboard()
-        {
-            var process = new Process
-            {
-                StartInfo = new ProcessStartInfo
-                {
-                    FileName = "xclip",
-                    Arguments = "-o",
-                    UseShellExecute = false,
-                    RedirectStandardOutput = true,
-                    CreateNoWindow = true
-                }
-            };
-            try
-            {
-                process.Start();
-                var output = process.StandardOutput.ReadToEnd();
-                process.WaitForExit();
-                return output;
-            }
-            catch (Exception ex)
-            {
-                logger.Error($"Failed to get clipboard: {ex.Message}");
-                return string.Empty;
-            }
-        }
-
-        public override void SetStartup(bool enabled)
-        {
-        }
-
-        public override void CopyImageToClipboard(string path)
-        {
-            if (!File.Exists(path) ||
-                (!path.EndsWith(".png") &&
-                 !path.EndsWith(".jpg") &&
-                 !path.EndsWith(".jpeg") &&
-                 !path.EndsWith(".gif") &&
-                 !path.EndsWith(".bmp") &&
-                 !path.EndsWith(".webp")))
-                return;
-
-            var process = new Process
-            {
-                StartInfo = new ProcessStartInfo
-                {
-                    FileName = "xclip",
-                    Arguments = $"-selection clipboard -t image/png -i \"{path}\"",
-                    UseShellExecute = false,
-                    CreateNoWindow = true
-                }
-            };
-            try
-            {
-                process.Start();
-                process.WaitForExit();
-            }
-            catch (Exception ex)
-            {
-                logger.Error($"Failed to copy image to clipboard: {ex.Message}");
-            }
-        }
-
-        public override void FlashWindow()
-        {
-        }
-
-        public override void SetUserAgent()
-        {
-        }
-
-        public override void SetTrayIconNotification(bool notify)
-        {
-        }
-
-        public override void OpenCalendarFile(string icsContent)
-        {
+            using var image = SixLabors.ImageSharp.Image.Load(path);
+            using var stream = new MemoryStream();
+            SixLabors.ImageSharp.ImageExtensions.SaveAsPng(image, stream);
+            return Convert.ToBase64String(stream.ToArray());
         }
     }
 }
