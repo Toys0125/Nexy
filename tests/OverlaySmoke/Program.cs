@@ -35,19 +35,49 @@ Check(OverlayFrames.Take(destination) && destination[0] == 43 && destination[^1]
 Check(!OverlayFrames.Take(destination), "A frame was consumed twice");
 try { OverlayFrames.Submit(new byte[4]); throw new Exception("Invalid frame accepted"); }
 catch (ArgumentException) { }
+using var firstFrameReady = new ManualResetEventSlim();
+using var firstFrameRead = new ManualResetEventSlim();
+var comparedFrames = 0;
+byte lastComparedValue = byte.MaxValue;
+void CompareFrame()
+{
+    var value = destination[0];
+    foreach (var pixel in destination) Check(pixel == value, "Frame was torn across threads");
+    comparedFrames++;
+    lastComparedValue = value;
+}
 var producer = Task.Run(() =>
 {
-    for (var i = 0; i < 50; i++) { Array.Fill(frame, (byte)i); OverlayFrames.Submit(frame); }
+    for (var i = 0; i < 50; i++)
+    {
+        Array.Fill(frame, (byte)i);
+        OverlayFrames.Submit(frame);
+        if (i == 0)
+        {
+            firstFrameReady.Set();
+            Check(firstFrameRead.Wait(TimeSpan.FromSeconds(10)), "Consumer never compared the first frame");
+        }
+    }
 });
+try
+{
+    Check(firstFrameReady.Wait(TimeSpan.FromSeconds(10)), "Producer never submitted its first frame");
+    Check(OverlayFrames.Take(destination), "The first produced frame was not available");
+    CompareFrame();
+    Check(lastComparedValue == 0, "The first produced frame was not copied");
+}
+finally { firstFrameRead.Set(); }
 while (!producer.IsCompleted)
 {
-    if (OverlayFrames.Take(destination))
-        foreach (var pixel in destination) Check(pixel == destination[0], "Frame was torn across threads");
+    if (OverlayFrames.Take(destination)) CompareFrame();
 }
 producer.GetAwaiter().GetResult();
+// Drain the last pending frame even if the producer completed before the loop.
+if (OverlayFrames.Take(destination)) CompareFrame();
+Check(comparedFrames >= 2 && lastComparedValue == 49, "Concurrency check did not compare the first and final frames");
 OverlayFrames.Clear();
 Check(!OverlayFrames.Take(destination), "Reset left a stale frame");
-Console.WriteLine("Overlay frame size, latest-frame delivery, and concurrency checks passed");
+Console.WriteLine($"Overlay frame size, latest-frame delivery, and concurrency checks passed ({comparedFrames} full frames compared)");
 
 if (OperatingSystem.IsWindows())
 {

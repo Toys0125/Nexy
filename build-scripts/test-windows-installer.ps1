@@ -38,15 +38,26 @@ function Install-Nexy([string]$InstallDirectory, [bool]$ExplicitDirectory = $tru
 }
 
 function Uninstall-Nexy([string]$InstallDirectory) {
+    # Simulate the per-user handler Electron creates on first launch. Use the
+    # installed command so its executable path matches NSIS's own spelling.
+    $command = (Get-ItemProperty 'Registry::HKEY_LOCAL_MACHINE\Software\Classes\nexy\shell\open\command').'(default)'
+    $userKey = [Microsoft.Win32.Registry]::CurrentUser.CreateSubKey('Software\Classes\nexy')
+    try { $userKey.SetValue('URL Protocol', '') } finally { $userKey.Dispose() }
+    $userKey = [Microsoft.Win32.Registry]::CurrentUser.CreateSubKey('Software\Classes\nexy\shell\open\command')
+    try { $userKey.SetValue('', $command) } finally { $userKey.Dispose() }
     # _?= makes NSIS run in place and lets -Wait observe the actual uninstaller.
     $process = Start-Process -FilePath (Join-Path $InstallDirectory 'Uninstall Nexy.exe') `
         -ArgumentList "/S _?=$InstallDirectory" -WindowStyle Hidden -Wait -PassThru
     if ($process.ExitCode -ne 0) { throw "Uninstallation failed: $($process.ExitCode)" }
     if (Test-Path -LiteralPath (Join-Path $InstallDirectory 'Nexy.exe')) { throw 'Uninstall left the application executable behind' }
     if (Test-Path 'Registry::HKEY_LOCAL_MACHINE\Software\Classes\nexy') { throw 'Uninstall left the Nexy protocol registration behind' }
+    if (Test-Path 'Registry::HKEY_CURRENT_USER\Software\Classes\nexy') { throw 'Uninstall left the per-user Nexy protocol registration behind' }
 }
 
 # This script is intended for a disposable CI runner, never a developer's installed Nexy.
+if (Test-Path 'Registry::HKEY_CURRENT_USER\Software\Classes\nexy') {
+    throw 'Refusing to overwrite an existing per-user Nexy protocol handler'
+}
 $uninstallKey = 'Software\Microsoft\Windows\CurrentVersion\Uninstall\Nexy'
 foreach ($view in @([Microsoft.Win32.RegistryView]::Registry32, [Microsoft.Win32.RegistryView]::Registry64)) {
     $base = [Microsoft.Win32.RegistryKey]::OpenBaseKey([Microsoft.Win32.RegistryHive]::LocalMachine, $view)

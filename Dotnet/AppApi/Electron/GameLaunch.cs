@@ -10,8 +10,11 @@ internal static class GameLaunch
     internal static ProcessStartInfo WindowsStartInfo(string path, string arguments)
     {
         if (string.IsNullOrWhiteSpace(path)) return null;
+        if (!Path.IsPathFullyQualified(path) || path.Replace('/', '\\').StartsWith(@"\\", StringComparison.Ordinal))
+            return null;
         var executable = path.EndsWith(".exe", StringComparison.OrdinalIgnoreCase)
             ? path : Path.Join(path, "NexVR.exe");
+        executable = Path.GetFullPath(executable);
         if (!string.Equals(Path.GetFileName(executable), "NexVR.exe", StringComparison.OrdinalIgnoreCase) || !File.Exists(executable))
             return null;
 
