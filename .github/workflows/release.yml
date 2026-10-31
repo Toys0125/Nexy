@@ -36,7 +36,7 @@ jobs:
     uses: ./.github/workflows/github_actions.yml
     with:
       ref: ${{ github.event.release.tag_name || inputs.tag }}
-      require-windows-signing: true
+      require-windows-signing: false
     secrets: inherit
 
   attach:

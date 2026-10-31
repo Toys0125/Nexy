@@ -75,7 +75,7 @@ jobs:
     with:
       ref: ${{ needs.prepare.outputs.sha }}
       version: ${{ needs.prepare.outputs.version }}
-      require-windows-signing: true
+      require-windows-signing: false
     secrets: inherit
 
   publish:

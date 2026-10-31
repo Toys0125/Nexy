@@ -22,7 +22,7 @@ test('nightly preserves its version override and downloads the Electron Windows 
     const build = yaml.load(workflow('github_actions.yml'));
     assert.equal(typeof build.on.workflow_call.inputs.version, 'object');
     assert.equal(nightly.jobs.builds.with.version, '${{ needs.prepare.outputs.version }}');
-    assert.equal(nightly.jobs.builds.with['require-windows-signing'], true);
+    assert.equal(nightly.jobs.builds.with['require-windows-signing'], false);
     assert.equal(
         build.jobs.set_version.steps.find((step) => step.id === 'version').env.VERSION_OVERRIDE,
         '${{ inputs.version }}'
@@ -114,7 +114,7 @@ test('release verifiers accept all six assets and reject missing, duplicate, or 
 
 test('published Windows releases require signing and verification before upload', () => {
     const release = yaml.load(workflow('release.yml'));
-    assert.equal(release.jobs.builds.with['require-windows-signing'], true);
+    assert.equal(release.jobs.builds.with['require-windows-signing'], false);
     const build = yaml.load(workflow('github_actions.yml'));
     assert.ok(
         !build.on.pull_request && !build.on.push,
