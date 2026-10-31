@@ -70,6 +70,11 @@ namespace VRCX
             {
                 logger.Debug("Address changed: " + addressChangedEventArgs.Address);
             };
+            Browser.FrameLoadStart += (_, args) =>
+            {
+                if (args.Frame.IsMain) ((AppApiCef)Program.AppApiInstance).NexvrRealtimeClose(null);
+            };
+            Browser.Disposed += (_, _) => ((AppApiCef)Program.AppApiInstance).NexvrRealtimeClose(null);
             Browser.LoadingStateChanged += (_, loadingFailedEventArgs) =>
             {
                 if (loadingFailedEventArgs.IsLoading)

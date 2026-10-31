@@ -7,6 +7,7 @@ import {
     ServerMessageSchema
 } from './realtimeSchema';
 import { AppDebug } from '../appConfig';
+import { createRealtimeSocket } from './realtimeSocket';
 
 const AUTH_TIMEOUT = 10000;
 const REQUEST_TIMEOUT = 10000;
@@ -24,8 +25,9 @@ const REQUEST_TIMEOUT = 10000;
  * - `instanceModeration`: { instanceId, moderation } for a watched instance
  */
 class RealtimeClient {
-    /** @type {WebSocket | null} */
+    /** @type {WebSocket | import('./realtimeSocket').CefRealtimeSocket | null} */
     ws = null;
+    cancelConnect = null;
     userId = '';
     connected = false;
     authFailed = false;
@@ -94,7 +96,7 @@ class RealtimeClient {
             this.notifications = [];
         }
 
-        const socket = new WebSocket(AppDebug.websocketDomain);
+        const socket = createRealtimeSocket(AppDebug.websocketDomain);
         socket.binaryType = 'arraybuffer';
         this.ws = socket;
 
@@ -110,11 +112,17 @@ class RealtimeClient {
                 settle(false);
                 socket.close();
             }, AUTH_TIMEOUT);
+            this.cancelConnect = () => {
+                clearTimeout(timer);
+                settle(false);
+            };
 
             socket.onopen = () => {
+                if (this.ws !== socket) return;
                 this.send({ case: 'auth', value: { accessToken } });
             };
             socket.onmessage = ({ data }) => {
+                if (this.ws !== socket) return;
                 if (!(data instanceof ArrayBuffer)) {
                     return;
                 }
@@ -151,6 +159,7 @@ class RealtimeClient {
                 this.ws = null;
                 this.connected = false;
                 this.connecting = null;
+                this.cancelConnect = null;
                 for (const resolvePending of this.pending.values()) {
                     resolvePending(null);
                 }
@@ -166,6 +175,8 @@ class RealtimeClient {
     }
 
     disconnect() {
+        this.cancelConnect?.();
+        this.cancelConnect = null;
         const socket = this.ws;
         this.ws = null;
         this.connected = false;
@@ -178,6 +189,8 @@ class RealtimeClient {
                 // already closed
             }
         }
+        for (const resolvePending of this.pending.values()) resolvePending(null);
+        this.pending.clear();
         this.releaseSnapshotWaiters();
     }
 
