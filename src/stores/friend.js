@@ -31,11 +31,6 @@ import configRepository from '../services/config';
 
 import * as workerTimers from 'worker-timers';
 
-// Marks that friend numbers were assigned from the friends list order. VRCX used
-// '-5'; Nexy's own value makes accounts numbered before Nexy listed NexVR friends
-// oldest first (friendsSince) get renumbered once.
-const FRIEND_ORDER_APPLIED = 'nexy-friends-since';
-
 export const useFriendStore = defineStore('Friend', () => {
     const appearanceSettingsStore = useAppearanceSettingsStore();
     const generalSettingsStore = useGeneralSettingsStore();
@@ -970,33 +965,32 @@ export const useFriendStore = defineStore('Friend', () => {
         }
     }
 
+    /**
+     * Numbers friends by the friends list order, which NexVR sorts by when each
+     * friendship began. That order is authoritative, so it's re-applied on every
+     * login instead of once: numbers handed out in between (a friend added
+     * before the friend log knew them) can't drift from it.
+     */
     async function tryApplyFriendOrder() {
-        const lastUpdate = await configRepository.getString(`VRCX_lastStoreTime_${userStore.currentUser.id}`);
-        if (lastUpdate === FRIEND_ORDER_APPLIED) {
-            // this means we're done
+        const friendOrder = userStore.currentUser.friends;
+        if (!friendOrder?.length) {
             return;
         }
-
-        // reset friendNumber and friendLog
-        state.friendNumber = 0;
-        for (const ref of friendLog.values()) {
-            ref.friendNumber = 0;
-        }
-
-        const friendOrder = userStore.currentUser.friends;
         runInSortedFriendsBatch(() => {
             for (let i = 0; i < friendOrder.length; i++) {
                 const userId = friendOrder[i];
-                state.friendNumber++;
-                setFriendNumber(state.friendNumber, userId);
+                setFriendNumber(i + 1, userId);
+                // not in the friend log yet; it picks the number up from the ref
+                const friendRef = friends.get(userId);
+                if (friendRef?.ref && !friendLog.has(userId)) {
+                    friendRef.ref.$friendNumber = i + 1;
+                    reindexSortedFriend(friendRef);
+                }
             }
         });
-        if (state.friendNumber === 0) {
-            state.friendNumber = friends.size;
-        }
+        state.friendNumber = friendOrder.length;
         console.log('Applied friend order from API', state.friendNumber);
         await configRepository.setInt(`VRCX_friendNumber_${userStore.currentUser.id}`, state.friendNumber);
-        await configRepository.setString(`VRCX_lastStoreTime_${userStore.currentUser.id}`, FRIEND_ORDER_APPLIED);
     }
 
     /**

@@ -348,10 +348,12 @@ export function toVrcCurrentUser(me, friends) {
     const location = self ? presenceState(self) : null;
     const inInstance = location?.state === 'online';
     // VRChat lists friends oldest first, and VRCX numbers them in that order
-    // (the "friend number"); NexVR's friendsSince gives the same order
+    // (the "friend number"); NexVR's friendsSince gives the same order. A
+    // friendship with no date goes last rather than becoming friend #1.
+    const since = (presence) => Date.parse(presence.friendsSince) || Infinity;
     const friendsByAge = [...friends.values()]
         .filter((presence) => presence.userId !== me.id)
-        .sort((a, b) => (a.friendsSince || '').localeCompare(b.friendsSince || '') || a.userId.localeCompare(b.userId))
+        .sort((a, b) => since(a) - since(b) || a.userId.localeCompare(b.userId))
         .map((presence) => presence.userId);
     return {
         ...baseUser(me),

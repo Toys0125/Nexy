@@ -81,13 +81,17 @@ async function nexvr(path, { method = 'GET', body, query, auth = true } = {}) {
             url.searchParams.set(key, String(value));
         }
     }
+    let sentToken = '';
     const send = async () => {
         const headers = {};
         if (auth) {
-            const token = await getAccessToken();
-            if (token) {
-                headers.Authorization = `Bearer ${token}`;
+            sentToken = await getAccessToken();
+            if (!sentToken) {
+                // the session is gone; VRCX re-logs in on this message rather
+                // than retrying every call without credentials
+                throw new ShimError(401, '"Missing Credentials"');
             }
+            headers.Authorization = `Bearer ${sentToken}`;
         }
         const init = { url: url.toString(), method, headers };
         if (body !== undefined) {
@@ -97,8 +101,12 @@ async function nexvr(path, { method = 'GET', body, query, auth = true } = {}) {
         return native(init);
     };
     let res = await send();
-    if (res.status === 401 && auth && (await refreshTokens(exchangeRefreshToken))) {
-        res = await send();
+    if (res.status === 401 && auth) {
+        if (await refreshTokens(exchangeRefreshToken, sentToken)) {
+            res = await send();
+        } else if (!(await getAccessToken())) {
+            throw new ShimError(401, '"Missing Credentials"');
+        }
     }
     let data = null;
     try {
@@ -135,6 +143,25 @@ async function exchangeRefreshToken(refreshToken) {
     return nexvr('/auth/refresh', { method: 'POST', body: { refreshToken }, auth: false });
 }
 
+/** @type {Map<string, Promise<any>>} */
+const pendingUsers = new Map();
+
+/**
+ * `users/:id` and `profile/:id` both read /users/:id, and a user dialog asks
+ * for both at once; share the request while it's in flight.
+ *
+ * @param {string} userId
+ * @returns {Promise<any>}
+ */
+function fetchUser(userId) {
+    let pending = pendingUsers.get(userId);
+    if (!pending) {
+        pending = nexvr(`/users/${encodeURIComponent(userId)}`).finally(() => pendingUsers.delete(userId));
+        pendingUsers.set(userId, pending);
+    }
+    return pending;
+}
+
 /**
  * @param {string} userId
  * @returns {Promise<string>}
@@ -169,7 +196,7 @@ function displayNameOf(userId) {
 async function ensureRealtime(userId) {
     let token = await getAccessToken();
     let ok = await realtime.connect(token, userId);
-    if (!ok && realtime.authFailed && (await refreshTokens(exchangeRefreshToken))) {
+    if (!ok && realtime.authFailed && (await refreshTokens(exchangeRefreshToken, token))) {
         token = await getAccessToken();
         ok = await realtime.connect(token, userId);
     }
@@ -583,7 +610,7 @@ const routes = [
         'GET',
         /^users\/([^/]+)$/,
         async (m) => {
-            const user = await nexvr(`/users/${encodeURIComponent(m[1])}`);
+            const user = await fetchUser(m[1]);
             return rememberTags(toVrcUser(user, realtime.friends.get(user.id)));
         }
     ],
@@ -620,7 +647,7 @@ const routes = [
         }
     ],
     ['GET', /^users\/([^/]+)\/groups\/represented$/, () => ({})],
-    ['GET', /^profile\/([^/]+)$/, async (m) => toVrcPublicProfile(await nexvr(`/users/${encodeURIComponent(m[1])}`))],
+    ['GET', /^profile\/([^/]+)$/, async (m) => toVrcPublicProfile(await fetchUser(m[1]))],
     ['GET', /^user\/([^/]+)\/friendStatus$/, (m) => friendStatus(m[1])],
     [
         'POST',

@@ -237,6 +237,17 @@
     /** @type {import('vue').Ref<any>} */
     const treeData = ref({});
 
+    // the dialog opens from the cached profile before NexVR's response is in,
+    // so an open JSON tab refills once it arrives
+    watch(
+        () => [getRawResponse(`/users/${userDialog.value.id}`), getRawResponse('/auth/me')],
+        () => {
+            if (userDialog.value.visible && userDialog.value.lastActiveTab === 'JSON') {
+                refreshUserDialogTreeData();
+            }
+        }
+    );
+
     /**
      * @param user
      */

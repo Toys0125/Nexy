@@ -3,6 +3,7 @@
 // the server actually sent, except that the account email is masked.
 
 import { toJson } from '@bufbuild/protobuf';
+import { shallowReactive } from 'vue';
 
 import { FriendPresenceSchema } from './realtimeSchema';
 import { maskEmail } from './mappers';
@@ -12,8 +13,13 @@ const MAX_ENTRIES = 300;
 // responses that carry session tokens are never kept
 const NEVER_KEPT = /^\/auth\/(login|refresh|2fa|passkey|reauth)/;
 
-/** @type {Map<string, any>} insertion order doubles as least-recently-stored order */
-const responses = new Map();
+/**
+ * Insertion order doubles as least-recently-stored order. Reactive per path, so
+ * an open JSON tab can refill when the response it shows arrives.
+ *
+ * @type {Map<string, any>}
+ */
+const responses = shallowReactive(new Map());
 
 /**
  * @param {string} path NexVR gateway path, e.g. '/users/123'
