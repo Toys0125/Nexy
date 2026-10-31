@@ -17,6 +17,7 @@ internal static class NativeLifecycleTests
         var program = new ProgramElectron();
         program.PreInit("Nexy lifecycle test", new[] { "--config=" + profile });
         program.Init();
+        ScreenshotTests.Run(profile);
         var monitor = SystemMonitorElectron.Instance;
         for (var cycle = 0; cycle < 6; cycle++)
         {
