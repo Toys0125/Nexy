@@ -42,7 +42,7 @@ jobs:
         run: |
           sha="$(gh api "repos/$GH_REPO/commits/master" --jq '.sha')"
           version="$(date -u +%Y.%m.%d)"
-          tag="${version}-nightly"
+          tag="v${version}-nightly"
           echo "sha=${sha}" >> "$GITHUB_OUTPUT"
           echo "version=${version}" >> "$GITHUB_OUTPUT"
           echo "tag=${tag}" >> "$GITHUB_OUTPUT"
