@@ -97,6 +97,18 @@ describe('useVRCXUpdaterStore.setAutoUpdateVRCX', () => {
         expect(mocks.configRepository.setString).toHaveBeenCalledWith('VRCX_autoUpdateVRCX', 'Notify');
     });
 
+    test.each([
+        ['Nexy v2026.11.01-nightly', 'Nightly'],
+        ['Nexy v2026.11.01', 'Stable']
+    ])('selects the branch for %s', async (version, expected) => {
+        AppApi.GetVersion.mockResolvedValue(version);
+        setActivePinia(createPinia());
+        const store = useVRCXUpdaterStore();
+        await flushPromises();
+        expect(store.branch).toBe(expected);
+        expect(mocks.configRepository.setString).toHaveBeenCalledWith('VRCX_branch', expected);
+    });
+
     test('checks Nexy GitHub stable releases instead of the VRCX feed', async () => {
         const asset = {
             name: 'Nexy_2026.11.1_Setup_x64.exe',
