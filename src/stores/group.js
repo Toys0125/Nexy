@@ -318,8 +318,8 @@ export const useGroupStore = defineStore('Group', () => {
                 break;
             }
         }
-        // set or update announcement
-        if (newPost.id === D.announcement.id || !D.announcement.id) {
+        // set or update announcement; a new post is the newest, so it becomes the announcement
+        if (!hasPost || newPost.id === D.announcement.id || !D.announcement.id) {
             D.announcement = newPost;
         }
         // add new post

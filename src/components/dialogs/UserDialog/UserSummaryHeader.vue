@@ -75,12 +75,14 @@
                         v-if="userDialog.loading || userIconError"
                         class="w-full! h-full! object-cover text-muted-foreground bg-accent" />
                     <img
-                        v-else
+                        v-else-if="userDialog.publicProfileRef?.iconUrl"
                         class="w-full h-full object-cover cursor-pointer"
-                        :src="userDialog.publicProfileRef?.iconUrl"
-                        @click.stop="showFullscreenImageDialog(userDialog.publicProfileRef?.iconUrl)"
+                        :src="userDialog.publicProfileRef.iconUrl"
+                        @click.stop="showFullscreenImageDialog(userDialog.publicProfileRef.iconUrl)"
                         @error="userIconError = true"
                         loading="lazy" />
+                    <!-- no picture set: their initial, as everywhere else -->
+                    <img v-else class="w-full h-full object-cover" :src="defaultUserImage(userDialog.ref)" alt="" />
                 </div>
                 <IconFrame :icon-frame="userDialog.ref.iconFrame" class="z-2" />
             </div>
@@ -545,6 +547,7 @@
     import {
         convertFileUrlToImageUrl,
         copyToClipboard,
+        defaultUserImage,
         formatDateFilter,
         languageClass,
         openDiscordProfile,

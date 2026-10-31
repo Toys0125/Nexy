@@ -307,6 +307,27 @@ function statusClass(status) {
 }
 
 /**
+ * Stand-in picture for anyone without one: their initial on a grey disc,
+ * as nexvr.net shows it, so every avatar spot looks the same.
+ *
+ * @param {object} user
+ * @returns {string} SVG data URL
+ */
+function defaultUserImage(user) {
+    const name = String(user?.displayName || user?.username || '').trim();
+    const initial = (Array.from(name)[0] || '?').toUpperCase();
+    const escaped = initial.replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`);
+    const svg =
+        '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128">' +
+        '<rect width="128" height="128" fill="#3f3f46"/>' +
+        '<text x="64" y="64" dy=".35em" text-anchor="middle" fill="#e4e4e7" ' +
+        'font-family="system-ui, Segoe UI, sans-serif" font-size="60" font-weight="600">' +
+        escaped +
+        '</text></svg>';
+    return `data:image/svg+xml,${encodeURIComponent(svg)}`;
+}
+
+/**
  * @param {object} user - User Ref Object
  * @param {boolean} isIcon - Is use for icon (about 40x40)
  * @param {string} resolution - Requested icon resolution (default 128),
@@ -337,7 +358,7 @@ function userImage(user, isIcon = false, resolution = '128') {
         }
         return user.currentAvatarImageUrl;
     }
-    return '';
+    return defaultUserImage(user);
 }
 
 /**
@@ -354,7 +375,7 @@ function userImageFull(user) {
     if (user.profilePicOverride) {
         return user.profilePicOverride;
     }
-    return user.currentAvatarImageUrl;
+    return user.currentAvatarImageUrl || defaultUserImage(user);
 }
 
 /**
@@ -397,6 +418,7 @@ function findUserByDisplayName(cachedUsers, displayName, cachedUserIdsByDisplayN
 }
 
 export {
+    defaultUserImage,
     userOnlineForTimestamp,
     languageClass,
     getNameColour,

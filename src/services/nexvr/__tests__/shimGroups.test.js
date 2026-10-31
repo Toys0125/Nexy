@@ -121,7 +121,7 @@ describe('NexVR group routes', () => {
     test('a group the caller is not in reads as inactive, with no myMember', async () => {
         const { json } = await get('groups/g2');
         expect(json.membershipStatus).toBe('inactive');
-        expect(json.myMember).toBeNull();
+        expect(json).not.toHaveProperty('myMember');
         expect(json.rules).toBe('');
     });
 

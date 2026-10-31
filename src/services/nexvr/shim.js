@@ -9,6 +9,8 @@ import {
     instanceIdFromLocation,
     presenceState,
     presenceToUser,
+    toNexvrEventBody,
+    toVrcCalendarEvent,
     toVrcCurrentUser,
     toVrcGroup,
     toVrcGroupMember,
@@ -455,6 +457,14 @@ function toNexvrGroupBody(body) {
  * @param {URLSearchParams} query
  */
 /**
+ * @param {string} eventId
+ * @returns {Promise<object>} VRChat CalendarEvent
+ */
+async function calendarEvent(eventId) {
+    return toVrcCalendarEvent(await nexvr(`/calendar/events/${encodeURIComponent(eventId)}`));
+}
+
+/**
  * Slices one page out of a full NexVR result list, by VRChat's n/offset.
  *
  * @template T
@@ -645,6 +655,70 @@ const routes = [
             return toVrcInstance(await nexvr(`/instances/${encodeURIComponent(id)}`));
         }
     ],
+    // following/featured span every group; NexVR only lists one owner's events.
+    // These sit above calendar/{groupId}, which would take them for a group id.
+    ['GET', /^calendar\/(following|featured)$/, () => ({ results: [], totalCount: 0, hasNext: false })],
+    [
+        'GET',
+        /^calendar\/([^/]+)$/,
+        async (m) => {
+            const events = await nexvr('/calendar/events', {
+                query: { ownerType: 'group', owner: m[1], limit: 200 }
+            });
+            const results = events.map(toVrcCalendarEvent);
+            return { results, totalCount: results.length, hasNext: false };
+        }
+    ],
+    [
+        'POST',
+        /^calendar\/([^/]+)\/event$/,
+        async (m, q, body) =>
+            toVrcCalendarEvent(
+                await nexvr('/calendar/events', {
+                    method: 'POST',
+                    body: { ownerType: 'group', owner: m[1], ...toNexvrEventBody(body) }
+                })
+            )
+    ],
+    ['GET', /^calendar\/([^/]+)\/([^/]+)$/, (m) => calendarEvent(m[2])],
+    [
+        'PUT',
+        /^calendar\/([^/]+)\/([^/]+)\/event$/,
+        async (m, q, body) => {
+            const id = encodeURIComponent(m[2]);
+            const patch = toNexvrEventBody(body);
+            // VRChat has no admins-only events; saving one as "group" must not widen it to members.
+            // The editor only sends visibility when it was changed, so this is a backstop.
+            if (patch.visibility === 'members') {
+                const current = await nexvr(`/calendar/events/${id}`);
+                if (current.visibility === 'admins') {
+                    delete patch.visibility;
+                }
+            }
+            return toVrcCalendarEvent(await nexvr(`/calendar/events/${id}`, { method: 'PATCH', body: patch }));
+        }
+    ],
+    [
+        'DELETE',
+        /^calendar\/([^/]+)\/([^/]+)$/,
+        async (m) => {
+            await nexvr(`/calendar/events/${encodeURIComponent(m[2])}`, { method: 'DELETE' });
+            return { success: { message: 'Event deleted', status_code: 200 } };
+        }
+    ],
+    [
+        'POST',
+        /^calendar\/([^/]+)\/([^/]+)\/follow$/,
+        async (m, q, body) => {
+            // following an event is an RSVP of "going"; unfollowing clears it
+            const id = encodeURIComponent(m[2]);
+            await nexvr(
+                `/calendar/events/${id}/rsvp`,
+                body.isFollowing ? { method: 'PUT', body: { status: 'going' } } : { method: 'DELETE' }
+            );
+            return calendarEvent(m[2]);
+        }
+    ],
     // NexVR has no role templates; one entry keeps the create dialog's request happy.
     // Must sit above groups/{id}, which would otherwise take 'roleTemplates' for an id.
     ['GET', /^groups\/roleTemplates$/, () => ({ default: { name: 'Default', description: '' } })],
@@ -711,6 +785,33 @@ const routes = [
             const posts = (await nexvr(`/groups/${encodeURIComponent(m[1])}/announcements`)).map(toVrcGroupPost);
             const offset = Number(q.get('offset') || 0);
             return { posts: posts.slice(offset, offset + Number(q.get('n') || 100)), total: posts.length };
+        }
+    ],
+    // posts are NexVR announcements: a title and a body, no image, roles or visibility, and no editing
+    [
+        'POST',
+        /^groups\/([^/]+)\/posts$/,
+        async (m, q, body) => {
+            const announcement = { body: body.text };
+            if (body.title) {
+                announcement.title = body.title;
+            }
+            return toVrcGroupPost(
+                await nexvr(`/groups/${encodeURIComponent(m[1])}/announcements`, {
+                    method: 'POST',
+                    body: announcement
+                })
+            );
+        }
+    ],
+    [
+        'DELETE',
+        /^groups\/([^/]+)\/posts\/([^/]+)$/,
+        async (m) => {
+            await nexvr(`/groups/${encodeURIComponent(m[1])}/announcements/${encodeURIComponent(m[2])}`, {
+                method: 'DELETE'
+            });
+            return { success: { message: 'Announcement deleted', status_code: 200 } };
         }
     ],
     [

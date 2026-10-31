@@ -36,6 +36,7 @@ import {
     parseUserUrl,
     removeEmojis,
     statusClass,
+    defaultUserImage,
     userImage,
     userImageFull,
     userOnlineForTimestamp,
@@ -415,8 +416,10 @@ describe('User Utils', () => {
             expect(userImage(user, true, '128', false, false)).toBe('converted:https://img.com/avatar/full');
         });
 
-        test('returns empty string when user has no image fields', () => {
-            expect(userImage({}, false, '128', false, false)).toBe('');
+        test('returns their initial when user has no image fields', () => {
+            const user = { displayName: 'iris' };
+            expect(userImage(user, false, '128', false, false)).toBe(defaultUserImage(user));
+            expect(decodeURIComponent(defaultUserImage(user))).toContain('>I</text>');
         });
     });
 

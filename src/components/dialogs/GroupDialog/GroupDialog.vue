@@ -245,7 +245,7 @@
                                             v-if="hasGroupPermission(groupDialog.ref, 'group-announcement-manage')"
                                             @click="groupDialogCommand('Create Post')">
                                             <Ticket class="size-4" />
-                                            {{ t('dialog.group.actions.create_post') }}
+                                            {{ t('dialog.group.announcements.create') }}
                                         </DropdownMenuItem>
                                         <DropdownMenuItem
                                             v-if="hasGroupPermission(groupDialog.ref, 'group-calendar-manage')"
@@ -609,6 +609,9 @@
                         :show-group-post-edit-dialog="showGroupPostEditDialog"
                         :confirm-delete-group-post="confirmDeleteGroupPost" />
                 </template>
+                <template #Calendar>
+                    <GroupDialogCalendarTab />
+                </template>
                 <template #Members>
                     <GroupDialogMembersTab ref="membersTabRef" />
                 </template>
@@ -629,7 +632,7 @@
                 </template>
             </TabsUnderline>
         </div>
-        <GroupPostEditDialog :dialog-data="groupPostEditDialog" :selected-gallery-file="selectedGalleryFile" />
+        <GroupPostEditDialog :dialog-data="groupPostEditDialog" />
         <GroupTransferDialog :dialog-data="groupTransferDialog" @close="groupTransferDialog.visible = false" />
     </div>
 </template>
@@ -704,17 +707,18 @@
         setGroupEventAnnouncements,
         getGroupDialogCalendar
     } from '../../../coordinators/groupCoordinator';
-    import { groupRequest, queryRequest } from '../../../api';
+    import { groupRequest } from '../../../api';
     import { queryKeys, refetchActiveEntityQuery } from '../../../queries';
     import { Badge } from '../../ui/badge';
     import { getRawResponse, presentSections } from '../../../services/nexvr/rawResponses';
 
     import DialogJsonTab from '../DialogJsonTab.vue';
+    import GroupDialogCalendarTab from './GroupDialogCalendarTab.vue';
     import GroupDialogInfoTab from './GroupDialogInfoTab.vue';
+    import GroupDialogPostsTab from './GroupDialogPostsTab.vue';
     import { useGroupDialogCommands } from './useGroupDialogCommands';
     import GroupDialogMembersTab from './GroupDialogMembersTab.vue';
     import GroupDialogPhotosTab from './GroupDialogPhotosTab.vue';
-    import GroupDialogPostsTab from './GroupDialogPostsTab.vue';
     import GroupDialogStoreTab from './GroupDialogStoreTab.vue';
     import GroupPostEditDialog from './GroupPostEditDialog.vue';
     import GroupTransferDialog from './GroupTransferDialog.vue';
@@ -724,7 +728,9 @@
     const { t } = useI18n();
     const groupDialogTabs = computed(() => [
         { value: 'Info', label: t('dialog.group.info.header') },
-        { value: 'Posts', label: t('dialog.group.posts.header') },
+        // NexVR has announcements rather than VRChat posts; the Posts tab shows them
+        { value: 'Posts', label: t('dialog.group.announcements.header') },
+        { value: 'Calendar', label: t('dialog.group.calendar.header') },
         { value: 'Members', label: t('dialog.group.members.header') },
         { value: 'Photos', label: t('dialog.group.gallery.header') },
         ...(groupDialog.value.ref.storeId ? [{ value: 'Store', label: t('dialog.group.store.header') }] : []),
@@ -794,20 +800,13 @@
     const photosTabRef = ref(null);
     const storeTabRef = ref(null);
 
-    const selectedGalleryFile = ref({
-        selectedFileId: '',
-        selectedImageUrl: ''
-    });
     const groupPostEditDialog = reactive({
         visible: false,
-        groupRef: {},
         title: '',
         text: '',
-        sendNotification: true,
-        visibility: 'group',
-        roleIds: [],
-        postId: '',
-        groupId: ''
+        groupId: '',
+        // bumped on every open, so a post still in flight from an earlier draft can't close this one
+        openId: 0
     });
 
     watch(
@@ -959,35 +958,13 @@
         groupDialogTabCurrentName.value = tabName;
     }
 
-    function showGroupPostEditDialog(groupId, post) {
+    // NexVR announcements can't be edited, so this only ever opens a new one
+    function showGroupPostEditDialog(groupId) {
         const D = groupPostEditDialog;
-        D.sendNotification = true;
-        D.groupRef = {};
         D.title = '';
         D.text = '';
-        D.visibility = 'group';
-        D.roleIds = [];
-        D.postId = '';
         D.groupId = groupId;
-        selectedGalleryFile.value = {
-            selectedFileId: '',
-            selectedImageUrl: ''
-        };
-
-        if (post) {
-            D.title = post.title;
-            D.text = post.text;
-            D.visibility = post.visibility;
-            D.roleIds = post.roleIds;
-            D.postId = post.id;
-            selectedGalleryFile.value = {
-                selectedFileId: post.imageId,
-                selectedImageUrl: post.imageUrl
-            };
-        }
-        queryRequest.fetch('group.dialog', { groupId }).then((args) => {
-            D.groupRef = args.ref;
-        });
+        D.openId += 1;
         D.visible = true;
     }
 
