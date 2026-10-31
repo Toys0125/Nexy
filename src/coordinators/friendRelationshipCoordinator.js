@@ -130,7 +130,9 @@ export function addFriendship(id) {
                     ref.$friendNumber = position + 1;
                 } else {
                     if (state.friendNumber === 0) {
-                        state.friendNumber = friendStore.friends.size;
+                        // a realtime friend-add puts them in the list before
+                        // this status reply lands; they don't count yet
+                        state.friendNumber = friendStore.friends.size - (friendStore.friends.has(id) ? 1 : 0);
                     }
                     ref.$friendNumber = ++state.friendNumber;
                     configRepository.setInt(`VRCX_friendNumber_${userStore.currentUser.id}`, state.friendNumber);
