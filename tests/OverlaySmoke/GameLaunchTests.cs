@@ -25,6 +25,22 @@ internal static class GameLaunchTests
             foreach (var path in new[] { other, suffix, legacyLauncher, Path.Join(directory, "missing"), "", null })
                 if (GameLaunch.WindowsStartInfo(path, "") != null)
                     throw new Exception("Game launch accepted a missing launcher or arbitrary executable");
+            if (OperatingSystem.IsWindows())
+            {
+                var previousDirectory = Environment.CurrentDirectory;
+                try
+                {
+                    Environment.CurrentDirectory = directory;
+                    var devicePath = @"\\?\" + launcher;
+                    if (!File.Exists(devicePath)) throw new Exception("Device-path fixture is not accessible");
+                    foreach (var path in new[] { "NexVR.exe", @"C:NexVR.exe", @"\\server\share\NexVR.exe", "//server/share/NexVR.exe", devicePath, @"\\.\" + launcher })
+                        if (GameLaunch.WindowsStartInfo(path, "") != null)
+                            throw new Exception("Game launch accepted a relative, UNC, or device path");
+                }
+                finally { Environment.CurrentDirectory = previousDirectory; }
+            }
+            if (OperatingSystem.IsWindows() && new AppApiElectron().StartGameFromPath(launcher, ""))
+                throw new Exception("The native bridge reported success for a corrupt NexVR executable");
             Console.WriteLine("Game launch accepts explicitly selected NexVR.exe and rejects legacy/arbitrary executable targets");
         }
         finally

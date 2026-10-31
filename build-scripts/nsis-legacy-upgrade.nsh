@@ -81,4 +81,7 @@
 !macro customUnInstall
   SetRegView 64
   !insertmacro unregisterNexyProtocol SHELL_CONTEXT "Software\Classes\nexy"
+  ; Electron registers a per-user handler on first launch. Remove it for the
+  ; uninstalling account only when it still targets this installation.
+  !insertmacro unregisterNexyProtocol HKCU "Software\Classes\nexy"
 !macroend

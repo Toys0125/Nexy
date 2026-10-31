@@ -100,12 +100,20 @@ namespace VRCX
             if (!OperatingSystem.IsWindows())
                 return false;
 
-            var startInfo = GameLaunch.WindowsStartInfo(path, arguments);
-            if (startInfo == null)
-                return false;
+            try
+            {
+                var startInfo = GameLaunch.WindowsStartInfo(path, arguments);
+                if (startInfo == null)
+                    return false;
 
-            Process.Start(startInfo)?.Dispose();
-            return true;
+                Process.Start(startInfo)?.Dispose();
+                return true;
+            }
+            catch (Exception ex)
+            {
+                logger.Error(ex, "Failed to start NexVR from {path}", path);
+                return false;
+            }
         }
 
         public override Task<bool> TryOpenInstanceInVrc(string launchUrl)
