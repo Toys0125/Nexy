@@ -66,9 +66,12 @@ namespace VRCX
             {
                 var versionFile = File.ReadAllText(Path.Join(BaseDirectory, "Version")).Trim();
 
-                // look for trailing git hash "-22bcd96" to indicate nightly build
+                // nightly builds are stamped "v2026.11.01-nightly" and show as-is;
+                // a trailing git hash "-22bcd96" is the older nightly form
                 var version = versionFile.Split('-');
-                if (version.Length > 0 && version[^1].Length == 7)
+                if (versionFile.EndsWith("-nightly", StringComparison.OrdinalIgnoreCase))
+                    Version = $"Nexy {versionFile}";
+                else if (version.Length > 0 && version[^1].Length == 7)
                     Version = $"Nexy Nightly {versionFile}";
                 else
                     Version = $"Nexy {versionFile}";

@@ -738,10 +738,13 @@ function getVersion() {
     try {
         const versionFile = fs.readFileSync(path.join(rootDir, 'Version'), 'utf8').trim();
 
-        // look for trailing git hash "-22bcd96" to indicate nightly build
+        // nightly builds are stamped "v2026.11.01-nightly" and show as-is;
+        // a trailing git hash "-22bcd96" is the older nightly form
         const version = versionFile.split('-');
         console.log('Version:', versionFile);
-        if (version.length > 0 && version[version.length - 1].length == 7) {
+        if (/-nightly$/i.test(versionFile)) {
+            return `Nexy ${versionFile}`;
+        } else if (version.length > 0 && version[version.length - 1].length == 7) {
             return `Nexy Nightly ${versionFile}`;
         } else {
             return `Nexy ${versionFile}`;

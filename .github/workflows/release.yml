@@ -16,6 +16,8 @@ permissions:
 jobs:
   verify_release:
     name: Verify release exists
+    # Nightly prereleases ship their own assets from nightly.yml.
+    if: ${{ !github.event.release.prerelease }}
     runs-on: ubuntu-24.04
     steps:
       - name: Check release tag
