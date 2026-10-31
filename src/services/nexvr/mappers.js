@@ -616,7 +616,9 @@ export function toVrcGroupMember(groupId, member) {
 // features run on NexVR data are mapped; the rest (bans, kicks, roles, invites)
 // would light up tools that call VRChat-only endpoints.
 const PERMISSION_MAP = {
-    'manage-members': ['group-members-viewall', 'group-members-manage']
+    'manage-members': ['group-members-viewall', 'group-members-manage'],
+    // announcements need manage-group; NexVR documents no calendar permission, so the same goes for events
+    'manage-group': ['group-announcement-manage', 'group-calendar-manage']
 };
 
 /**
@@ -648,10 +650,13 @@ export function toVrcMyMember(groupId, userId, membership, listed) {
         membershipStatus: toVrcMembershipStatus(membership.status),
         visibility: MEMBER_VISIBILITY[membership.membershipVisibility] ?? 'visible',
         isSubscribedToAnnouncements: !membership.muted,
+        // the owner holds every permission implicitly, so it may be missing from the list
+        permissions: toVrcGroupPermissions(
+            membership.isOwner ? [...(membership.permissions || []), 'manage-group'] : membership.permissions
+        ),
         isSubscribedToEventAnnouncements: !membership.muted,
         isRepresenting: false,
         joinedAt: listed?.joinedAt || null,
-        permissions: toVrcGroupPermissions(membership.permissions),
         bannedAt: null
     };
 }
@@ -757,4 +762,88 @@ export function toVrcPlayerModeration(moderation) {
         targetDisplayName: '',
         created: moderation.createdAt
     };
+}
+
+// VRChat events are group-only or public; NexVR also has admins-only, shown as group-only
+const EVENT_ACCESS = {
+    admins: 'group',
+    members: 'group',
+    public: 'public'
+};
+
+/**
+ * @param {any} event NexVR calendar event
+ * @returns {object} VRChat CalendarEvent
+ */
+export function toVrcCalendarEvent(event) {
+    const rsvps = event.rsvpSummary || {};
+    return {
+        id: event.id,
+        ownerId: event.owner,
+        title: event.title,
+        description: event.description || '',
+        startsAt: event.startsAt,
+        endsAt: event.endsAt,
+        accessType: EVENT_ACCESS[event.visibility] ?? 'group',
+        category: 'other',
+        imageId: null,
+        imageUrl: '',
+        tags: [],
+        languages: [],
+        platforms: [],
+        roleIds: [],
+        featured: false,
+        isDraft: false,
+        type: 'event',
+        hostEarlyJoinMinutes: 0,
+        guestEarlyJoinMinutes: 0,
+        closeInstanceAfterEndMinutes: 0,
+        usesInstanceOverflow: false,
+        // RSVPs stand in for VRChat's "interested"
+        interestedUserCount: (rsvps.going || 0) + (rsvps.maybe || 0),
+        userInterest: {
+            createdAt: null,
+            isFollowing: event.myRsvp === 'going' || event.myRsvp === 'maybe',
+            updatedAt: null
+        },
+        createdAt: event.createdAt,
+        updatedAt: event.updatedAt,
+        deletedAt: null,
+        $nexvr: {
+            visibility: event.visibility,
+            location: event.location || null,
+            timeline: event.timeline || [],
+            rsvpSummary: rsvps,
+            myRsvp: event.myRsvp ?? null,
+            viewerPermissions: event.viewerPermissions || {}
+        }
+    };
+}
+
+/**
+ * VRChat's create/edit-event body → NexVR's. Category, tags, languages,
+ * platforms, image, roles, recurrence and early-join times have no NexVR
+ * counterpart and are dropped.
+ *
+ * @param {any} body
+ * @returns {object}
+ */
+export function toNexvrEventBody(body) {
+    const patch = {};
+    if (body.title !== undefined) {
+        patch.title = body.title;
+    }
+    if (body.description !== undefined) {
+        patch.description = body.description || null;
+    }
+    if (body.startsAt !== undefined) {
+        patch.startsAt = new Date(body.startsAt).toISOString();
+    }
+    if (body.endsAt !== undefined) {
+        patch.endsAt = new Date(body.endsAt).toISOString();
+    }
+    if (body.accessType !== undefined) {
+        patch.visibility = body.accessType === 'public' ? 'public' : 'members';
+    }
+    return patch;
 }

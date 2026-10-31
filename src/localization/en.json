@@ -2023,6 +2023,17 @@
                 "search_placeholder": "Search",
                 "posts_count": "Posts: "
             },
+            "announcements": {
+                "header": "Announcements",
+                "count": "Announcements:",
+                "create": "New Announcement",
+                "post": "Post",
+                "posted": "Announcement posted",
+                "post_failed": "Failed to post announcement"
+            },
+            "calendar": {
+                "header": "Calendar"
+            },
             "members": {
                 "header": "Members",
                 "all_members": "All Members",

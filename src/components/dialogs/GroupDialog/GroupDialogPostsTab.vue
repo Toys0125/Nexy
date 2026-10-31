@@ -2,7 +2,7 @@
     <div class="flex h-full min-h-0 flex-col p-2 rounded-xl bg-(--profile-card)">
         <div class="sticky flex items-center gap-2 top-0 z-10 p-2">
             <span style="margin-right: 8px; vertical-align: top"
-                >{{ t('dialog.group.posts.posts_count') }} {{ groupDialog.posts.length }}</span
+                >{{ t('dialog.group.announcements.count') }} {{ groupDialog.posts.length }}</span
             >
             <InputGroupField
                 v-model="groupDialog.postsSearch"
@@ -11,6 +11,14 @@
                 :placeholder="t('dialog.group.posts.search_placeholder')"
                 class="flex-1"
                 @input="updateGroupPostSearch" />
+            <Button
+                v-if="hasGroupPermission(groupDialog.ref, 'group-announcement-manage')"
+                size="sm"
+                variant="outline"
+                @click="showGroupPostEditDialog(groupDialog.id)">
+                <Megaphone />
+                {{ t('dialog.group.announcements.create') }}
+            </Button>
         </div>
         <div class="flex flex-1 min-h-0 flex-wrap items-start overflow-y-auto">
             <div
@@ -20,16 +28,6 @@
                 <div class="relative flex-1 overflow-hidden rounded-lg border border-border/60 bg-muted/60 p-2">
                     <template v-if="hasGroupPermission(groupDialog.ref, 'group-announcement-manage')">
                         <div class="absolute top-0 right-0 flex items-center">
-                            <TooltipWrapper side="top" :content="t('dialog.group.posts.edit_tooltip')">
-                                <Button
-                                    size="icon-sm"
-                                    class="h-6 w-6 text-xs text-muted-foreground hover:text-foreground"
-                                    variant="ghost"
-                                    :ariaLabel="t('dialog.group.posts.edit_tooltip')"
-                                    @click="showGroupPostEditDialog(groupDialog.id, post)"
-                                    ><Pencil class="h-4 w-4" />
-                                </Button>
-                            </TooltipWrapper>
                             <TooltipWrapper side="top" :content="t('dialog.group.posts.delete_tooltip')">
                                 <Button
                                     size="icon-sm"
@@ -107,7 +105,7 @@
 </template>
 
 <script setup>
-    import { Eye, Image, Pencil, Trash2 } from 'lucide-vue-next';
+    import { Eye, Image, Megaphone, Trash2 } from 'lucide-vue-next';
     import { Button } from '@/components/ui/button';
     import { InputGroupField } from '@/components/ui/input-group';
     import { storeToRefs } from 'pinia';

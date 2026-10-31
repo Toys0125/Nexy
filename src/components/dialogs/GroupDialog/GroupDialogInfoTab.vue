@@ -82,13 +82,6 @@
                         class="h-5 w-5 text-muted-foreground"
                         size="icon-sm"
                         variant="ghost"
-                        @click="showGroupPostEditDialog(groupDialog.id, groupDialog.announcement)">
-                        <Pencil class="h-3 w-3" />
-                    </Button>
-                    <Button
-                        class="h-5 w-5 text-muted-foreground"
-                        size="icon-sm"
-                        variant="ghost"
                         @click="confirmDeleteGroupPost(groupDialog.announcement)">
                         <Trash2 class="h-3 w-3" />
                     </Button>
@@ -163,46 +156,6 @@
             <pre v-else class="text-xs font-[inherit] text-muted-foreground">—</pre>
         </div>
 
-        <!-- Upcoming Events card -->
-        <div v-if="upcomingCalenderEvents.length" class="rounded-xl bg-(--profile-card) p-3">
-            <div
-                class="text-[10px] font-bold uppercase tracking-wide text-muted-foreground mb-2 pb-2 border-b border-border">
-                {{ t('dialog.group.info.upcoming_events') }}
-            </div>
-            <div v-if="upcomingCalenderEvents.length" class="flex flex-wrap gap-4 overflow-y-auto max-h-[360px] py-2.5">
-                <GroupCalendarEventCard
-                    v-for="value in upcomingCalenderEvents"
-                    :key="value.id"
-                    :event="value"
-                    :is-following="value.userInterest?.isFollowing"
-                    @update-following-calendar-data="updateFollowingCalendarData"
-                    mode="grid"
-                    card-class="group-dialog-grid-card" />
-            </div>
-            <span v-else class="text-xs text-muted-foreground">—</span>
-        </div>
-
-        <!-- Past Events card -->
-        <div v-if="pastCalenderEvents.length" class="rounded-xl bg-(--profile-card) p-3">
-            <div
-                class="text-[10px] font-bold uppercase tracking-wide text-muted-foreground mb-2 pb-2 border-b border-border">
-                {{ t('dialog.group.info.past_events') }}
-            </div>
-            <div
-                v-if="pastCalenderEvents.length"
-                class="flex flex-wrap gap-4 overflow-y-auto overflow-x-hidden max-h-[230px] py-2.5">
-                <GroupCalendarEventCard
-                    v-for="value in pastCalenderEvents"
-                    :key="value.id"
-                    :event="value"
-                    :is-following="value.userInterest?.isFollowing"
-                    @update-following-calendar-data="updateFollowingCalendarData"
-                    mode="grid"
-                    card-class="group-dialog-grid-card" />
-            </div>
-            <span v-else class="text-xs text-muted-foreground">—</span>
-        </div>
-
         <!-- Rules card -->
         <div class="rounded-xl bg-(--profile-card) p-3">
             <div
@@ -217,7 +170,7 @@
 </template>
 
 <script setup>
-    import { Eye, Image, Pencil, Trash2, User } from 'lucide-vue-next';
+    import { Eye, Image, Trash2, User } from 'lucide-vue-next';
     import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
     import IconFrame from '@/components/IconFrame.vue';
     import { Button } from '@/components/ui/button';
@@ -230,9 +183,7 @@
     import { useUserDisplay } from '../../../composables/useUserDisplay';
     import { refreshInstancePlayerCount } from '../../../coordinators/instanceCoordinator';
     import { useGalleryStore, useGroupStore, useLocationStore } from '../../../stores';
-    import { useGroupCalendarEvents } from './useGroupCalendarEvents';
 
-    import GroupCalendarEventCard from '../../../views/Tools/components/GroupCalendarEventCard.vue';
     import InstanceActionBar from '../../InstanceActionBar.vue';
     import { showUserDialog } from '../../../coordinators/userCoordinator';
 
@@ -253,9 +204,6 @@
     const { groupDialog } = storeToRefs(useGroupStore());
     const { lastLocation } = storeToRefs(useLocationStore());
     const { showFullscreenImageDialog } = useGalleryStore();
-
-    const { pastCalenderEvents, upcomingCalenderEvents, updateFollowingCalendarData } =
-        useGroupCalendarEvents(groupDialog);
 
     const announcementPhotoError = ref(false);
 

@@ -121,8 +121,11 @@
     const emit = defineEmits(['update-following-calendar-data', 'click-action']);
 
     const showGroupName = computed(() => props.mode === 'timeline');
-    const canManageEvent = computed(() =>
-        hasGroupPermission(props.groupRef ?? cachedGroups.get(props.event.ownerId), 'group-calendar-manage')
+    // NexVR says per event whether the viewer may edit it (e.g. its creator)
+    const canManageEvent = computed(
+        () =>
+            Boolean(props.event.$nexvr?.viewerPermissions?.canEdit) ||
+            hasGroupPermission(props.groupRef ?? cachedGroups.get(props.event.ownerId), 'group-calendar-manage')
     );
 
     const timeClass = computed(() => (props.mode === 'grid' ? 'event-time' : ''));
