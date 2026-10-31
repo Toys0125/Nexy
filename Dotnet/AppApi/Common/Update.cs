@@ -1,12 +1,13 @@
+using System;
 using System.Threading.Tasks;
 
 namespace VRCX;
 
 public partial class AppApi
 {
-    public async Task DownloadUpdate(string fileUrl, string hashString, int downloadSize)
+    public Task DownloadUpdate(string fileUrl, string hashString, int downloadSize)
     {
-        await Update.DownloadUpdate(fileUrl, hashString, downloadSize);
+        throw new NotSupportedException("Automatic updates are disabled. Install Nexy updates from Releases.");
     }
 
     public void CancelUpdate()

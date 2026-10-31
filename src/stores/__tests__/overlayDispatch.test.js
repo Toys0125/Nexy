@@ -124,8 +124,7 @@ describe('displayDesktopToast', () => {
 
     beforeEach(() => {
         vi.clearAllMocks();
-        globalThis.WINDOWS = true;
-        globalThis.AppApi = { DesktopNotification: vi.fn() };
+        window.electron = { desktopNotification: vi.fn() };
         deps = makeDeps();
         dispatch = createOverlayDispatch(deps);
     });
@@ -139,7 +138,7 @@ describe('displayDesktopToast', () => {
         dispatch.displayDesktopToast({}, 'some message', 'img.jpg');
 
         expect(getNotificationMessage).toHaveBeenCalled();
-        expect(AppApi.DesktopNotification).toHaveBeenCalledWith('Friend Online', 'Alice is online', 'img.jpg');
+        expect(window.electron.desktopNotification).toHaveBeenCalledWith('Friend Online', 'Alice is online', 'img.jpg');
     });
 
     test('does nothing when getNotificationMessage returns null', () => {
@@ -147,7 +146,7 @@ describe('displayDesktopToast', () => {
 
         dispatch.displayDesktopToast({}, 'some message', 'img.jpg');
 
-        expect(AppApi.DesktopNotification).not.toHaveBeenCalled();
+        expect(window.electron.desktopNotification).not.toHaveBeenCalled();
     });
 });
 

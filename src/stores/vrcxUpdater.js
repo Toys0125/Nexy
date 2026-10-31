@@ -7,7 +7,7 @@ import { logWebRequest } from '../services/appConfig';
 import { branches } from '../shared/constants';
 import { getWhatsNewRelease, normalizeReleaseVersion } from '../shared/constants/whatsNewReleases';
 import { changeLogRemoveLinks } from '../shared/utils';
-import { getNexyAsset, getNexyReleases, isNexyReleaseNewer } from '../shared/utils/nexyUpdater';
+import { getNexyAsset, getNexyReleases, getNexyReleasePage, isNexyReleaseNewer } from '../shared/utils/nexyUpdater';
 
 import configRepository from '../services/config';
 
@@ -25,10 +25,12 @@ export const useVRCXUpdaterStore = defineStore('VRCXUpdater', () => {
 
     const arch = ref('x64');
     const noUpdater = ref(false);
-    const isMacOS = computed(() => navigator.platform.includes('Mac'));
+    // Release discovery works without granting download/install capability.
+    const canInstallUpdates = ref(false);
+    const latestRelease = ref(null);
 
     const appVersion = ref('');
-    const autoUpdateVRCX = ref('Auto Download');
+    const autoUpdateVRCX = ref('Notify');
     const latestAppVersion = ref('');
     const branch = ref('Stable');
     const vrcxId = ref('');
@@ -58,22 +60,15 @@ export const useVRCXUpdaterStore = defineStore('VRCXUpdater', () => {
             noUpdater.value = await window.electron.getNoUpdater();
             console.log('Architecture:', arch.value);
         }
-        if (isMacOS.value) {
-            noUpdater.value = true;
-        }
-        // macOS currently has no supported in-app installation path.
-        // Windows and Linux use Nexy's GitHub release feed unless explicitly disabled.
 
         const [VRCX_autoUpdateVRCX, VRCX_id] = await Promise.all([
-            configRepository.getString('VRCX_autoUpdateVRCX', 'Auto Download'),
+            configRepository.getString('VRCX_autoUpdateVRCX', 'Notify'),
             configRepository.getString('VRCX_id', '')
         ]);
 
-        if (VRCX_autoUpdateVRCX === 'Auto Install') {
-            autoUpdateVRCX.value = 'Auto Download';
-        } else {
-            autoUpdateVRCX.value = VRCX_autoUpdateVRCX;
-        }
+        autoUpdateVRCX.value = normalizeUpdateAction(VRCX_autoUpdateVRCX);
+        if (autoUpdateVRCX.value !== VRCX_autoUpdateVRCX)
+            await configRepository.setString('VRCX_autoUpdateVRCX', autoUpdateVRCX.value);
         if (noUpdater.value) {
             autoUpdateVRCX.value = 'Off';
         }
@@ -106,10 +101,15 @@ export const useVRCXUpdaterStore = defineStore('VRCXUpdater', () => {
 
     const currentVersion = computed(() => appVersion.value.replace(' (Linux)', ''));
 
+    function normalizeUpdateAction(value) {
+        return !canInstallUpdates.value && value !== 'Off' ? 'Notify' : value;
+    }
+
     /**
      * @param {string} value
      */
     async function setAutoUpdateVRCX(value) {
+        value = normalizeUpdateAction(value);
         if (value === 'Off') {
             pendingVRCXUpdate.value = false;
         }
@@ -226,10 +226,10 @@ export const useVRCXUpdaterStore = defineStore('VRCXUpdater', () => {
         }
     }
     function getAssetOfInterest(assets) {
-        return getNexyAsset(assets, WINDOWS ? 'win32' : LINUX ? 'linux' : 'darwin', arch.value);
+        return getNexyAsset(assets, IS_WINDOWS ? 'win32' : IS_LINUX ? 'linux' : 'darwin', arch.value);
     }
     function availableReleases(data) {
-        return getNexyReleases(data, branch.value, WINDOWS ? 'win32' : LINUX ? 'linux' : 'darwin', arch.value);
+        return getNexyReleases(data, branch.value, IS_WINDOWS ? 'win32' : IS_LINUX ? 'linux' : 'darwin', arch.value);
     }
     async function checkForVRCXUpdate() {
         if (
@@ -280,6 +280,7 @@ export const useVRCXUpdaterStore = defineStore('VRCXUpdater', () => {
         logWebRequest('[EXTERNAL GET]', url, `(${response.status})`, json);
         const latest = availableReleases(json)[0];
         if (latest) {
+            latestRelease.value = latest;
             changeLogDialog.value.buildName = latest.name || latest.tag_name;
             changeLogDialog.value.changeLog = changeLogRemoveLinks(latest.body || '');
             const releaseName = latest.name || latest.tag_name;
@@ -304,13 +305,13 @@ export const useVRCXUpdaterStore = defineStore('VRCXUpdater', () => {
                         duration: 5000,
                         action: {
                             label: t('nav_menu.update'),
-                            onClick: () => showVRCXUpdateDialog()
+                            onClick: () => openReleasePage(latest)
                         }
                     });
                 }
                 if (autoUpdateVRCX.value === 'Notify') {
                     // this.showVRCXUpdateDialog();
-                } else if (autoUpdateVRCX.value === 'Auto Download') {
+                } else if (canInstallUpdates.value && autoUpdateVRCX.value === 'Auto Download') {
                     await downloadVRCXUpdate(downloadUrl, hashString, size, releaseName);
                 }
             }
@@ -322,7 +323,7 @@ export const useVRCXUpdaterStore = defineStore('VRCXUpdater', () => {
         const D = VRCXUpdateDialog.value;
         D.visible = true;
         D.updatePendingIsLatest = false;
-        D.updatePending = await AppApi.CheckForUpdateExe();
+        D.updatePending = canInstallUpdates.value && (await AppApi.CheckForUpdateExe());
         if (updateInProgress.value) {
             return;
         }
@@ -378,6 +379,7 @@ export const useVRCXUpdaterStore = defineStore('VRCXUpdater', () => {
         setBranch(branch.value);
     }
     async function downloadVRCXUpdate(downloadUrl, hashString, size, releaseName) {
+        if (!canInstallUpdates.value) return openReleasePage();
         if (updateInProgress.value) {
             return;
         }
@@ -401,6 +403,7 @@ export const useVRCXUpdaterStore = defineStore('VRCXUpdater', () => {
         }
     }
     function installVRCXUpdate() {
+        if (!canInstallUpdates.value) return openReleasePage();
         for (const release of VRCXUpdateDialog.value.releases) {
             if (release.name !== VRCXUpdateDialog.value.release) {
                 continue;
@@ -413,6 +416,15 @@ export const useVRCXUpdaterStore = defineStore('VRCXUpdater', () => {
             downloadVRCXUpdate(downloadUrl, hashString, size, releaseName);
             break;
         }
+    }
+    function openReleasePage(release = null) {
+        const selected =
+            release ||
+            VRCXUpdateDialog.value.releases.find(
+                (item) => (item.name || item.tag_name) === VRCXUpdateDialog.value.release
+            ) ||
+            latestRelease.value;
+        return AppApi.OpenLink(getNexyReleasePage(selected));
     }
     async function showChangeLogDialog(options = {}) {
         const { prefetch = false } = options;
@@ -437,12 +449,8 @@ export const useVRCXUpdaterStore = defineStore('VRCXUpdater', () => {
         }
         return checkForVRCXUpdate();
     }
-    function restartVRCX(isUpgrade) {
-        if (!LINUX) {
-            AppApi.RestartApplication(isUpgrade);
-        } else {
-            window.electron.restartApp();
-        }
+    function restartVRCX(_isUpgrade) {
+        window.electron.restartApp();
     }
     function updateProgressText() {
         if (updateProgress.value === 100) {
@@ -474,6 +482,7 @@ export const useVRCXUpdaterStore = defineStore('VRCXUpdater', () => {
         updateInProgress,
         updateProgress,
         noUpdater,
+        canInstallUpdates,
 
         setAutoUpdateVRCX,
         setBranch,
@@ -484,6 +493,7 @@ export const useVRCXUpdaterStore = defineStore('VRCXUpdater', () => {
         checkForVRCXUpdate,
         loadBranchVersions,
         installVRCXUpdate,
+        openReleasePage,
         showVRCXUpdateDialog,
         showChangeLogDialog,
         restartVRCX,

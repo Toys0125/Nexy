@@ -7,6 +7,10 @@ declare global {
 
     const WINDOWS: boolean;
     const LINUX: boolean;
+    const ELECTRON: boolean;
+    const IS_WINDOWS: boolean;
+    const IS_LINUX: boolean;
+    const IS_MACOS: boolean;
 
     interface Window {
         $pinia: any;
@@ -37,6 +41,11 @@ declare global {
         electron: {
             getArch: () => Promise<string>;
             getClipboardText: () => Promise<string>;
+            copyImageToClipboard: (path: string) => Promise<boolean>;
+            focusWindow: () => Promise<void>;
+            flashWindow: () => Promise<void>;
+            setStartup: (enabled: boolean) => Promise<void>;
+            openCalendarFile: (content: string) => Promise<void>;
             getNoUpdater: () => Promise<boolean>;
             setTrayIconNotification: (notify: boolean) => Promise<void>;
             setThemeSource: (source: 'system' | 'light' | 'dark') => Promise<void>;
@@ -51,6 +60,7 @@ declare global {
             onWindowStateChange: (Function: (event: any, state: { windowState: any }) => void) => () => void;
             onBrowserFocus: (Function: (event: any) => void) => () => void;
             onBrowserBlur: (Function: (event: any) => void) => () => void;
+            onVrOverlayReady: (callback: (event: any) => void) => () => void;
             restartApp: () => Promise<void>;
             getOverlayWindow: () => Promise<boolean>;
             updateVr: (
@@ -84,16 +94,6 @@ declare global {
         websocketDomain: string;
         websocketDomainVrchat: string;
     }
-
-    const CefSharp: {
-        PostMessage: (message: any) => void;
-        BindObjectAsync: (...args: string[]) => Promise<any>;
-        BindObject: (name: string) => any;
-        ExecuteScriptAsync: (script: string) => Promise<any>;
-        ExecuteScript: (script: string) => any;
-        RemoveObjectFromCache?: (name: string) => void;
-        DeleteBoundObject?: (name: string) => void;
-    };
 
     const VRCXStorage: {
         Get(key: string): Promise<string>;

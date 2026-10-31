@@ -1,5 +1,6 @@
 using System;
 using System.IO;
+using System.Runtime.InteropServices;
 using System.Threading;
 using NLog;
 
@@ -10,12 +11,27 @@ namespace VRCX
         public static readonly SystemMonitorElectron Instance;
         public float CpuUsage;
         public double UpTime;
-        private bool _enabled;
+        private volatile bool _enabled;
+        private readonly object _lifecycleLock = new();
         private long _lastTotalTime;
         private long _lastIdleTime;
         private bool _firstReading = true; // Add this flag
         private Thread _thread;
         private static readonly Logger logger = LogManager.GetCurrentClassLogger();
+
+        [StructLayout(LayoutKind.Sequential)]
+        private struct SystemFileTime
+        {
+            public uint Low;
+            public uint High;
+            public long Ticks => unchecked((long)(((ulong)High << 32) | Low));
+        }
+
+        [DllImport("kernel32.dll", SetLastError = true)]
+        private static extern bool GetSystemTimes(
+            out SystemFileTime idle,
+            out SystemFileTime kernel,
+            out SystemFileTime user);
 
         static SystemMonitorElectron()
         {
@@ -28,54 +44,43 @@ namespace VRCX
 
         public void Start(bool enabled)
         {
-            if (enabled == _enabled)
-                return;
-
-            _enabled = enabled;
-            if (enabled)
-                StartThread();
-            else
+            lock (_lifecycleLock)
+            {
+                if (!enabled)
+                {
+                    Exit();
+                    return;
+                }
+                if (_enabled && _thread?.IsAlive == true) return;
                 Exit();
+                try { ReadCpuInfo(); }
+                catch (Exception ex)
+                {
+                    logger.Error(ex, "Failed to initialize CPU monitoring");
+                    return;
+                }
+                _enabled = true;
+                _thread = new Thread(ThreadProc) { IsBackground = true };
+                _thread.Start();
+            }
         }
 
         internal void Exit()
         {
-            CpuUsage = 0;
-            UpTime = 0;
-            _firstReading = true; // Reset flag
-            try
+            lock (_lifecycleLock)
             {
-                if (_thread != null)
+                _enabled = false;
+                var thread = _thread;
+                _thread = null;
+                if (thread != null && thread != Thread.CurrentThread && thread.IsAlive)
                 {
-                    _thread.Interrupt();
-                    _thread.Join();
-                    _thread = null;
+                    thread.Interrupt();
+                    thread.Join();
                 }
+                CpuUsage = 0;
+                UpTime = 0;
+                _firstReading = true;
             }
-            catch (ThreadInterruptedException)
-            {
-            }
-        }
-
-        private void StartThread()
-        {
-            Exit();
-
-            try
-            {
-                ReadCpuInfo();
-            }
-            catch (Exception ex)
-            {
-                logger.Error($"Failed to initialize CPU monitoring: {ex}");
-                return;
-            }
-
-            _thread = new Thread(ThreadProc)
-            {
-                IsBackground = true
-            };
-            _thread.Start();
         }
 
         private void ThreadProc()
@@ -88,12 +93,15 @@ namespace VRCX
                     Thread.Sleep(1000);
                 }
             }
+            catch (ThreadInterruptedException)
+            {
+                // The owner requests shutdown and joins this worker. Never join
+                // from the worker itself or acquire the owner's lifecycle lock.
+            }
             catch (Exception ex)
             {
                 logger.Warn($"SystemMonitor thread exception: {ex}");
             }
-
-            Exit();
         }
 
         private void UpdateMetrics()
@@ -152,6 +160,9 @@ namespace VRCX
 
         private double GetUptime()
         {
+            if (OperatingSystem.IsWindows())
+                return Environment.TickCount64;
+
             try
             {
                 var uptimeContent = File.ReadAllText("/proc/uptime");
@@ -170,6 +181,14 @@ namespace VRCX
 
         private (long TotalTime, long IdleTime)? ReadCpuInfo()
         {
+            if (OperatingSystem.IsWindows())
+            {
+                if (!GetSystemTimes(out var idle, out var kernel, out var user))
+                    return null;
+                // Kernel time includes idle time according to the Win32 API.
+                return (kernel.Ticks + user.Ticks, idle.Ticks);
+            }
+
             try
             {
                 var statContent = File.ReadAllText("/proc/stat");

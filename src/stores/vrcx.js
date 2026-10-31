@@ -82,6 +82,7 @@ export const useVrcxStore = defineStore('Vrcx', () => {
     const proxyServer = ref('');
     const appStartAt = Date.now();
     const isBrowserFocused = ref(true);
+    const pendingLaunchCommands = [];
 
     async function init() {
         try {
@@ -89,7 +90,8 @@ export const useVrcxStore = defineStore('Vrcx', () => {
                 try {
                     window.electron.ipcRenderer.on('launch-command', (command) => {
                         if (command) {
-                            eventLaunchCommand(command);
+                            if (watchState.isLoggedIn) eventLaunchCommand(command);
+                            else pendingLaunchCommands.push(command);
                         }
                     });
 
@@ -368,7 +370,7 @@ export const useVrcxStore = defineStore('Vrcx', () => {
             console.log('Screenshot metadata added', newPath);
         }
         if (advancedSettingsStore.screenshotHelperCopyToClipboard) {
-            await AppApi.CopyImageToClipboard(newPath);
+            await window.electron.copyImageToClipboard(newPath);
             console.log('Screenshot copied to clipboard', newPath);
         }
     }
@@ -513,6 +515,7 @@ export const useVrcxStore = defineStore('Vrcx', () => {
     );
 
     async function startupLaunchCommand() {
+        while (pendingLaunchCommands.length) eventLaunchCommand(pendingLaunchCommands.shift());
         const command = await AppApi.GetLaunchCommand();
         if (!command) {
             return;
@@ -635,7 +638,7 @@ export const useVrcxStore = defineStore('Vrcx', () => {
                 break;
         }
         if (shouldFocusWindow) {
-            AppApi.FocusWindow();
+            window.electron.focusWindow();
         }
     }
 
@@ -645,12 +648,7 @@ export const useVrcxStore = defineStore('Vrcx', () => {
     async function backupVrcRegistry(name) {
         let regJson;
         try {
-            if (WINDOWS) {
-                regJson = await AppApi.GetVRChatRegistry();
-            } else {
-                regJson = await AppApi.GetVRChatRegistryJson();
-                regJson = JSON.parse(regJson);
-            }
+            regJson = JSON.parse(await AppApi.GetVRChatRegistryJson());
         } catch (e) {
             console.error('Failed to get VRChat registry for backup:', e);
             return;
@@ -690,7 +688,7 @@ export const useVrcxStore = defineStore('Vrcx', () => {
                 title: t('dialog.registry_backup.header')
             });
             showRegistryBackupDialog();
-            await AppApi.FocusWindow();
+            await window.electron.focusWindow();
             await configRepository.setString('VRCX_VRChatRegistryLastRestoreCheck', lastBackupDate);
         } else {
             await tryAutoBackupVrcRegistry();

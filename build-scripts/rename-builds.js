@@ -54,18 +54,17 @@ function renameBuild(arch, platform) {
             process.exit(1);
         }
     } else if (platform === 'win32') {
-        const oldSetup = path.join(buildDir, 'Nexy_Version.exe');
-        const newSetup = path.join(buildDir, `Nexy_${version}_Setup_${arch}.exe`);
-        try {
-            if (fs.existsSync(oldSetup)) {
-                fs.renameSync(oldSetup, newSetup);
-                console.log(`Renamed: ${oldSetup} -> ${newSetup}`);
-            } else {
-                console.log(`File not found: ${oldSetup}`);
+        for (const [oldName, newName] of [
+            ['Nexy_Version.exe', `Nexy_${version}_Setup_${arch}.exe`],
+            ['Nexy_Version.zip', `Nexy_${version}_${arch}.zip`]
+        ]) {
+            const oldPath = path.join(buildDir, oldName);
+            const newPath = path.join(buildDir, newName);
+            if (!fs.existsSync(oldPath)) {
+                throw new Error(`Expected Electron Windows artifact missing: ${oldPath}`);
             }
-        } catch (err) {
-            console.error('Error renaming files:', err);
-            process.exit(1);
+            fs.renameSync(oldPath, newPath);
+            console.log(`Renamed: ${oldPath} -> ${newPath}`);
         }
     } else {
         console.log('No renaming needed for this platform.');

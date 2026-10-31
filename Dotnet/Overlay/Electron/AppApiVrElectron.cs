@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
@@ -6,6 +7,13 @@ namespace VRCX
 {
     public class AppApiVrElectron : AppApiVr
     {
+        public void SubmitOverlayFrame(Memory<byte> frame)
+        {
+            OverlayFrames.Submit(frame.Span);
+        }
+
+        public string[] GetOverlayInputEvents() => ((VRCXVRElectron)Program.VRCXVRInstance).GetOverlayInputEvents();
+
         static AppApiVrElectron()
         {
             Instance = new AppApiVrElectron();

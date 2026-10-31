@@ -44,7 +44,6 @@
             </div>
         </SettingsGroup>
 
-        <!-- Nexy has no release feed yet, so the updater (and VRCX's changelog) stay hidden -->
         <SettingsGroup v-if="!noUpdater" :title="t('view.settings.general.vrcx_updater.header')">
             <div class="flex gap-2">
                 <Button size="sm" variant="outline" @click="showChangeLogDialog">{{
@@ -68,7 +67,7 @@
                             <SelectItem value="Notify">{{
                                 t('view.settings.general.vrcx_updater.auto_update_notify')
                             }}</SelectItem>
-                            <SelectItem value="Auto Download">{{
+                            <SelectItem v-if="canInstallUpdates" value="Auto Download">{{
                                 t('view.settings.general.vrcx_updater.auto_update_download')
                             }}</SelectItem>
                         </SelectContent>
@@ -113,7 +112,6 @@
             </SettingsItem>
 
             <SettingsItem
-                v-if="!isLinux"
                 :label="t('view.settings.general.application.disable_gpu_acceleration')"
                 :description="t('view.settings.general.application.disable_gpu_acceleration_tooltip')"
                 toggle>
@@ -124,14 +122,8 @@
             </SettingsItem>
 
             <SettingsItem
-                v-if="!isLinux"
-                :label="t('view.settings.general.application.disable_vr_overlay_gpu_acceleration')"
-                :description="t('view.settings.general.application.disable_gpu_acceleration_tooltip')"
-                toggle>
-                <Switch
-                    :model-value="disableVrOverlayGpuAcceleration"
-                    @update:modelValue="setDisableVrOverlayGpuAcceleration" />
-            </SettingsItem>
+                :label="t('view.settings.general.application.vr_overlay_rendering')"
+                :description="t('view.settings.general.application.vr_overlay_gpu_requirement')" />
 
             <SettingsItem :label="t('view.settings.general.application.proxy')">
                 <Button size="sm" variant="outline" @click="promptProxySettings">{{
@@ -197,28 +189,23 @@
     const generalSettingsStore = useGeneralSettingsStore();
     const vrcxUpdaterStore = useVRCXUpdaterStore();
 
-    const {
-        isStartAtWindowsStartup,
-        isStartAsMinimizedState,
-        isCloseToTray,
-        disableGpuAcceleration,
-        disableVrOverlayGpuAcceleration
-    } = storeToRefs(generalSettingsStore);
+    const { isStartAtWindowsStartup, isStartAsMinimizedState, isCloseToTray, disableGpuAcceleration } =
+        storeToRefs(generalSettingsStore);
 
     const {
         setIsStartAtWindowsStartup,
         setIsStartAsMinimizedState,
         setIsCloseToTray,
         setDisableGpuAcceleration,
-        setDisableVrOverlayGpuAcceleration,
         promptProxySettings
     } = generalSettingsStore;
 
-    const { appVersion, autoUpdateVRCX, latestAppVersion, noUpdater } = storeToRefs(vrcxUpdaterStore);
+    const { appVersion, autoUpdateVRCX, latestAppVersion, noUpdater, canInstallUpdates } =
+        storeToRefs(vrcxUpdaterStore);
     const { setAutoUpdateVRCX, checkForVRCXUpdate, showVRCXUpdateDialog, showChangeLogDialog } = vrcxUpdaterStore;
 
     const ossDialog = ref(false);
-    const isLinux = computed(() => LINUX);
+    const isLinux = computed(() => IS_LINUX);
     const isMacOS = computed(() => {
         return navigator.platform.indexOf('Mac') > -1;
     });

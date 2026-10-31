@@ -21,6 +21,9 @@ namespace VRCX
     {
         private readonly Dictionary<string, MonitoredProcess> monitoredProcesses;
         private readonly Timer monitorProcessTimer;
+        private readonly object sync = new();
+        private bool running;
+        private readonly Func<string, Process[]> findProcesses;
         private static readonly Logger logger = LogManager.GetCurrentClassLogger();
 
         static ProcessMonitor()
@@ -30,8 +33,11 @@ namespace VRCX
             Instance.ProcessExited += Program.AppApiInstance.OnProcessStateChanged;
         }
 
-        public ProcessMonitor()
+        public ProcessMonitor() : this(Process.GetProcessesByName) { }
+
+        internal ProcessMonitor(Func<string, Process[]> findProcesses)
         {
+            this.findProcesses = findProcesses;
             monitoredProcesses = new Dictionary<string, MonitoredProcess>();
 
             monitorProcessTimer = new Timer();
@@ -53,57 +59,67 @@ namespace VRCX
 
         public void Init()
         {
-            AddProcess("nexvr");
-            AddProcess("vrserver");
-            monitorProcessTimer.Start();
+            lock (sync)
+            {
+                AddProcess(AutoAppLaunchManager.GameProcessName);
+                AddProcess("vrserver");
+                running = true;
+                monitorProcessTimer.Start();
+            }
         }
 
         public void Exit()
         {
-            monitorProcessTimer.Stop();
-            monitoredProcesses.Values.ToList().ForEach(x => x.ProcessExited());
+            lock (sync)
+            {
+                running = false;
+                monitorProcessTimer.Stop();
+                foreach (var process in monitoredProcesses.Values) process.ProcessExited();
+            }
         }
 
         private void MonitorProcessTimer_Elapsed(object sender, ElapsedEventArgs e)
         {
-            var processesNeedingUpdate = new List<MonitoredProcess>();
-
-            // Check if any of the monitored processes have been opened or closed.
-            foreach (var keyValuePair in monitoredProcesses)
+            lock (sync)
             {
-                var monitoredProcess = keyValuePair.Value;
-
-                if (monitoredProcess.IsRunning)
+                if (!running) return;
+                try
                 {
-                    if (monitoredProcess.Process == null || WinApi.HasProcessExited(monitoredProcess.Process.Id))
+                    foreach (var monitored in monitoredProcesses.Values.ToArray())
                     {
-                        monitoredProcess.ProcessExited();
-                        ProcessExited?.Invoke(monitoredProcess);
-                        logger.Info($"Monitored process {monitoredProcess.ProcessName} (PID: {(monitoredProcess.Process?.Id.ToString() ?? "null")}) exited.");
+                        if (monitored.IsRunning)
+                        {
+                            if (monitored.Process == null || WinApi.HasProcessExited(monitored.Process.Id))
+                            {
+                                monitored.ProcessExited();
+                                ProcessExited?.Invoke(monitored);
+                            }
+                            else continue;
+                        }
+
+                        // Only inspect the requested name, and retain a handle
+                        // solely for the process we track. Enabling this timer
+                        // must not leak a full system process snapshot each tick.
+                        var processes = findProcesses(monitored.ProcessName);
+                        Process selected = null;
+                        try
+                        {
+                            selected = processes.FirstOrDefault(process => !WinApi.HasProcessExited(process.Id));
+                            if (selected == null) continue;
+                            monitored.ProcessStarted(selected);
+                            ProcessStarted?.Invoke(monitored);
+                        }
+                        finally
+                        {
+                            foreach (var process in processes)
+                                if (process != selected) process.Dispose();
+                        }
                     }
                 }
-                else
+                catch (Exception ex)
                 {
-                    processesNeedingUpdate.Add(monitoredProcess);
+                    logger.Warn(ex, "Failed to poll monitored processes");
                 }
-            }
-
-            // We do it this way so we're not constantly polling for processes if we don't actually need to (aka, all processes are already accounted for).
-            if (processesNeedingUpdate.Count == 0)
-                return;
-
-            var processes = Process.GetProcesses();
-            foreach (var monitoredProcess in processesNeedingUpdate)
-            {
-                var process = processes.FirstOrDefault(p => string.Equals(p.ProcessName, monitoredProcess.ProcessName, StringComparison.OrdinalIgnoreCase));
-
-                // We are also checking to see if the process is exiting before adding it, otherwise we'll keep adding it and then removing it constantly in an endless loop.
-                if (process == null || WinApi.HasProcessExited(process.Id))
-                    continue;
-
-                monitoredProcess.ProcessStarted(process);
-                ProcessStarted?.Invoke(monitoredProcess);
-                logger.Info($"Monitored process {monitoredProcess.ProcessName} (PID: {process.Id}) started.");
             }
         }
 
@@ -115,22 +131,24 @@ namespace VRCX
         /// <returns>Whether the given process is monitored and currently running.</returns>
         public bool IsProcessRunning(string processName, bool ensureCheck = false)
         {
-            processName = processName.ToLower();
-            if (!monitoredProcesses.TryGetValue(processName, out var process))
-                return false;
-
-            if (ensureCheck && process.Process == null)
+            lock (sync)
             {
-                var processes = Process.GetProcessesByName(processName);
-                var isProcessRunning = processes.Length > 0;
-                foreach (var proc in processes)
-                    proc.Dispose();
+                processName = processName.ToLower();
+                if (!monitoredProcesses.TryGetValue(processName, out var process))
+                    return false;
 
-                return isProcessRunning;
+                if (ensureCheck && process.Process == null)
+                {
+                    var processes = Process.GetProcessesByName(processName);
+                    var isProcessRunning = processes.Length > 0;
+                    foreach (var proc in processes)
+                        proc.Dispose();
+
+                    return isProcessRunning;
+                }
+
+                return process.IsRunning;
             }
-
-            return process.IsRunning;
-
         }
 
         /// <summary>
@@ -139,12 +157,15 @@ namespace VRCX
         /// <param name="process"></param>
         public void AddProcess(Process process)
         {
-            var processName = process.ProcessName.ToLower();
-            if (monitoredProcesses.ContainsKey(processName))
-                return;
+            lock (sync)
+            {
+                var processName = process.ProcessName.ToLower();
+                if (monitoredProcesses.ContainsKey(processName))
+                    return;
 
-            monitoredProcesses.Add(processName, new MonitoredProcess(process));
-            logger.Debug($"Added process {processName} to process monitor.");
+                monitoredProcesses.Add(processName, new MonitoredProcess(process));
+                logger.Debug($"Added process {processName} to process monitor.");
+            }
         }
 
         /// <summary>
@@ -153,12 +174,15 @@ namespace VRCX
         /// <param name="processName"></param>
         public void AddProcess(string processName)
         {
-            processName = processName.ToLower();
-            if (monitoredProcesses.ContainsKey(processName))
-                return;
+            lock (sync)
+            {
+                processName = processName.ToLower();
+                if (monitoredProcesses.ContainsKey(processName))
+                    return;
 
-            monitoredProcesses.Add(processName, new MonitoredProcess(processName));
-            logger.Debug($"Added process {processName} to process monitor.");
+                monitoredProcesses.Add(processName, new MonitoredProcess(processName));
+                logger.Debug($"Added process {processName} to process monitor.");
+            }
         }
 
         /// <summary>
@@ -167,9 +191,12 @@ namespace VRCX
         /// <param name="processName"></param>
         public void RemoveProcess(string processName)
         {
-            processName = processName.ToLower();
-            monitoredProcesses.Remove(processName);
-            logger.Debug($"Removed process {processName} from process monitor.");
+            lock (sync)
+            {
+                processName = processName.ToLower();
+                if (monitoredProcesses.Remove(processName, out var process)) process.ProcessExited();
+                logger.Debug($"Removed process {processName} from process monitor.");
+            }
         }
     }
 

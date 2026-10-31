@@ -1,0 +1,107 @@
+name: Windows Electron Installer
+
+on:
+  pull_request:
+    branches: [master]
+  push:
+    branches:
+      - feat/electron-only-migration
+    paths-ignore:
+      - '**/*.md'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  linux-overlay-pixels:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: '10.0.x'
+      - name: Install software OpenGL test dependencies
+        run: sudo apt-get update && sudo apt-get install -y xvfb libgl1-mesa-dri libglx-mesa0 libx11-6
+      - name: Verify OpenGL wrist and HMD pixels under Xvfb
+        env:
+          LIBGL_ALWAYS_SOFTWARE: '1'
+        run: xvfb-run --auto-servernum dotnet run --project tests/OverlaySmoke -p:Configuration=Release -p:Platform=x64 --runtime linux-x64
+  build-installer:
+    runs-on: windows-latest
+    defaults:
+      run:
+        shell: pwsh
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '24'
+          cache: npm
+      - uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: '10.0.x'
+      - name: Install Node dependencies
+        run: npm ci
+      - name: Check Electron desktop APIs and protocol queue
+        run: npm run test:electron
+      - name: Validate Windows shortcut path comparisons
+        run: ./tests/electron/installer-paths.test.ps1
+      - name: Validate signed/unsigned artifact verification
+        run: ./tests/electron/windows-signatures.test.ps1
+      - name: Check renderer JavaScript types
+        run: npm run typecheck:js
+      - name: Build Windows .NET bridge
+        run: dotnet build Dotnet/VRCX-Electron.csproj -p:Configuration=Release -p:Platform=x64 --runtime win-x64
+      - name: Validate overlay frames and shared Direct3D textures
+        run: npm run test:overlay
+      - name: Smoke-test Electron preload, native bridge and offscreen rendering
+        run: npm run test:electron:runtime
+      - name: Build frontend
+        run: npm run prod
+      - name: Build NSIS installer and portable ZIP
+        # Automatic validation never receives signing credentials, including
+        # same-repository PRs and branch pushes. Signing runs in release.yml.
+        env:
+          NEXY_WINDOWS_SIGNING: none
+        run: npm run build-electron
+      - name: Validate isolated NSIS protocol registration and removal
+        run: ./tests/electron/installer-protocol.test.ps1
+      - name: Validate output files and portable package contents
+        run: |
+          $version = (Get-Content Version -Raw).Trim()
+          $setup = "build/Nexy_${version}_Setup_x64.exe"
+          $portable = "build/Nexy_${version}_x64.zip"
+          if (-not (Test-Path $setup)) { throw "Windows installer not found: $setup" }
+          if (-not (Test-Path $portable)) { throw "Portable ZIP not found: $portable" }
+          if ((Get-Item $setup).Length -lt 10000000) { throw "Installer appears unexpectedly small" }
+          if ((Get-Item $portable).Length -lt 10000000) { throw "Portable ZIP appears unexpectedly small" }
+          New-Item -ItemType Directory -Force build/portable-check | Out-Null
+          Expand-Archive -Path $portable -DestinationPath build/portable-check
+          $required = @(
+            'Nexy.exe',
+            'resources/app.asar',
+            'resources/app.asar.unpacked/build/Electron/VRCX-Electron.cjs',
+            'resources/app.asar.unpacked/build/Electron/VRCX-Electron.dll',
+            'resources/app.asar.unpacked/build/Electron/Vortice.Direct3D11.dll',
+            'resources/dotnet-runtime/dotnet.exe'
+          )
+          foreach ($file in $required) {
+            if (-not (Test-Path (Join-Path 'build/portable-check' $file))) {
+              throw "Missing portable runtime file: $file"
+            }
+          }
+          Get-FileHash $setup -Algorithm SHA256
+          Get-FileHash $portable -Algorithm SHA256
+      - name: Smoke-test fresh install and legacy custom-directory upgrades
+        run: |
+          $version = (Get-Content Version -Raw).Trim()
+          ./build-scripts/test-windows-installer.ps1 -Installer "build/Nexy_${version}_Setup_x64.exe"
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: Nexy-Electron-Windows-x64
+          if-no-files-found: error
+          path: |
+            build/Nexy_*_Setup_x64.exe
+            build/Nexy_*_x64.zip

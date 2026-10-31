@@ -566,7 +566,7 @@
     async function getAndDisplayScreenshotFromFile() {
         let filePath = '';
 
-        if (LINUX) {
+        if (IS_LINUX) {
             filePath = await window.electron.openFileDialog();
         } else {
             filePath = await AppApi.OpenFileSelectorDialog(
@@ -601,7 +601,7 @@
         if (!path) {
             return;
         }
-        AppApi.CopyImageToClipboard(path).then(() => {
+        window.electron.copyImageToClipboard(path).then(() => {
             toast.success('Image copied to clipboard');
         });
     }

@@ -2,7 +2,7 @@ using System;
 using System.Runtime.InteropServices;
 using Valve.VR;
 
-public class GLTextureWriter : IDisposable
+internal class GLTextureWriter : VRCX.IOverlayTextureWriter
 {
     private uint _textureId;
     private readonly int _width, _height;

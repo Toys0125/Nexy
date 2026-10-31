@@ -655,7 +655,7 @@ export const useAuthStore = defineStore('Auth', () => {
         if (twoFactorAuthDialogVisible.value) {
             return;
         }
-        AppApi.FlashWindow();
+        window.electron.flashWindow();
         twoFactorAuthDialogVisible.value = true;
         modalStore
             .otpPrompt({
@@ -734,7 +734,7 @@ export const useAuthStore = defineStore('Auth', () => {
         if (twoFactorAuthDialogVisible.value) {
             return;
         }
-        AppApi.FlashWindow();
+        window.electron.flashWindow();
         twoFactorAuthDialogVisible.value = true;
         modalStore
             .otpPrompt({

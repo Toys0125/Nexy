@@ -4,108 +4,50 @@ using namespace System.Runtime.InteropServices
 
 [CmdletBinding()]
 param (
-    [Parameter()]
-    [Switch]
-    $NoCI,
-    [Parameter()]
-    [Switch]
-    $BuildArm64
+    [Switch]$NoCI,
+    [Switch]$BuildArm64
 )
 
 $ErrorActionPreference = "Stop"
+Set-Location "$PSScriptRoot/.."
 
-$IsArm64 = [RuntimeInformation]::ProcessArchitecture -eq [Architecture]::Arm64
-
-if ($IsArm64) {
+if ([RuntimeInformation]::ProcessArchitecture -eq [Architecture]::Arm64) {
     $BuildArm64 = $true
 }
+$arch = if ($BuildArm64) { "arm64" } else { "x64" }
+$os = if ($IsWindows) { "win" } elseif ($IsMacOS) { "osx" } else { "linux" }
+$rid = "$os-$arch"
 
-cd "$PSScriptRoot/.."
+Write-Host "Building Electron .NET backend for $rid" -ForegroundColor Green
+dotnet build 'Dotnet/VRCX-Electron.csproj' -p:Configuration=Release -p:WarningLevel=0 -p:Platform=$arch -maxcpucount --runtime $rid
+if ($LASTEXITCODE -ne 0) { throw "The .NET build failed." }
 
-$root = Resolve-Path .
-
-$Date = Get-Date -format yyyyMMdd
-$ZipName = "Nexy_" + $Date + ".zip"
-$SetupName = "Nexy_" + $Date + "_Setup_x64.exe"
-
-Write-Host "Building .Net..." -ForegroundColor Green
-
-if ($IsWindows) {
-    dotnet build Dotnet\VRCX-Cef.csproj -p:Configuration=Release -p:WarningLevel=0 -p:Platform=x64 -t:"Clean;Build" -maxcpucount --runtime win-x64 --self-contained
-}
-
-if ($IsLinux) {
-    if ($BuildArm64) {
-        dotnet build 'Dotnet/VRCX-Electron.csproj' -p:Configuration=Release -p:WarningLevel=0 -p:Platform=arm64 -t:"Clean;Build" -maxcpucount --runtime linux-arm64
-    }
-    else {
-        dotnet build 'Dotnet/VRCX-Electron.csproj' -p:Configuration=Release -p:WarningLevel=0 -p:Platform=x64 -t:"Clean;Build" -maxcpucount --runtime linux-x64
-    }
-}
-
-if ($IsMacOS) {
-    if ($BuildArm64) {
-        dotnet build 'Dotnet/VRCX-Electron.csproj' -p:Configuration=Release -p:WarningLevel=0 -p:Platform=arm64 -t:"Clean;Build" -maxcpucount --runtime osx-arm64
-    }
-    else {
-        dotnet build 'Dotnet/VRCX-Electron.csproj' -p:Configuration=Release -p:WarningLevel=0 -p:Platform=x64 -t:"Clean;Build" -maxcpucount --runtime osx-x64
-    }
-}
-
-Write-Host "Building Node.js..." -ForegroundColor Green
-Remove-Item -Path "node_modules" -Force -Recurse -ErrorAction SilentlyContinue
-
+Write-Host "Building Node.js and web frontend..." -ForegroundColor Green
 if ($NoCI) {
-    npm install --package-lock-only=false --no-save
-}
-else {
+    npm install --no-save
+} else {
     npm ci --loglevel=error
 }
+if ($LASTEXITCODE -ne 0) { throw "npm install failed." }
 
-# this is for some long forgotten reason, possibly something returning non-zero despite a passing build
-$ErrorActionPreference = "Continue"
+npm run prod
+if ($LASTEXITCODE -ne 0) { throw "Frontend build failed." }
+
+if ($BuildArm64) {
+    npm run build-electron-arm64
+} else {
+    npm run build-electron
+}
+if ($LASTEXITCODE -ne 0) { throw "Electron package build failed." }
 
 if ($IsWindows) {
-    npm run prod
-}
-
-if ($IsLinux -or $IsMacOS) {
-    if ($BuildArm64) {
-        npm run prod
-        npm run build-electron-arm64
+    $version = (Get-Content -Path "Version" -Raw).Trim()
+    $setupName = "Nexy_${version}_Setup_${arch}.exe"
+    $setupPath = Join-Path "build" $setupName
+    if (Test-Path $setupPath) {
+        $hash = Get-FileHash -Path $setupPath -Algorithm SHA256
+        "$($hash.Hash)  $setupName" | Out-File -FilePath "SHA256SUMS.txt" -Encoding ASCII
     }
-    else {
-        npm run prod
-        npm run build-electron
-    }
-}
-
-$ErrorActionPreference = "Stop"
-
-if ($IsWindows) {
-    Remove-Item -Path "build\Cef\html" -Force -Recurse -ErrorAction SilentlyContinue
-    New-Item -ItemType Junction -Path "$root\build\Cef\html" -Target "$root\build\html"
-
-    Write-Host "Creating Zip..." -ForegroundColor Green
-    cd "build\Cef"
-    7z a -tzip $ZipName * -mx=7 -xr0!"*.log" -xr0!"*.pdb"
-    Move-Item $ZipName ..\..\$ZipName -Force
-    cd ..\..\
-
-    Write-Host "Creating Installer..." -ForegroundColor Green
-    $version = Get-Content -Path "Version" -Raw
-    cd "Installer"
-    Out-File -FilePath "version_define.nsh" -Encoding UTF8 -InputObject "!define PRODUCT_VERSION_FROM_FILE `"$version.0`""
-    $nsisPath = "C:\Program Files (x86)\NSIS\makensis.exe"
-    &$nsisPath installer.nsi
-    Start-Sleep -Seconds 1
-    Move-Item Nexy_Setup_x64.exe ..\$SetupName -Force
-    cd ..
-
-    Write-Host "Creating SHA256-hash..." -ForegroundColor Green
-    $hash = Get-FileHash -Path $SetupName -Algorithm SHA256
-    $hashLine = "$($hash.Hash)  $SetupName"
-    $hashLine | Out-File -FilePath "SHA256SUMS.txt" -Encoding ASCII
 }
 
 Write-Host "Done!" -ForegroundColor Green

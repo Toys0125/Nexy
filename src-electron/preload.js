@@ -29,8 +29,14 @@ function registerManagedListener(channel, callback, mapKey = channel) {
     };
 }
 
+// LINUX remains a temporary compatibility alias for the Electron IPC backend.
+// Use IS_LINUX / IS_WINDOWS for real operating-system checks.
 contextBridge.exposeInMainWorld('LINUX', true);
 contextBridge.exposeInMainWorld('WINDOWS', false);
+contextBridge.exposeInMainWorld('ELECTRON', true);
+contextBridge.exposeInMainWorld('IS_LINUX', process.platform === 'linux');
+contextBridge.exposeInMainWorld('IS_WINDOWS', process.platform === 'win32');
+contextBridge.exposeInMainWorld('IS_MACOS', process.platform === 'darwin');
 
 contextBridge.exposeInMainWorld('interopApi', {
     callDotNetMethod: (className, methodName, args) => {
@@ -43,6 +49,11 @@ const validChannels = ['launch-command'];
 contextBridge.exposeInMainWorld('electron', {
     getArch: () => ipcRenderer.invoke('app:getArch'),
     getClipboardText: () => ipcRenderer.invoke('app:getClipboardText'),
+    copyImageToClipboard: (imagePath) => ipcRenderer.invoke('app:copyImageToClipboard', imagePath),
+    focusWindow: () => ipcRenderer.invoke('app:focusWindow'),
+    flashWindow: () => ipcRenderer.invoke('app:flashWindow'),
+    setStartup: (enabled) => ipcRenderer.invoke('app:setStartup', enabled),
+    openCalendarFile: (content) => ipcRenderer.invoke('app:openCalendarFile', content),
     getNoUpdater: () => ipcRenderer.invoke('app:getNoUpdater'),
     setTrayIconNotification: (notify) => ipcRenderer.invoke('app:setTrayIconNotification', notify),
     setThemeSource: (source) => ipcRenderer.invoke('app:setThemeSource', source),
@@ -54,6 +65,7 @@ contextBridge.exposeInMainWorld('electron', {
     onWindowStateChange: (callback) => registerManagedListener('setWindowState', callback),
     onBrowserFocus: (callback) => registerManagedListener('onBrowserFocus', callback),
     onBrowserBlur: (callback) => registerManagedListener('onBrowserBlur', callback),
+    onVrOverlayReady: (callback) => registerManagedListener('vr-overlay-ready', callback),
     desktopNotification: (title, body, icon) => ipcRenderer.invoke('notification:showNotification', title, body, icon),
     restartApp: () => ipcRenderer.invoke('app:restart'),
     getOverlayWindow: () => ipcRenderer.invoke('app:getOverlayWindow'),
@@ -62,7 +74,13 @@ contextBridge.exposeInMainWorld('electron', {
     ipcRenderer: {
         on(channel, func) {
             if (validChannels.includes(channel)) {
-                return registerManagedListener(channel, (_event, ...args) => func(...args), `ipcRenderer:${channel}`);
+                const dispose = registerManagedListener(
+                    channel,
+                    (_event, ...args) => func(...args),
+                    `ipcRenderer:${channel}`
+                );
+                if (channel === 'launch-command') ipcRenderer.send('app:launchCommandsReady');
+                return dispose;
             }
 
             return undefined;

@@ -1,0 +1,18 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <OutputType Condition="'$(RuntimeIdentifier)' == 'win-x64' or '$(RuntimeIdentifier)' == 'win-arm64'">WinExe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../../Dotnet/VRCX-Electron.csproj" />
+    <Compile Include="../../Dotnet/Overlay/Electron/OverlayFrames.cs" Link="OverlayFrames.cs" />
+    <Compile Include="../../Dotnet/Overlay/Electron/IOverlayTextureWriter.cs" Link="IOverlayTextureWriter.cs" />
+    <Compile Include="../../Dotnet/Overlay/Electron/D3DTextureWriter.cs" Link="D3DTextureWriter.cs" />
+    <Compile Include="../../Dotnet/Overlay/Electron/OverlayTextureLayout.cs" Link="OverlayTextureLayout.cs" />
+    <Compile Include="../../Dotnet/Overlay/Electron/GLTextureWriter.cs" Link="GLTextureWriter.cs" />
+    <Compile Include="../../Dotnet/AppApi/Common/NexvrLaunch.cs" Link="NexvrLaunch.cs" />
+    <Compile Include="../../Dotnet/AppApi/Electron/GameLaunch.cs" Link="GameLaunch.cs" />
+    <Compile Include="../../Dotnet/AppApi/Electron/WindowsRegistryBridge.cs" Link="WindowsRegistryBridge.cs" />
+  </ItemGroup>
+</Project>

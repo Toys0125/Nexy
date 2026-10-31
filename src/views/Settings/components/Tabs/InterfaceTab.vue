@@ -669,7 +669,7 @@
     }
 
     const zoomLevel = ref(100);
-    const isLinux = computed(() => LINUX);
+    const isLinux = computed(() => IS_LINUX);
     let cleanupWheel = null;
 
     onBeforeUnmount(() => {

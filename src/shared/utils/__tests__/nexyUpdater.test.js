@@ -1,6 +1,7 @@
 import { readFileSync } from 'node:fs';
+import { createRequire } from 'node:module';
 import { describe, expect, test } from 'vitest';
-import { getNexyAsset, getNexyReleases, isNexyReleaseNewer } from '../nexyUpdater';
+import { getNexyAsset, getNexyReleases, getNexyReleasePage, isNexyReleaseNewer } from '../nexyUpdater';
 
 const url = (name) => `https://github.com/valzzu/Nexy/releases/download/v2026.11.1/${name}`;
 const asset = (name, overrides = {}) => ({
@@ -47,6 +48,23 @@ describe('Nexy release updater', () => {
         expect(getNexyAsset(assets, 'linux', 'x64').downloadUrl).toBe(url('Nexy_2026.11.1_x64.AppImage'));
         expect(getNexyAsset(assets, 'darwin', 'x64').downloadUrl).toBe('');
     });
+    test('discovers macOS DMGs for manual release notifications', () => {
+        const dmg = asset('Nexy_2026.11.1_arm64.dmg');
+        expect(getNexyAsset([dmg], 'darwin', 'arm64').downloadUrl).toBe(url(dmg.name));
+        expect(getNexyAsset([dmg], 'darwin', 'x64').downloadUrl).toBe('');
+        expect(
+            getNexyReleases([release('Nexy 2026.11.1', { assets: [dmg] })], 'Stable', 'darwin', 'arm64')
+        ).toHaveLength(1);
+    });
+    test('manual release links remain on the Nexy GitHub repository', () => {
+        expect(getNexyReleasePage({ html_url: 'https://github.com/valzzu/Nexy/releases/tag/v1' })).toBe(
+            'https://github.com/valzzu/Nexy/releases/tag/v1'
+        );
+        expect(getNexyReleasePage({ html_url: 'https://evil.test/setup.exe', tag_name: 'v1/a' })).toBe(
+            'https://github.com/valzzu/Nexy/releases/tag/v1%2Fa'
+        );
+        expect(getNexyReleasePage({ html_url: 'javascript:alert(1)' })).toBe('https://github.com/valzzu/Nexy/releases');
+    });
     test('separates stable and nightly, ignores drafts and incompatible releases', () => {
         const stable = release('Nexy 2026.11.1');
         const nightly = release('Nexy Nightly 2026.11.2', { prerelease: true });
@@ -58,10 +76,12 @@ describe('Nexy release updater', () => {
         expect(getNexyReleases({ message: 'Not Found' }, 'Stable', 'win32', 'x64')).toEqual([]);
     });
     test('keeps Windows Nexy installation separate from the original VRCX app', () => {
-        const installer = readFileSync('Installer/installer.nsi', 'utf8');
-        expect(installer).toContain('InstallDir "$PROGRAMFILES64\\Nexy"');
-        expect(installer).toContain('OutFile "Nexy_Setup_x64.exe"');
-        expect(installer).not.toContain('InstallDir "$PROGRAMFILES64\\VRCX"');
+        const config = createRequire(import.meta.url)('../../../../electron-builder.config.js');
+        const installer = readFileSync('build-scripts/nsis-legacy-upgrade.nsh', 'utf8');
+        expect(config.appId).toBe('app.nexy');
+        expect(config.productName).toBe('Nexy');
+        expect(config.nsis.perMachine).toBe(true);
+        expect(config.protocols.flatMap((protocol) => protocol.schemes)).toEqual(['nexy']);
         expect(installer).not.toContain('taskkill /IM VRCX.exe');
         expect(installer).not.toContain('Software\\Classes\\vrcx');
     });

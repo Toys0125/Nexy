@@ -96,7 +96,7 @@ vi.mock('../../../../coordinators/gameCoordinator', () => ({
     runSweepVRChatCacheFlow: (...args) => mocks.sweepVRChatCache(...args)
 }));
 
-// Set global mocks for CefSharp-injected APIs
+// Set global mocks for Electron-injected .NET APIs
 globalThis.AppApi = mocks.appApi;
 globalThis.AssetBundleManager = mocks.assetBundleManager;
 

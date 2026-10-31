@@ -1,7 +1,8 @@
-import { beforeEach, describe, expect, test, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 import { createPinia, setActivePinia } from 'pinia';
 
 const mocks = vi.hoisted(() => ({
+    updatePreference: 'Off',
     configRepository: {
         getString: vi.fn(),
         setString: vi.fn()
@@ -41,9 +42,12 @@ import { useVRCXUpdaterStore } from '../vrcxUpdater';
 
 describe('useVRCXUpdaterStore.setAutoUpdateVRCX', () => {
     beforeEach(async () => {
+        mocks.updatePreference = 'Off';
+        vi.stubGlobal('IS_WINDOWS', true);
+        vi.stubGlobal('IS_LINUX', false);
         mocks.configRepository.getString.mockImplementation((key, defaultValue) => {
             if (key === 'VRCX_autoUpdateVRCX') {
-                return Promise.resolve('Off');
+                return Promise.resolve(mocks.updatePreference);
             }
             if (key === 'VRCX_id') {
                 return Promise.resolve('test-vrcx-id');
@@ -56,14 +60,20 @@ describe('useVRCXUpdaterStore.setAutoUpdateVRCX', () => {
         mocks.configRepository.setString.mockResolvedValue(undefined);
 
         globalThis.AppApi = {
-            GetVersion: vi.fn().mockResolvedValue('2026.1.0')
+            GetVersion: vi.fn().mockResolvedValue('2026.1.0'),
+            OpenLink: vi.fn().mockResolvedValue(undefined),
+            DownloadUpdate: vi.fn(),
+            CheckForUpdateExe: vi.fn()
         };
+        window.electron.getNoUpdater.mockResolvedValue(false);
 
         setActivePinia(createPinia());
         useVRCXUpdaterStore();
         await flushPromises();
         vi.clearAllMocks();
     });
+
+    afterEach(() => vi.unstubAllGlobals());
 
     test('sets autoUpdateVRCX to Off, clears pending flag, and persists config', async () => {
         const store = useVRCXUpdaterStore();
@@ -124,6 +134,8 @@ describe('useVRCXUpdaterStore.setAutoUpdateVRCX', () => {
         };
 
         const store = useVRCXUpdaterStore();
+        expect(store.noUpdater).toBe(false);
+        expect(store.canInstallUpdates).toBe(false);
         await store.setAutoUpdateVRCX('Notify');
         expect(await store.checkForVRCXUpdate()).toBe(true);
         expect(globalThis.webApiService.execute).toHaveBeenCalledWith(
@@ -134,6 +146,9 @@ describe('useVRCXUpdaterStore.setAutoUpdateVRCX', () => {
         expect(store.latestAppVersion).toBe('Nexy 2026.11.1');
         expect(store.pendingVRCXUpdate).toBe(true);
         expect(mocks.toast).toHaveBeenCalled();
+        mocks.toast.mock.calls[0][1].action.onClick();
+        expect(AppApi.OpenLink).toHaveBeenCalledWith('https://github.com/valzzu/Nexy/releases/tag/v2026.11.1');
+        expect(AppApi.DownloadUpdate).not.toHaveBeenCalled();
     });
 
     test('handles no published Nexy releases without offering an update', async () => {
@@ -141,9 +156,55 @@ describe('useVRCXUpdaterStore.setAutoUpdateVRCX', () => {
             execute: vi.fn().mockResolvedValue({ status: 200, data: '[]' })
         };
         const store = useVRCXUpdaterStore();
+        store.noUpdater = false;
         await store.setAutoUpdateVRCX('Notify');
         expect(await store.checkForVRCXUpdate()).toBe(false);
         expect(store.pendingVRCXUpdate).toBe(false);
         expect(mocks.toast).not.toHaveBeenCalled();
+    });
+
+    test('honors an explicit disabled-discovery capability', async () => {
+        globalThis.webApiService = { execute: vi.fn() };
+        window.electron.getNoUpdater.mockResolvedValue(true);
+        setActivePinia(createPinia());
+        const store = useVRCXUpdaterStore();
+        await flushPromises();
+        expect(store.noUpdater).toBe(true);
+        expect(await store.checkForVRCXUpdate()).toBe(false);
+        expect(globalThis.webApiService.execute).not.toHaveBeenCalled();
+    });
+
+    test.each(['Auto Download', 'Auto Install'])(
+        'normalizes %s to notifications while installation is unavailable',
+        async (action) => {
+            const store = useVRCXUpdaterStore();
+            await store.setAutoUpdateVRCX(action);
+            expect(store.autoUpdateVRCX).toBe('Notify');
+            expect(mocks.configRepository.setString).toHaveBeenCalledWith('VRCX_autoUpdateVRCX', 'Notify');
+            expect(AppApi.DownloadUpdate).not.toHaveBeenCalled();
+        }
+    );
+
+    test('migrates saved automatic downloads to notifications without downloading', async () => {
+        mocks.updatePreference = 'Auto Download';
+        globalThis.webApiService = { execute: vi.fn().mockResolvedValue({ status: 200, data: '[]' }) };
+        setActivePinia(createPinia());
+        const store = useVRCXUpdaterStore();
+        await flushPromises();
+        expect(store.autoUpdateVRCX).toBe('Notify');
+        expect(store.noUpdater).toBe(false);
+        expect(mocks.configRepository.setString).toHaveBeenCalledWith('VRCX_autoUpdateVRCX', 'Notify');
+        expect(globalThis.webApiService.execute).toHaveBeenCalled();
+        expect(AppApi.DownloadUpdate).not.toHaveBeenCalled();
+    });
+
+    test('opens the selected GitHub release for manual installation', async () => {
+        const store = useVRCXUpdaterStore();
+        store.VRCXUpdateDialog.release = 'Nexy 2026.11.1';
+        store.VRCXUpdateDialog.releases = [{ name: 'Nexy 2026.11.1', tag_name: 'v2026.11.1' }];
+        await store.installVRCXUpdate();
+        expect(AppApi.OpenLink).toHaveBeenCalledWith('https://github.com/valzzu/Nexy/releases/tag/v2026.11.1');
+        expect(AppApi.DownloadUpdate).not.toHaveBeenCalled();
+        expect(AppApi.CheckForUpdateExe).not.toHaveBeenCalled();
     });
 });
