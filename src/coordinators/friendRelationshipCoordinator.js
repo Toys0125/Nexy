@@ -123,11 +123,26 @@ export function addFriendship(id) {
             }
             handleFriendStatus(args);
             if (args.json.isFriend && !friendLog.has(id)) {
-                if (state.friendNumber === 0) {
-                    state.friendNumber = friendStore.friends.size;
+                // the friends list is in friendship order, so a friend already
+                // on it keeps their place instead of going to the end
+                const position = userStore.currentUser.friends?.indexOf(id) ?? -1;
+                if (position !== -1) {
+                    ref.$friendNumber = position + 1;
+                } else {
+                    if (state.friendNumber === 0) {
+                        // a realtime friend-add puts friends in the list before
+                        // their status reply lands; only those already in the
+                        // friend log have a number to count
+                        state.friendNumber = 0;
+                        for (const friendId of friendStore.friends.keys()) {
+                            if (friendLog.has(friendId)) {
+                                state.friendNumber++;
+                            }
+                        }
+                    }
+                    ref.$friendNumber = ++state.friendNumber;
+                    configRepository.setInt(`VRCX_friendNumber_${userStore.currentUser.id}`, state.friendNumber);
                 }
-                ref.$friendNumber = ++state.friendNumber;
-                configRepository.setInt(`VRCX_friendNumber_${userStore.currentUser.id}`, state.friendNumber);
                 friendStore.addFriend(id, ref.state);
                 const friendCtx = friendStore.friends.get(id);
                 if (friendCtx) {

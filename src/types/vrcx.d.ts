@@ -68,6 +68,8 @@ export interface VrcxCurrentUser extends Json<CurrentUser> {
     $languages?: string[];
     $locationTag?: string;
     $travelingToLocation?: string;
+    /** NexVR: the friends snapshot arrived, so an empty friends list is real */
+    $friendsComplete?: boolean;
 }
 
 export interface VrcxGroup extends Json<Group> {

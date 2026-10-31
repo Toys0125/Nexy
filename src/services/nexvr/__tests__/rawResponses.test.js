@@ -2,7 +2,12 @@ vi.mock('../../appConfig', () => ({
     AppDebug: { endpointDomain: 'https://nexvr.net/api', websocketDomain: '', debugWebRequests: false }
 }));
 vi.mock('../../config', () => ({
-    default: { getString: async () => '', setString: async () => {}, remove: async () => {} }
+    // a stored session, so authed routes don't read as signed out
+    default: {
+        getString: async () => JSON.stringify({ accessToken: 'access', refreshToken: 'refresh' }),
+        setString: async () => {},
+        remove: async () => {}
+    }
 }));
 
 import { create } from '@bufbuild/protobuf';

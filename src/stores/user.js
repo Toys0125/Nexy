@@ -174,7 +174,8 @@ export const useUserStore = defineStore('User', () => {
             $trustSortNum: 1,
             $languages: [],
             $locationTag: '',
-            $travelingToLocation: ''
+            $travelingToLocation: '',
+            $friendsComplete: false
         }
     );
 

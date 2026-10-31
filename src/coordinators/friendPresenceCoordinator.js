@@ -48,8 +48,15 @@ export async function runUpdateFriendDelayedCheckFlow(
     }
     const isVIP = localFavoriteFriends.has(id);
     const ref = ctx.ref;
-    if (ctx.state !== newState && typeof ctx.ref !== 'undefined') {
-        if ((newState === 'offline' || newState === 'active') && ctx.state === 'online') {
+    const previousState = ctx.state;
+    // commit the transition before awaiting world/group names, otherwise
+    // concurrent updates (e.g. a new friend's user fetches) each log it
+    if (previousState !== newState) {
+        ctx.state = newState;
+        friendStore.updateOnlineFriendCounter();
+    }
+    if (previousState !== newState && typeof ref !== 'undefined') {
+        if ((newState === 'offline' || newState === 'active') && previousState === 'online') {
             ctx.ref.$online_for = '';
             ctx.ref.$offline_for = now();
             ctx.ref.$active_for = '';
@@ -76,7 +83,7 @@ export async function runUpdateFriendDelayedCheckFlow(
             if (persistedFeed) {
                 feedStore.addFeedEntry(persistedFeed);
             }
-        } else if (newState === 'online' && (ctx.state === 'offline' || ctx.state === 'active')) {
+        } else if (newState === 'online' && (previousState === 'offline' || previousState === 'active')) {
             ctx.ref.$previousLocation = '';
             ctx.ref.$travelingToTime = now();
             ctx.ref.$location_at = now();
@@ -105,10 +112,6 @@ export async function runUpdateFriendDelayedCheckFlow(
         if (newState === 'active') {
             ctx.ref.$active_for = now();
         }
-    }
-    if (ctx.state !== newState) {
-        ctx.state = newState;
-        friendStore.updateOnlineFriendCounter();
     }
     if (ref?.displayName) {
         ctx.name = ref.displayName;

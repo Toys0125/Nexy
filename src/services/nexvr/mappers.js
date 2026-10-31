@@ -324,9 +324,11 @@ export function toVrcUser(user, presence) {
 /**
  * @param {any} me NexVR /auth/me payload
  * @param {Map<string, any>} friends FriendPresence by id, from the realtime socket
+ * @param {boolean} [friendsComplete] Whether the friends snapshot arrived, so an
+ *   empty map means no friends rather than none received yet
  * @returns {object} VRChat CurrentUser
  */
-export function toVrcCurrentUser(me, friends) {
+export function toVrcCurrentUser(me, friends, friendsComplete = true) {
     const onlineFriends = [];
     const activeFriends = [];
     const offlineFriends = [];
@@ -348,10 +350,12 @@ export function toVrcCurrentUser(me, friends) {
     const location = self ? presenceState(self) : null;
     const inInstance = location?.state === 'online';
     // VRChat lists friends oldest first, and VRCX numbers them in that order
-    // (the "friend number"); NexVR's friendsSince gives the same order
+    // (the "friend number"); NexVR's friendsSince gives the same order. A
+    // friendship with no date goes last rather than becoming friend #1.
+    const since = (presence) => Date.parse(presence.friendsSince) || Infinity;
     const friendsByAge = [...friends.values()]
         .filter((presence) => presence.userId !== me.id)
-        .sort((a, b) => (a.friendsSince || '').localeCompare(b.friendsSince || '') || a.userId.localeCompare(b.userId))
+        .sort((a, b) => since(a) - since(b) || a.userId.localeCompare(b.userId))
         .map((presence) => presence.userId);
     return {
         ...baseUser(me),
@@ -361,6 +365,7 @@ export function toVrcCurrentUser(me, friends) {
         status: PREFERENCE_STATUS[me.userPreferenceStatus] ?? 'active',
         state: 'online',
         friends: friendsByAge,
+        $friendsComplete: friendsComplete,
         onlineFriends,
         activeFriends,
         offlineFriends,

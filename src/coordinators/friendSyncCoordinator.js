@@ -8,7 +8,7 @@ import { useAuthStore } from '../stores/auth';
 import { useFriendStore } from '../stores/friend';
 import { useUpdateLoopStore } from '../stores/updateLoop';
 import { useUserStore } from '../stores/user';
-import { getCurrentUser } from './userCoordinator';
+import { getCurrentUser, prefetchFriendProfiles } from './userCoordinator';
 import { watchState } from '../services/watchState';
 
 import configRepository from '../services/config';
@@ -65,6 +65,7 @@ export async function runInitFriendsListFlow(t) {
 
     friendStore.tryApplyFriendOrder(); // once again
     friendStore.getAllUserStats(); // joinCount, lastSeen, timeSpent
+    prefetchFriendProfiles(); // full profiles, so opening a friend is instant
 
     // remove old data from json file and migrate to SQLite (July 2021)
     if (await VRCXStorage.Get(`${userId}_friendLogUpdatedAt`)) {

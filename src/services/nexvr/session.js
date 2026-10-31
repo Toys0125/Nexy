@@ -90,18 +90,35 @@ export async function restoreTokens(blob) {
  * Exchanges the refresh token for a new pair. Concurrent callers share one
  * request, because NexVR rotates the refresh token on every use.
  *
+ * A request that was sent with an access token another caller has since
+ * replaced just retries with the current one; refreshing again would rotate
+ * the pair under requests already in flight.
+ *
  * @param {(refreshToken: string) => Promise<NexvrTokens | null>} exchange
+ * @param {string} [staleToken] Access token the rejected request was sent with
  * @returns {Promise<boolean>} True when a new access token is in place
  */
-export function refreshTokens(exchange) {
+export async function refreshTokens(exchange, staleToken) {
+    await load();
+    if (staleToken !== undefined && tokens?.accessToken && tokens.accessToken !== staleToken) {
+        return true;
+    }
     if (!refreshing) {
         refreshing = (async () => {
-            await load();
             const refreshToken = tokens?.refreshToken;
             if (!refreshToken) {
                 return false;
             }
-            const next = await exchange(refreshToken).catch(() => null);
+            let next = null;
+            try {
+                next = await exchange(refreshToken);
+            } catch (err) {
+                // only a rejected refresh token ends the session; a dropped
+                // connection or a gateway hiccup leaves it for the next try
+                if (!(err?.status >= 400 && err.status < 500) || err.status === 429) {
+                    return false;
+                }
+            }
             if (!next?.accessToken) {
                 await clearTokens();
                 return false;

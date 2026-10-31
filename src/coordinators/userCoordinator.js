@@ -14,7 +14,8 @@ import {
     isRealInstance,
     parseLocation,
     sanitizeUserJson,
-    getReadableProfileThemeColor
+    getReadableProfileThemeColor,
+    createRateLimiter
 } from '../shared/utils';
 import { getUserMemo } from './memoCoordinator';
 import { avatarRequest, instanceRequest, queryRequest, userRequest } from '../api';
@@ -431,143 +432,163 @@ export function showUserDialog(userId) {
     }
     updateUserDialogProfile();
     AppApi.SendIpc('ShowUserDialog', userId);
+    let isDialogPopulated = false;
+    const populateUserDialog = (userRef) => {
+        D.loading = false;
+        D.ref = userRef;
+        uiStore.setDialogCrumbLabel('user', D.id, D.ref?.displayName || D.id);
+        D.friend = friendStore.friends.get(D.id);
+        D.isFriend = Boolean(D.friend);
+        D.note = String(D.ref.note || '');
+        D.incomingRequest = false;
+        D.outgoingRequest = false;
+        D.isBlock = false;
+        D.isMute = false;
+        D.isInteractOff = false;
+        D.isMuteChat = false;
+        for (const ref of moderationStore.cachedPlayerModerations.values()) {
+            if (ref.targetUserId === D.id && ref.sourceUserId === currentUser.id) {
+                if (ref.type === 'block') {
+                    D.isBlock = true;
+                } else if (ref.type === 'mute') {
+                    D.isMute = true;
+                } else if (ref.type === 'interactOff') {
+                    D.isInteractOff = true;
+                } else if (ref.type === 'muteChat') {
+                    D.isMuteChat = true;
+                }
+            }
+        }
+        D.isFavorite = favoriteStore.getCachedFavoritesByObjectId(D.id) || favoriteStore.isInAnyLocalFriendGroup(D.id);
+        if (D.ref.friendRequestStatus === 'incoming') {
+            D.incomingRequest = true;
+        } else if (D.ref.friendRequestStatus === 'outgoing') {
+            D.outgoingRequest = true;
+        }
+        if (isDialogPopulated) {
+            userStore.applyUserDialogLocation();
+            return;
+        }
+        isDialogPopulated = true;
+        let inCurrentWorld = false;
+        if (locationStore.lastLocation.playerList.has(D.ref.id)) {
+            inCurrentWorld = true;
+        }
+        if (userId !== currentUser.id && watchState.isFriendsLoaded) {
+            database.getUserStats(D.ref, inCurrentWorld).then(async (ref1) => {
+                if (ref1.userId === D.id) {
+                    D.lastSeen = ref1.lastSeen;
+                    D.joinCount = ref1.joinCount;
+                    D.timeSpent = ref1.timeSpent;
+                }
+                const displayNameMap = ref1.previousDisplayNames;
+                const userNotifications = await database.getFriendLogHistoryForUserId(D.id, [
+                    'DisplayName',
+                    'Friend',
+                    'Unfriend'
+                ]);
+                const dateFriendedInfo = [];
+                for (const notification of userNotifications) {
+                    if (notification.userId !== D.id) {
+                        continue;
+                    }
+                    if (notification.type === 'DisplayName') {
+                        displayNameMap.set(notification.previousDisplayName, notification.created_at);
+                    }
+                    if (
+                        notification.type === 'Friend' ||
+                        (notification.type === 'Unfriend' && !appearanceSettingsStore.hideUnfriends)
+                    ) {
+                        dateFriendedInfo.unshift(notification);
+                    }
+                }
+                D.dateFriendedInfo = dateFriendedInfo;
+                if (dateFriendedInfo.length > 0) {
+                    const latestFriendedInfo = dateFriendedInfo[0];
+                    D.unFriended = latestFriendedInfo.type === 'Unfriend';
+                    D.dateFriended = latestFriendedInfo.created_at;
+                }
+                // NexVR records when the current friendship began; the local log only
+                // knows friendships Nexy saw happen, so the server's date wins
+                if (D.isFriend && D.ref.$friendsSince) {
+                    D.unFriended = false;
+                    D.dateFriended = D.ref.$friendsSince;
+                    if (D.dateFriendedInfo.length === 0) {
+                        D.dateFriendedInfo = [{ type: 'Friend', created_at: D.ref.$friendsSince }];
+                    }
+                }
+                displayNameMap.forEach((updated_at, displayName) => {
+                    D.previousDisplayNames.push({
+                        displayName,
+                        updated_at
+                    });
+                });
+            });
+            AppApi.GetVRChatUserModeration(currentUser.id, userId).then((result) => {
+                D.avatarModeration = result;
+                if (result === 4) {
+                    D.isHideAvatar = true;
+                } else if (result === 5) {
+                    D.isShowAvatar = true;
+                }
+            });
+            if (!currentUser.hasSharedConnectionsOptOut) {
+                try {
+                    queryRequest.fetch('mutualCounts', { userId }).then((args) => {
+                        if (args.params.userId === D.id) {
+                            D.mutualFriendCount = args.json.friends;
+                            D.mutualGroupCount = args.json.groups;
+                        }
+                    });
+                } catch (error) {
+                    console.error(error);
+                }
+            }
+        } else {
+            D.previousDisplayNames = currentUser.pastDisplayNames;
+            database.getUserStats(D.ref, inCurrentWorld).then((ref1) => {
+                if (ref1.userId === D.id) {
+                    D.lastSeen = ref1.lastSeen;
+                    D.joinCount = ref1.joinCount;
+                    D.timeSpent = ref1.timeSpent;
+                }
+            });
+        }
+        queryRequest.fetch('representedGroup', { userId }).then((args1) => {
+            handleGroupRepresented(args1);
+        });
+        D.visible = true;
+        userStore.applyUserDialogLocation(true);
+    };
+    // friends are cached from startup (see prefetchFriendProfiles), so show what
+    // we have right away and let the fetch below refresh it
+    const cachedRef = userStore.cachedUsers.get(userId);
+    if (cachedRef) {
+        populateUserDialog(cachedRef);
+    }
     queryRequest
         .fetch('user', {
             userId
         })
+        .then((args) => {
+            if (args.ref.id === D.id) {
+                populateUserDialog(args.ref);
+            }
+        })
         .catch((err) => {
+            if (isDialogPopulated) {
+                console.error('Failed to refresh user dialog', err);
+                return;
+            }
+            if (D.id !== userId) {
+                throw err;
+            }
             D.loading = false;
             D.id = null;
             D.visible = false;
             uiStore.jumpBackDialogCrumb();
             toast.error(t('message.user.load_failed'));
             throw err;
-        })
-        .then((args) => {
-            if (args.ref.id === D.id) {
-                D.loading = false;
-
-                D.ref = args.ref;
-                uiStore.setDialogCrumbLabel('user', D.id, D.ref?.displayName || D.id);
-                D.friend = friendStore.friends.get(D.id);
-                D.isFriend = Boolean(D.friend);
-                D.note = String(D.ref.note || '');
-                D.incomingRequest = false;
-                D.outgoingRequest = false;
-                D.isBlock = false;
-                D.isMute = false;
-                D.isInteractOff = false;
-                D.isMuteChat = false;
-                for (const ref of moderationStore.cachedPlayerModerations.values()) {
-                    if (ref.targetUserId === D.id && ref.sourceUserId === currentUser.id) {
-                        if (ref.type === 'block') {
-                            D.isBlock = true;
-                        } else if (ref.type === 'mute') {
-                            D.isMute = true;
-                        } else if (ref.type === 'interactOff') {
-                            D.isInteractOff = true;
-                        } else if (ref.type === 'muteChat') {
-                            D.isMuteChat = true;
-                        }
-                    }
-                }
-                D.isFavorite =
-                    favoriteStore.getCachedFavoritesByObjectId(D.id) || favoriteStore.isInAnyLocalFriendGroup(D.id);
-                if (D.ref.friendRequestStatus === 'incoming') {
-                    D.incomingRequest = true;
-                } else if (D.ref.friendRequestStatus === 'outgoing') {
-                    D.outgoingRequest = true;
-                }
-                let inCurrentWorld = false;
-                if (locationStore.lastLocation.playerList.has(D.ref.id)) {
-                    inCurrentWorld = true;
-                }
-                if (userId !== currentUser.id && watchState.isFriendsLoaded) {
-                    database.getUserStats(D.ref, inCurrentWorld).then(async (ref1) => {
-                        if (ref1.userId === D.id) {
-                            D.lastSeen = ref1.lastSeen;
-                            D.joinCount = ref1.joinCount;
-                            D.timeSpent = ref1.timeSpent;
-                        }
-                        const displayNameMap = ref1.previousDisplayNames;
-                        const userNotifications = await database.getFriendLogHistoryForUserId(D.id, [
-                            'DisplayName',
-                            'Friend',
-                            'Unfriend'
-                        ]);
-                        const dateFriendedInfo = [];
-                        for (const notification of userNotifications) {
-                            if (notification.userId !== D.id) {
-                                continue;
-                            }
-                            if (notification.type === 'DisplayName') {
-                                displayNameMap.set(notification.previousDisplayName, notification.created_at);
-                            }
-                            if (
-                                notification.type === 'Friend' ||
-                                (notification.type === 'Unfriend' && !appearanceSettingsStore.hideUnfriends)
-                            ) {
-                                dateFriendedInfo.unshift(notification);
-                            }
-                        }
-                        D.dateFriendedInfo = dateFriendedInfo;
-                        if (dateFriendedInfo.length > 0) {
-                            const latestFriendedInfo = dateFriendedInfo[0];
-                            D.unFriended = latestFriendedInfo.type === 'Unfriend';
-                            D.dateFriended = latestFriendedInfo.created_at;
-                        }
-                        // NexVR records when the current friendship began; the local log only
-                        // knows friendships Nexy saw happen, so the server's date wins
-                        if (D.isFriend && D.ref.$friendsSince) {
-                            D.unFriended = false;
-                            D.dateFriended = D.ref.$friendsSince;
-                            if (D.dateFriendedInfo.length === 0) {
-                                D.dateFriendedInfo = [{ type: 'Friend', created_at: D.ref.$friendsSince }];
-                            }
-                        }
-                        displayNameMap.forEach((updated_at, displayName) => {
-                            D.previousDisplayNames.push({
-                                displayName,
-                                updated_at
-                            });
-                        });
-                    });
-                    AppApi.GetVRChatUserModeration(currentUser.id, userId).then((result) => {
-                        D.avatarModeration = result;
-                        if (result === 4) {
-                            D.isHideAvatar = true;
-                        } else if (result === 5) {
-                            D.isShowAvatar = true;
-                        }
-                    });
-                    if (!currentUser.hasSharedConnectionsOptOut) {
-                        try {
-                            queryRequest.fetch('mutualCounts', { userId }).then((args) => {
-                                if (args.params.userId === D.id) {
-                                    D.mutualFriendCount = args.json.friends;
-                                    D.mutualGroupCount = args.json.groups;
-                                }
-                            });
-                        } catch (error) {
-                            console.error(error);
-                        }
-                    }
-                } else {
-                    D.previousDisplayNames = currentUser.pastDisplayNames;
-                    database.getUserStats(D.ref, inCurrentWorld).then((ref1) => {
-                        if (ref1.userId === D.id) {
-                            D.lastSeen = ref1.lastSeen;
-                            D.joinCount = ref1.joinCount;
-                            D.timeSpent = ref1.timeSpent;
-                        }
-                    });
-                }
-                queryRequest.fetch('representedGroup', { userId }).then((args1) => {
-                    handleGroupRepresented(args1);
-                });
-                D.visible = true;
-                userStore.applyUserDialogLocation(true);
-            }
         });
     showUserDialogHistory.delete(userId);
     showUserDialogHistory.add(userId);
@@ -609,6 +630,35 @@ export function updateUserDialogProfile() {
             console.error('Failed to fetch public profile', err);
             D.publicProfileRef = {};
         });
+}
+
+/**
+ * Fetches every friend's full profile in the background so opening one doesn't
+ * wait on the network; friends arrive from the realtime socket without bio,
+ * badges or languages.
+ */
+export async function prefetchFriendProfiles() {
+    const friendStore = useFriendStore();
+    const userIds = Array.from(friendStore.friends.keys());
+    const rateLimiter = createRateLimiter({
+        limitPerInterval: 60,
+        intervalMs: 60_000
+    });
+    let next = 0;
+
+    async function worker() {
+        while (next < userIds.length && watchState.isLoggedIn) {
+            const userId = userIds[next++];
+            await rateLimiter.wait();
+            try {
+                await Promise.all([queryRequest.fetch('user', { userId }), userRequest.getPublicProfile({ userId })]);
+            } catch (err) {
+                console.error('Failed to prefetch friend profile', userId, err);
+            }
+        }
+    }
+
+    await Promise.all(Array.from({ length: 3 }, () => worker()));
 }
 
 /**
