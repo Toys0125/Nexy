@@ -41,6 +41,11 @@ declare global {
         electron: {
             getArch: () => Promise<string>;
             getClipboardText: () => Promise<string>;
+            copyImageToClipboard: (path: string) => Promise<boolean>;
+            focusWindow: () => Promise<void>;
+            flashWindow: () => Promise<void>;
+            setStartup: (enabled: boolean) => Promise<void>;
+            openCalendarFile: (content: string) => Promise<void>;
             getNoUpdater: () => Promise<boolean>;
             setTrayIconNotification: (notify: boolean) => Promise<void>;
             setThemeSource: (source: 'system' | 'light' | 'dark') => Promise<void>;

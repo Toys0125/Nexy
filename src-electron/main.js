@@ -10,6 +10,7 @@ const {
     dialog,
     Notification: ElectronNotification,
     nativeImage,
+    shell,
     nativeTheme,
     session
 } = require('electron');
@@ -269,6 +270,48 @@ ipcMain.handle('app:getArch', () => {
 });
 ipcMain.handle('app:getClipboardText', () => {
     return clipboard.readText();
+});
+
+ipcMain.handle('app:copyImageToClipboard', (_event, imagePath) => {
+    if (typeof imagePath !== 'string' || !imagePath) {
+        throw new Error('An image path is required');
+    }
+    const image = nativeImage.createFromPath(imagePath);
+    if (image.isEmpty()) {
+        throw new Error('Could not read an image from the selected file');
+    }
+    clipboard.writeImage(image);
+    return true;
+});
+
+ipcMain.handle('app:focusWindow', () => {
+    if (!mainWindow || mainWindow.isDestroyed()) return;
+    mainWindow.show();
+    mainWindow.focus();
+});
+
+ipcMain.handle('app:flashWindow', () => {
+    if (!mainWindow || mainWindow.isDestroyed()) return;
+    mainWindow.flashFrame(true);
+});
+
+ipcMain.handle('app:setStartup', (_event, enabled) => {
+    if (process.platform === 'win32' || process.platform === 'darwin') {
+        app.setLoginItemSettings({
+            openAtLogin: Boolean(enabled),
+            args: ['--startup']
+        });
+    }
+});
+
+ipcMain.handle('app:openCalendarFile', async (_event, content) => {
+    if (typeof content !== 'string' || !content.startsWith('BEGIN:VCALENDAR')) {
+        throw new Error('Invalid calendar file content');
+    }
+    const filePath = path.join(os.tmpdir(), `Nexy-calendar-${Date.now()}-${process.pid}.ics`);
+    fs.writeFileSync(filePath, content, 'utf8');
+    const error = await shell.openPath(filePath);
+    if (error) throw new Error(error);
 });
 
 ipcMain.handle('app:getNoUpdater', () => {

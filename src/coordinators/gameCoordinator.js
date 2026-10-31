@@ -203,7 +203,7 @@ async function runRestartCrashedGameFlow(location) {
         console.log("SteamVR isn't running, not relaunching VRChat");
         return;
     }
-    AppApi.FocusWindow();
+    window.electron.focusWindow();
     const message = 'VRChat crashed, attempting to rejoin last instance';
     toast(message);
     const entry = {

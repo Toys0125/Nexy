@@ -368,7 +368,7 @@ export const useVrcxStore = defineStore('Vrcx', () => {
             console.log('Screenshot metadata added', newPath);
         }
         if (advancedSettingsStore.screenshotHelperCopyToClipboard) {
-            await AppApi.CopyImageToClipboard(newPath);
+            await window.electron.copyImageToClipboard(newPath);
             console.log('Screenshot copied to clipboard', newPath);
         }
     }
@@ -635,7 +635,7 @@ export const useVrcxStore = defineStore('Vrcx', () => {
                 break;
         }
         if (shouldFocusWindow) {
-            AppApi.FocusWindow();
+            window.electron.focusWindow();
         }
     }
 
@@ -685,7 +685,7 @@ export const useVrcxStore = defineStore('Vrcx', () => {
                 title: t('dialog.registry_backup.header')
             });
             showRegistryBackupDialog();
-            await AppApi.FocusWindow();
+            await window.electron.focusWindow();
             await configRepository.setString('VRCX_VRChatRegistryLastRestoreCheck', lastBackupDate);
         } else {
             await tryAutoBackupVrcRegistry();

@@ -1,5 +1,6 @@
 using System;
 using System.IO;
+using System.Runtime.InteropServices;
 using System.Threading;
 using NLog;
 
@@ -16,6 +17,20 @@ namespace VRCX
         private bool _firstReading = true; // Add this flag
         private Thread _thread;
         private static readonly Logger logger = LogManager.GetCurrentClassLogger();
+
+        [StructLayout(LayoutKind.Sequential)]
+        private struct SystemFileTime
+        {
+            public uint Low;
+            public uint High;
+            public long Ticks => unchecked((long)(((ulong)High << 32) | Low));
+        }
+
+        [DllImport("kernel32.dll", SetLastError = true)]
+        private static extern bool GetSystemTimes(
+            out SystemFileTime idle,
+            out SystemFileTime kernel,
+            out SystemFileTime user);
 
         static SystemMonitorElectron()
         {
@@ -152,6 +167,9 @@ namespace VRCX
 
         private double GetUptime()
         {
+            if (OperatingSystem.IsWindows())
+                return Environment.TickCount64;
+
             try
             {
                 var uptimeContent = File.ReadAllText("/proc/uptime");
@@ -170,6 +188,14 @@ namespace VRCX
 
         private (long TotalTime, long IdleTime)? ReadCpuInfo()
         {
+            if (OperatingSystem.IsWindows())
+            {
+                if (!GetSystemTimes(out var idle, out var kernel, out var user))
+                    return null;
+                // Kernel time includes idle time according to the Win32 API.
+                return (kernel.Ticks + user.Ticks, idle.Ticks);
+            }
+
             try
             {
                 var statContent = File.ReadAllText("/proc/stat");
