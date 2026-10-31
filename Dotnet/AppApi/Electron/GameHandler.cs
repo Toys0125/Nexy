@@ -144,16 +144,11 @@ namespace VRCX
             if (!OperatingSystem.IsWindows())
                 return false;
 
-            var executable = path.EndsWith(".exe", StringComparison.OrdinalIgnoreCase)
-                ? path : Path.Join(path, "launch.exe");
-            if (!File.Exists(executable))
+            var startInfo = GameLaunch.WindowsStartInfo(path, arguments);
+            if (startInfo == null)
                 return false;
 
-            Process.Start(new ProcessStartInfo(executable, arguments)
-            {
-                WorkingDirectory = Path.GetDirectoryName(executable),
-                UseShellExecute = false
-            })?.Dispose();
+            Process.Start(startInfo)?.Dispose();
             return true;
         }
 

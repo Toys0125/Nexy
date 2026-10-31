@@ -60,25 +60,13 @@ jobs:
       - name: Build frontend
         run: npm run prod
       - name: Build NSIS installer and portable ZIP
+        # Automatic validation never receives signing credentials, including
+        # same-repository PRs and branch pushes. Signing runs in release.yml.
         env:
-          NEXY_WINDOWS_SIGNING: ${{ github.event_name != 'pull_request' && vars.NEXY_WINDOWS_SIGNING || 'none' }}
-          NEXY_AZURE_SIGNING_ENDPOINT: ${{ vars.NEXY_AZURE_SIGNING_ENDPOINT }}
-          NEXY_AZURE_SIGNING_ACCOUNT: ${{ vars.NEXY_AZURE_SIGNING_ACCOUNT }}
-          NEXY_AZURE_SIGNING_PROFILE: ${{ vars.NEXY_AZURE_SIGNING_PROFILE }}
-          NEXY_SIGNING_PUBLISHER: ${{ vars.NEXY_SIGNING_PUBLISHER }}
-          AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
-          AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
-          AZURE_CLIENT_SECRET: ${{ secrets.AZURE_CLIENT_SECRET }}
-          WIN_CSC_LINK: ${{ secrets.WIN_CSC_LINK }}
-          WIN_CSC_KEY_PASSWORD: ${{ secrets.WIN_CSC_KEY_PASSWORD }}
+          NEXY_WINDOWS_SIGNING: none
         run: npm run build-electron
       - name: Validate isolated NSIS protocol registration and removal
         run: ./tests/electron/installer-protocol.test.ps1
-      - name: Verify configured release signatures
-        if: github.event_name != 'pull_request' && (vars.NEXY_WINDOWS_SIGNING == 'azure' || vars.NEXY_WINDOWS_SIGNING == 'pfx')
-        run: |
-          $version = (Get-Content Version -Raw).Trim()
-          ./build-scripts/verify-windows-signatures.ps1 -Paths @("build/Nexy_${version}_Setup_x64.exe", 'build/win-unpacked/Nexy.exe', 'build/win-unpacked/resources/app.asar.unpacked/build/Electron/VRCX-Electron.dll')
       - name: Validate output files and portable package contents
         run: |
           $version = (Get-Content Version -Raw).Trim()
