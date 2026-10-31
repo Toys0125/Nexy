@@ -49,6 +49,11 @@ const validChannels = ['launch-command'];
 contextBridge.exposeInMainWorld('electron', {
     getArch: () => ipcRenderer.invoke('app:getArch'),
     getClipboardText: () => ipcRenderer.invoke('app:getClipboardText'),
+    copyImageToClipboard: (imagePath) => ipcRenderer.invoke('app:copyImageToClipboard', imagePath),
+    focusWindow: () => ipcRenderer.invoke('app:focusWindow'),
+    flashWindow: () => ipcRenderer.invoke('app:flashWindow'),
+    setStartup: (enabled) => ipcRenderer.invoke('app:setStartup', enabled),
+    openCalendarFile: (content) => ipcRenderer.invoke('app:openCalendarFile', content),
     getNoUpdater: () => ipcRenderer.invoke('app:getNoUpdater'),
     setTrayIconNotification: (notify) => ipcRenderer.invoke('app:setTrayIconNotification', notify),
     setThemeSource: (source) => ipcRenderer.invoke('app:setThemeSource', source),

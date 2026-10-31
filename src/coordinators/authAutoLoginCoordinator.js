@@ -43,7 +43,7 @@ export async function runHandleAutoLoginFlow({ isOnline = () => navigator.onLine
         );
         authStore.setAttemptingAutoLogin(false);
         await authStore.handleLogoutEvent();
-        AppApi.FlashWindow();
+        window.electron.flashWindow();
         return;
     }
     authStore.autoLoginAttempts.add(currentTimestamp);

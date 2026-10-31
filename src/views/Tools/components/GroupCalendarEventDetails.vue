@@ -90,7 +90,7 @@
     async function openCalendarEvent(event) {
         const content = await getCalendarIcs(event);
         if (!content) return;
-        await AppApi.OpenCalendarFile(content);
+        await window.electron.openCalendarFile(content);
     }
 
     /**

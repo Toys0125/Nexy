@@ -147,7 +147,7 @@ export const useGeneralSettingsStore = defineStore('GeneralSettings', () => {
     function setIsStartAtWindowsStartup() {
         isStartAtWindowsStartup.value = !isStartAtWindowsStartup.value;
         configRepository.setBool('VRCX_StartAtWindowsStartup', isStartAtWindowsStartup.value);
-        AppApi.SetStartup(isStartAtWindowsStartup.value);
+        window.electron.setStartup(isStartAtWindowsStartup.value);
     }
     function setIsStartAsMinimizedState() {
         isStartAsMinimizedState.value = !isStartAsMinimizedState.value;

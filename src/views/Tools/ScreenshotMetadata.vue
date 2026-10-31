@@ -601,7 +601,7 @@
         if (!path) {
             return;
         }
-        AppApi.CopyImageToClipboard(path).then(() => {
+        window.electron.copyImageToClipboard(path).then(() => {
             toast.success('Image copied to clipboard');
         });
     }
