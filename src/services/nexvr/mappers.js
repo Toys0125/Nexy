@@ -324,9 +324,11 @@ export function toVrcUser(user, presence) {
 /**
  * @param {any} me NexVR /auth/me payload
  * @param {Map<string, any>} friends FriendPresence by id, from the realtime socket
+ * @param {boolean} [friendsComplete] Whether the friends snapshot arrived, so an
+ *   empty map means no friends rather than none received yet
  * @returns {object} VRChat CurrentUser
  */
-export function toVrcCurrentUser(me, friends) {
+export function toVrcCurrentUser(me, friends, friendsComplete = true) {
     const onlineFriends = [];
     const activeFriends = [];
     const offlineFriends = [];
@@ -363,6 +365,7 @@ export function toVrcCurrentUser(me, friends) {
         status: PREFERENCE_STATUS[me.userPreferenceStatus] ?? 'active',
         state: 'online',
         friends: friendsByAge,
+        $friendsComplete: friendsComplete,
         onlineFriends,
         activeFriends,
         offlineFriends,

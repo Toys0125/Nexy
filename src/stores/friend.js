@@ -974,6 +974,12 @@ export const useFriendStore = defineStore('Friend', () => {
     async function tryApplyFriendOrder() {
         const friendOrder = userStore.currentUser.friends;
         if (!friendOrder?.length) {
+            // no friends at all, not a snapshot that never came: the next
+            // friend is #1, not one past a count saved before
+            if (userStore.currentUser.$friendsComplete) {
+                state.friendNumber = 0;
+                await configRepository.setInt(`VRCX_friendNumber_${userStore.currentUser.id}`, 0);
+            }
             return;
         }
         runInSortedFriendsBatch(() => {

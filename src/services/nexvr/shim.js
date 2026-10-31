@@ -232,7 +232,7 @@ async function currentUser() {
         throw err;
     }
     await ensureRealtime(me.id);
-    return toVrcCurrentUser(me, realtime.friends);
+    return toVrcCurrentUser(me, realtime.friends, realtime.hasSnapshot);
 }
 
 /**
@@ -635,7 +635,7 @@ const routes = [
                 patch.displayName = body.displayName;
             }
             const me = await nexvr('/users/me', { method: 'PATCH', body: patch });
-            return toVrcCurrentUser(me, realtime.friends);
+            return toVrcCurrentUser(me, realtime.friends, realtime.hasSnapshot);
         }
     ],
     [
