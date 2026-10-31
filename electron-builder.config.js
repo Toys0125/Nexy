@@ -94,6 +94,7 @@ module.exports = {
     },
     nsis: {
         artifactName: 'Nexy_Version.exe',
+        include: 'build-scripts/nsis-legacy-upgrade.nsh',
         oneClick: false,
         perMachine: true,
         allowToChangeInstallationDirectory: true
