@@ -2,8 +2,10 @@ name: Nightly
 
 on:
   schedule:
-    # Midnight UTC every day.
-    - cron: '0 0 * * *'
+    # Midnight Europe/Helsinki every day. Cron is UTC-only, so fire at both 21:00 (EEST, UTC+3)
+    # and 22:00 (EET, UTC+2); the prepare job drops whichever run is not midnight in Helsinki.
+    - cron: '0 21 * * *'
+    - cron: '0 22 * * *'
   workflow_dispatch:
     inputs:
       force:
@@ -39,11 +41,26 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
           FORCE: ${{ inputs.force || false }}
+          EVENT: ${{ github.event_name }}
+          SCHEDULE: ${{ github.event.schedule }}
+          TZ: Europe/Helsinki
         run: |
+          # Only the schedule entry matching Helsinki's current UTC offset builds.
+          if [ "$EVENT" = "schedule" ]; then
+            offset="$(date +%z)"
+            expected_hour="$(( (24 - 10#${offset:1:2}) % 24 ))"
+            if [ "$SCHEDULE" != "0 ${expected_hour} * * *" ]; then
+              echo "Schedule '${SCHEDULE}' is not midnight in Helsinki (UTC$(date +%:z)); skipping."
+              echo "skip=true" >> "$GITHUB_OUTPUT"
+              exit 0
+            fi
+          fi
+
           sha="$(gh api "repos/$GH_REPO/commits/master" --jq '.sha')"
           # Stamped into the build as-is. The app shows it, reads the -nightly suffix as the
           # Nightly channel, and marks the release whose title "Nexy <version>" matches as current.
-          version="v$(date -u +%Y.%m.%d)-nightly"
+          # Dated in Helsinki time.
+          version="v$(date +%Y.%m.%d)-nightly"
           tag="${version}"
           echo "sha=${sha}" >> "$GITHUB_OUTPUT"
           echo "version=${version}" >> "$GITHUB_OUTPUT"
