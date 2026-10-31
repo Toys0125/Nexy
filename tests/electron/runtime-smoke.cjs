@@ -4,14 +4,35 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
-const { pathToFileURL } = require('node:url');
+const { pathToFileURL, fileURLToPath } = require('node:url');
+const { execFileSync } = require('node:child_process');
 const { createDesktopApi } = require('../../src-electron/desktop-api');
 const { createRendererSecurity } = require('../../src-electron/renderer-security');
 const { applyGpuPreferences } = require('../../src-electron/gpu-preferences');
 
-const profile = fs.mkdtempSync(path.join(os.tmpdir(), 'Nexy-Electron-Smoke-'));
-app.setPath('userData', profile);
 const root = path.resolve(__dirname, '../..');
+const profileDirectory = fs.mkdtempSync(path.join(os.tmpdir(), 'Nexy Electron Smoke '));
+// CI's TEMP contains RUNNER~1. Exercise a genuine 8.3 alias on every Windows
+// run so Chromium's expansion to a long path cannot bypass local validation.
+const profile =
+    process.platform === 'win32'
+        ? execFileSync(
+              'powershell.exe',
+              [
+                  '-NoProfile',
+                  '-NonInteractive',
+                  '-Command',
+                  '. (Join-Path $env:NEXY_TEST_ROOT "build-scripts/installer-paths.ps1"); [NexyInstallerPaths]::ShortFile($env:NEXY_TEST_LONG_PATH)'
+              ],
+              {
+                  encoding: 'utf8',
+                  windowsHide: true,
+                  env: { ...process.env, NEXY_TEST_ROOT: root, NEXY_TEST_LONG_PATH: profileDirectory }
+              }
+          ).trim()
+        : profileDirectory;
+console.log('Smoke profile requested:', profile, 'canonical:', fs.realpathSync.native(profile));
+app.setPath('userData', profile);
 const rid = `${process.platform === 'win32' ? 'win' : process.platform === 'darwin' ? 'osx' : 'linux'}-${process.arch}`;
 require(path.join(root, 'build/Electron', rid, 'VRCX-Electron.cjs'));
 const dotnet = require('node-api-dotnet/net10.0');
@@ -31,6 +52,7 @@ const managed = new dotnet.VRCX.AppApiElectron();
 const vr = new dotnet.VRCX.AppApiVrElectron();
 let window;
 let offscreen;
+let archived;
 const rendererIpc = createRendererSecurity(ipcMain);
 
 app.whenReady()
@@ -83,7 +105,30 @@ app.whenReady()
             `location.href = ${JSON.stringify(pathToFileURL(path.join(profile, 'foreign.html')).href)}; void 0`
         );
         await blockedNavigation;
-        assert.equal(window.webContents.getURL(), pathToFileURL(documentPath).href);
+        assert.equal(
+            fs.realpathSync.native(fileURLToPath(window.webContents.getURL())),
+            fs.realpathSync.native(documentPath)
+        );
+        // Exercise the packaged-app filesystem too, with its outer archive
+        // accessed through the same real 8.3 alias as an installed app.
+        const archiveInput = path.join(profile, 'archive-input');
+        fs.mkdirSync(archiveInput);
+        fs.writeFileSync(path.join(archiveInput, 'index.html'), '<html><body>Archived document</body></html>');
+        const archivePath = path.join(profile, 'renderer.asar');
+        await require('@electron/asar').createPackage(archiveInput, archivePath);
+        const archivedDocument = path.join(archivePath, 'index.html');
+        archived = new BrowserWindow({
+            show: false,
+            webPreferences: { preload: path.join(root, 'src-electron/preload.js') }
+        });
+        rendererIpc.protectWindow(archived, pathToFileURL(archivedDocument).href);
+        await archived.loadFile(archivedDocument);
+        assert.equal(
+            await archived.webContents.executeJavaScript(
+                "window.interopApi.callDotNetMethod('AppApiElectron', 'GetZoom', [])"
+            ),
+            1.5
+        );
         // Programmatic loads bypass navigation events. IPC must still reject
         // an untrusted document even if it has the privileged preload bridge.
         await window.loadURL('data:text/html,<html><body>Untrusted document</body></html>');
@@ -170,6 +215,7 @@ app.whenReady()
     );
 
 function finish(code) {
+    archived?.destroy();
     offscreen?.destroy();
     window?.destroy();
     program.Exit();

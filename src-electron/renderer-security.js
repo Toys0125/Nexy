@@ -1,10 +1,21 @@
+const fs = require('node:fs');
+const { fileURLToPath, pathToFileURL } = require('node:url');
+
 /** Confine privileged IPC to each registered window's own main document. */
 function createRendererSecurity(ipcMain) {
     const documents = new Map();
     const documentUrl = (value) => {
         try {
-            const url = new URL(value);
+            let url = new URL(value);
             url.hash = ''; // Vue's hash routes stay in the same trusted document.
+            if (url.protocol === 'file:') {
+                const search = url.search;
+                // Chromium expands Windows 8.3 paths when it loads a document.
+                // Use native realpath for both sides; the JS implementation
+                // preserves short names. Electron also supports files in ASAR.
+                url = pathToFileURL(fs.realpathSync.native(fileURLToPath(url)));
+                url.search = search;
+            }
             return url.href;
         } catch {
             return undefined;

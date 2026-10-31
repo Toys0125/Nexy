@@ -1,9 +1,22 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const { EventEmitter } = require('node:events');
+const fs = require('node:fs');
+const os = require('node:os');
+const path = require('node:path');
+const { pathToFileURL } = require('node:url');
 const { createRendererSecurity } = require('../../src-electron/renderer-security');
 
-function fixture(url = 'file:///C:/Nexy/build/html/index.html') {
+const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'Nexy Renderer Security '));
+const documentUrl = pathToFileURL(path.join(directory, 'index.html')).href;
+const overlayUrl = pathToFileURL(path.join(directory, 'vr.html')).href;
+for (const file of ['index.html', 'vr.html', 'other.html']) fs.writeFileSync(path.join(directory, file), 'fixture');
+test.after(() => {
+    for (const file of ['index.html', 'vr.html', 'other.html']) fs.unlinkSync(path.join(directory, file));
+    fs.rmdirSync(directory);
+});
+
+function fixture(url = documentUrl) {
     const handles = new Map();
     const messages = new Map();
     const security = createRendererSecurity({
@@ -41,7 +54,7 @@ test('native IPC requires a registered window, its main frame, and its intended 
         assert.throws(() => handles.get('native')(event), /Untrusted IPC sender/);
         messages.get('ready')(event);
     }
-    contents.mainFrame.url = 'file:///C:/Nexy/build/html/index.html';
+    contents.mainFrame.url = documentUrl;
     contents.emit('destroyed');
     assert.throws(() => handles.get('native')(event), /Untrusted IPC sender/);
     assert.equal(calls, 2, 'Rejected requests reached native code');
@@ -82,11 +95,35 @@ test('window guards block other documents, redirects, subframes, popups and webv
 });
 
 test('development and overlay documents have the same exact-document IPC policy', () => {
-    for (const url of ['http://localhost:9000/index.html', 'file:///C:/Nexy/build/html/vr.html']) {
+    for (const url of ['http://localhost:9000/index.html', overlayUrl]) {
         const { security, handles, contents, event } = fixture(url);
         security.handle('native', () => true);
         assert.equal(handles.get('native')(event), true);
         contents.mainFrame.url = url.replace('index.html', 'vr.html').replace('vr.html', 'other.html');
         assert.throws(() => handles.get('native')(event), /Untrusted IPC sender/);
+    }
+});
+
+test('file aliases match only the intended existing document and preserve query restrictions', () => {
+    const alias = path.join(directory, 'alias');
+    fs.symlinkSync(directory, alias, process.platform === 'win32' ? 'junction' : 'dir');
+    try {
+        const aliasUrl = pathToFileURL(path.join(alias, 'index.html')).href;
+        const { security, handles, contents, event } = fixture(aliasUrl);
+        security.handle('native', () => true);
+        contents.mainFrame.url = documentUrl;
+        assert.equal(handles.get('native')(event), true);
+        contents.mainFrame.url = documentUrl + '#settings';
+        assert.equal(handles.get('native')(event), true);
+        for (const url of [
+            overlayUrl,
+            documentUrl + '?changed=1',
+            pathToFileURL(path.join(alias, 'missing.html')).href
+        ]) {
+            contents.mainFrame.url = url;
+            assert.throws(() => handles.get('native')(event), /Untrusted IPC sender/);
+        }
+    } finally {
+        fs.unlinkSync(alias);
     }
 });
