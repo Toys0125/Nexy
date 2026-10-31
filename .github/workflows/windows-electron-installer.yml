@@ -1,0 +1,69 @@
+name: Windows Electron Installer
+
+on:
+  push:
+    branches:
+      - feat/electron-only-migration
+    paths-ignore:
+      - '**/*.md'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build-installer:
+    runs-on: windows-latest
+    defaults:
+      run:
+        shell: pwsh
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '24'
+          cache: npm
+      - uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: '10.0.x'
+      - name: Install Node dependencies
+        run: npm ci
+      - name: Build Windows .NET bridge
+        run: dotnet build Dotnet/VRCX-Electron.csproj -p:Configuration=Release -p:Platform=x64 --runtime win-x64
+      - name: Build frontend
+        run: npm run prod
+      - name: Build NSIS installer and portable ZIP
+        run: npm run build-electron
+      - name: Validate output files and portable package contents
+        run: |
+          $version = (Get-Content Version -Raw).Trim()
+          $setup = "build/Nexy_${version}_Setup_x64.exe"
+          $portable = "build/Nexy_${version}_x64.zip"
+          if (-not (Test-Path $setup)) { throw "Windows installer not found: $setup" }
+          if (-not (Test-Path $portable)) { throw "Portable ZIP not found: $portable" }
+          if ((Get-Item $setup).Length -lt 10000000) { throw "Installer appears unexpectedly small" }
+          if ((Get-Item $portable).Length -lt 10000000) { throw "Portable ZIP appears unexpectedly small" }
+          New-Item -ItemType Directory -Force build/portable-check | Out-Null
+          Expand-Archive -Path $portable -DestinationPath build/portable-check
+          $required = @(
+            'Nexy.exe',
+            'resources/app.asar',
+            'resources/app.asar.unpacked/build/Electron/VRCX-Electron.cjs',
+            'resources/app.asar.unpacked/build/Electron/VRCX-Electron.dll',
+            'resources/dotnet-runtime/dotnet.exe'
+          )
+          foreach ($file in $required) {
+            if (-not (Test-Path (Join-Path 'build/portable-check' $file))) {
+              throw "Missing portable runtime file: $file"
+            }
+          }
+          Get-FileHash $setup -Algorithm SHA256
+          Get-FileHash $portable -Algorithm SHA256
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: Nexy-Electron-Windows-x64
+          if-no-files-found: error
+          path: |
+            build/Nexy_*_Setup_x64.exe
+            build/Nexy_*_x64.zip
