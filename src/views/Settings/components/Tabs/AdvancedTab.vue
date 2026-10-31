@@ -548,7 +548,7 @@
         cachedInstances: 0
     });
 
-    const isLinux = computed(() => LINUX);
+    const isLinux = computed(() => IS_LINUX);
 
     function handlePurge() {
         const days = selectedPurgePeriod.value === 'all' ? null : parseInt(selectedPurgePeriod.value, 10);

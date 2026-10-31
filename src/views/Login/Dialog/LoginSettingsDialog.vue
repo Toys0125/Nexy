@@ -92,7 +92,7 @@
 
     const open = ref(false);
     const proxyServerLocal = ref('');
-    const isLinux = computed(() => LINUX);
+    const isLinux = computed(() => IS_LINUX);
 
     watch(open, (isOpen) => {
         if (isOpen) {

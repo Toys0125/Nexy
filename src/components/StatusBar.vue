@@ -386,7 +386,7 @@
     const { t } = useI18n();
 
     const isMacOS = computed(() => navigator.platform.includes('Mac'));
-    const isLinux = computed(() => LINUX);
+    const isLinux = computed(() => IS_LINUX);
 
     const gameStore = useGameStore();
     const gameLogStore = useGameLogStore();

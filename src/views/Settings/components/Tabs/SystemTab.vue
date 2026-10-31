@@ -218,7 +218,7 @@
     const { setAutoUpdateVRCX, checkForVRCXUpdate, showVRCXUpdateDialog, showChangeLogDialog } = vrcxUpdaterStore;
 
     const ossDialog = ref(false);
-    const isLinux = computed(() => LINUX);
+    const isLinux = computed(() => IS_LINUX);
     const isMacOS = computed(() => {
         return navigator.platform.indexOf('Mac') > -1;
     });

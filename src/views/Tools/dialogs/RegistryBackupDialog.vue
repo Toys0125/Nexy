@@ -219,19 +219,8 @@
     }
 
     async function restoreVrcRegistryFromFile() {
-        const filePath = await AppApi.OpenFileSelectorDialog(null, '.json', 'JSON Files (*.json)|*.json');
-        if (WINDOWS) {
-            if (filePath === '') {
-                return;
-            }
-        }
-
-        let json;
-        if (LINUX) {
-            json = await openJsonFileSelectorDialogElectron();
-        } else {
-            json = await AppApi.ReadVrcRegJsonFile(filePath);
-        }
+        const json = await openJsonFileSelectorDialogElectron();
+        if (!json) return;
 
         try {
             const data = JSON.parse(json);

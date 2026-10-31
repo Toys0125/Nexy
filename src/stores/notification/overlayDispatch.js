@@ -148,11 +148,7 @@ export function createOverlayDispatch({
      * @param {string} image
      */
     function desktopNotification(displayName, message, image) {
-        if (WINDOWS) {
-            AppApi.DesktopNotification(displayName, message, image);
-        } else {
-            window.electron.desktopNotification(displayName, message, image);
-        }
+        window.electron.desktopNotification(displayName, message, image);
     }
 
     return {

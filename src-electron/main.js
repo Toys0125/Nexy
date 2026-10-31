@@ -68,7 +68,7 @@ const noDesktop = args.includes('--no-desktop');
 const startup = args.includes('--startup');
 const debug = args.includes('--hot-reload');
 const noUpdater = args.includes('--no-updater') || fs.existsSync(path.join(rootDir, '.no-updater'));
-if (app.isPackaged && process.defaultApp && process.platform !== 'win32') {
+if (app.isPackaged && process.defaultApp) {
     if (process.argv.length >= 2) {
         app.setAsDefaultProtocolClient(NEXY_URI_PREFIX, process.execPath, [path.resolve(process.argv[1])]);
     } else {
@@ -816,7 +816,9 @@ app.whenReady().then(() => {
     allowNexvrRealtime();
     createWindow();
     createTray();
-    installVRCX();
+    if (process.platform === 'linux') {
+        installVRCX();
+    }
 
     // only initialise when the app is ready otherwise it could get called early and crash the app
     app.on('activate', function () {

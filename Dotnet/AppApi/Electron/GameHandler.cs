@@ -14,7 +14,7 @@ namespace VRCX
         }
 
         /// <summary>
-        /// for Cef only, checks if VRChat and SteamVR are currently running and updates the browser using JavaScript with the results.
+        /// The Electron frontend polls game state directly through the .NET bridge.
         /// </summary>
         public override void CheckGameRunning()
         {
@@ -38,7 +38,9 @@ namespace VRCX
 
         public override bool IsSteamVRRunning()
         {
-            var processNames = new[] { "vrmonitor", "monado-service" };
+            var processNames = OperatingSystem.IsWindows()
+                ? new[] { "vrserver", "vrmonitor" }
+                : new[] { "vrmonitor", "monado-service" };
             foreach (var name in processNames)
             {
                 var processes = Process.GetProcessesByName(name);
@@ -49,6 +51,9 @@ namespace VRCX
                 if (isSteamVRRunning)
                     return true;
             }
+
+            if (OperatingSystem.IsWindows())
+                return false;
 
             // Check for wivrn-server (requires full scan)
             var allProcesses = Process.GetProcesses();
@@ -72,6 +77,34 @@ namespace VRCX
 
         public override bool StartGame(string arguments)
         {
+            if (OperatingSystem.IsWindows())
+            {
+                try
+                {
+                    var steamExecutable = Path.Join(_steamPath, "steam.exe");
+                    if (File.Exists(steamExecutable))
+                    {
+                        Process.Start(new ProcessStartInfo(steamExecutable, $"-applaunch 438100 {arguments}")
+                        {
+                            UseShellExecute = false
+                        })?.Dispose();
+                        return true;
+                    }
+
+                    // Steam's protocol handler works without an explicitly configured installation path.
+                    Process.Start(new ProcessStartInfo("steam://rungameid/438100")
+                    {
+                        UseShellExecute = true
+                    })?.Dispose();
+                    return true;
+                }
+                catch (Exception ex)
+                {
+                    logger.Error(ex, "Failed to launch NexVR through Steam on Windows");
+                    return false;
+                }
+            }
+
             try
             {
                 Process.Start(new ProcessStartInfo
@@ -121,12 +154,27 @@ namespace VRCX
 
         public override bool StartGameFromPath(string path, string arguments)
         {
-            // This method is not used
-            return false;
+            if (!OperatingSystem.IsWindows())
+                return false;
+
+            var executable = path.EndsWith(".exe", StringComparison.OrdinalIgnoreCase)
+                ? path : Path.Join(path, "launch.exe");
+            if (!File.Exists(executable))
+                return false;
+
+            Process.Start(new ProcessStartInfo(executable, arguments)
+            {
+                WorkingDirectory = Path.GetDirectoryName(executable),
+                UseShellExecute = false
+            })?.Dispose();
+            return true;
         }
 
         public override Task<bool> TryOpenInstanceInVrc(string launchUrl)
         {
+            if (OperatingSystem.IsWindows())
+                return Task.FromResult(false); // Windows attaches via the standard game launch handler.
+
             try
             {
                 var pid = FindVRChatPid();

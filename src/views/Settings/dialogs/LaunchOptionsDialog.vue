@@ -84,7 +84,7 @@
         vrcLaunchPathOverride: ''
     });
 
-    const isLinux = computed(() => LINUX);
+    const isLinux = computed(() => IS_LINUX);
 
     function init() {
         configRepository

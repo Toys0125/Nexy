@@ -26,6 +26,28 @@ namespace VRCX
         {
             const string vrchatAppid = "438100";
             _homeDirectory = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
+            if (OperatingSystem.IsWindows())
+            {
+                _steamPath = Path.Join(Environment.GetFolderPath(Environment.SpecialFolder.ProgramFilesX86), "Steam");
+                try
+                {
+                    using var steamKey = Registry.CurrentUser.OpenSubKey(@"Software\Valve\Steam");
+                    var steamPath = steamKey?.GetValue("SteamPath")?.ToString();
+                    if (!string.IsNullOrWhiteSpace(steamPath))
+                        _steamPath = steamPath;
+                }
+                catch (Exception e)
+                {
+                    logger.Warn(e, "Failed to locate Steam from Windows registry");
+                }
+
+                _steamUserdataPath = Path.Join(_steamPath, "userdata");
+                _vrcInstallPath = Path.Join(_steamPath, "steamapps", "common", "VRChat");
+                _vrcAppDataPath = Path.Join(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData) + "Low", "VRChat", "VRChat");
+                _vrcCrashesPath = Path.Join(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Temp", "VRChat", "VRChat", "Crashes");
+                return;
+            }
+
             _steamUserdataPath = Path.Join(_homeDirectory, ".steam/steam/userdata");
             _steamPath = Path.Join(_homeDirectory, ".local/share/Steam");
 
@@ -129,7 +151,9 @@ namespace VRCX
 
         public override string GetVRChatPhotosLocation()
         {
-            var defaultPath = Path.Join(_vrcPrefixPath, "drive_c/users/steamuser/Pictures/VRChat");
+            var defaultPath = OperatingSystem.IsWindows()
+                ? Path.Join(Environment.GetFolderPath(Environment.SpecialFolder.MyPictures), "VRChat")
+                : Path.Join(_vrcPrefixPath, "drive_c/users/steamuser/Pictures/VRChat");
             try
             {
                 var json = ReadConfigFile();
@@ -191,8 +215,28 @@ namespace VRCX
 
         public override string GetVRChatScreenshotsLocation()
         {
-            // program files steam userdata screenshots
-            return Path.Join(_steamUserdataPath, "760/remote/438100/screenshots");
+            if (OperatingSystem.IsWindows())
+            {
+                if (!Directory.Exists(_steamUserdataPath))
+                    return string.Empty;
+                var newest = DateTime.MinValue;
+                var selected = string.Empty;
+                foreach (var dir in Directory.GetDirectories(_steamUserdataPath))
+                {
+                    var screenshots = Path.Join(dir, "760", "remote", "438100", "screenshots");
+                    if (!Directory.Exists(screenshots))
+                        continue;
+                    var lastWrite = Directory.GetLastWriteTimeUtc(screenshots);
+                    if (lastWrite > newest)
+                    {
+                        newest = lastWrite;
+                        selected = screenshots;
+                    }
+                }
+                return selected;
+            }
+
+            return Path.Join(GetSteamUserdataPathFromRegistry(), "760", "remote", "438100", "screenshots");
         }
 
         public override bool OpenVrcxAppDataFolder()
@@ -268,6 +312,13 @@ namespace VRCX
         {
             if (!File.Exists(path) && !Directory.Exists(path))
                 return;
+
+            if (OperatingSystem.IsWindows())
+            {
+                var arguments = isFolder ? $"\"{path}\"" : $"/select,\"{path}\"";
+                Process.Start(new ProcessStartInfo("explorer.exe", arguments) { UseShellExecute = true })?.Dispose();
+                return;
+            }
 
             string directoryPath = isFolder ? path : Path.GetDirectoryName(path);
             var commandAttempt = new Dictionary<string, string>

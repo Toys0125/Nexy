@@ -16,10 +16,6 @@ using SixLabors.ImageSharp;
 using Cookie = System.Net.Cookie;
 using Timer = System.Threading.Timer;
 
-#if !LINUX
-using CefSharp;
-using System.Windows.Forms;
-#endif
 
 namespace VRCX
 {
@@ -122,9 +118,6 @@ namespace VRCX
                 VRCXStorage.Instance.Save();
                 const string message =
                     "The proxy server URI you used is invalid.\nVRCX will close, please correct the proxy URI.";
-#if !LINUX
-                System.Windows.Forms.MessageBox.Show(message, "Invalid Proxy URI", MessageBoxButtons.OK, MessageBoxIcon.Error);
-#endif
                 Logger.Error(message);
                 Environment.Exit(0);
             }
@@ -138,9 +131,6 @@ namespace VRCX
 
         public void ClearCookies()
         {
-#if !LINUX
-            Cef.GetGlobalCookieManager().DeleteCookies();
-#endif
             CookieContainer = new CookieContainer();
             InitializeHttpClient();
             _cookieDirty = true;

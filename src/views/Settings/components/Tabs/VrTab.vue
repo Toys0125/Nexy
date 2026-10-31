@@ -313,7 +313,7 @@
 
     const isNotificationPositionDialogVisible = ref(false);
     const feedFiltersDialogMode = ref('');
-    const isLinux = computed(() => LINUX);
+    const isLinux = computed(() => IS_LINUX);
 
     const notificationOpacityValue = computed({
         get: () => [notificationOpacity.value],

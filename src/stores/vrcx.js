@@ -645,12 +645,7 @@ export const useVrcxStore = defineStore('Vrcx', () => {
     async function backupVrcRegistry(name) {
         let regJson;
         try {
-            if (WINDOWS) {
-                regJson = await AppApi.GetVRChatRegistry();
-            } else {
-                regJson = await AppApi.GetVRChatRegistryJson();
-                regJson = JSON.parse(regJson);
-            }
+            regJson = JSON.parse(await AppApi.GetVRChatRegistryJson());
         } catch (e) {
             console.error('Failed to get VRChat registry for backup:', e);
             return;

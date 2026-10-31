@@ -8,10 +8,6 @@ using System.Text;
 using System.Text.Json;
 using System.Threading;
 
-#if !LINUX
-using System.Windows.Forms;
-using CefSharp.Internals;
-#endif
 
 namespace VRCX
 {
@@ -37,9 +33,6 @@ namespace VRCX
                 {
                     var message =
                         "Move your \"Nexy.sqlite3\" into a folder then specify the folder in the launch parameter e.g.\n--config=\"C:\\Nexy\\\"";
-#if !LINUX
-                    MessageBox.Show(message, "--config is now a directory", MessageBoxButtons.OK, MessageBoxIcon.Error);
-#endif
                     Console.WriteLine(message);
                     Environment.Exit(0);
                 }
@@ -47,18 +40,6 @@ namespace VRCX
                 Program.AppDataDirectory = LaunchArguments.ConfigDirectory;
             }
 
-#if !LINUX
-            var disableClosing = LaunchArguments.IsUpgrade || // we're upgrading, allow it
-                                        !string.IsNullOrEmpty(CommandLineArgsParser.GetArgumentValue(args, CefSharpArguments.SubProcessTypeArgument)); // we're launching a subprocess, allow it
-
-            // if we're launching a second instance with same config directory, focus the first instance then exit
-            if (!disableClosing && IsDuplicateProcessRunning(LaunchArguments))
-            {
-                IPCToMain();
-                Thread.Sleep(10);
-                Environment.Exit(0);
-            }
-#endif
         }
 
         private static VrcxLaunchArguments ParseArgs(string[] args)
