@@ -59,6 +59,32 @@ jobs:
           }
           Get-FileHash $setup -Algorithm SHA256
           Get-FileHash $portable -Algorithm SHA256
+      - name: Smoke-test NSIS silent install and uninstall
+        run: |
+          $version = (Get-Content Version -Raw).Trim()
+          $setup = (Resolve-Path "build/Nexy_${version}_Setup_x64.exe").Path
+          $installDir = Join-Path $env:TEMP 'NexyElectronInstallSmoke'
+          if (Test-Path $installDir) {
+            Remove-Item $installDir -Recurse -Force
+          }
+          $installerProcess = Start-Process -FilePath $setup -ArgumentList @('/S', "/D=$installDir") -Wait -PassThru
+          if ($installerProcess.ExitCode -ne 0) {
+            throw "Silent NSIS installation failed with exit code $($installerProcess.ExitCode)"
+          }
+          foreach ($path in @('Nexy.exe', 'resources/app.asar', 'resources/dotnet-runtime/dotnet.exe')) {
+            if (-not (Test-Path (Join-Path $installDir $path))) {
+              throw "Installed application is missing $path"
+            }
+          }
+          $uninstaller = Join-Path $installDir 'Uninstall Nexy.exe'
+          if (-not (Test-Path $uninstaller)) {
+            throw "Electron NSIS uninstaller was not created"
+          }
+          $uninstallProcess = Start-Process -FilePath $uninstaller -ArgumentList @('/S') -Wait -PassThru
+          if ($uninstallProcess.ExitCode -ne 0) {
+            throw "Silent NSIS uninstallation failed with exit code $($uninstallProcess.ExitCode)"
+          }
+          Write-Host 'NSIS silent installation and uninstallation succeeded'
       - uses: actions/upload-artifact@v7
         if: always()
         with:
