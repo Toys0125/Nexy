@@ -67,16 +67,12 @@ namespace VRCX
         /// </summary>
         public bool JoinNexvrInstance(string instanceId)
         {
-            if (string.IsNullOrEmpty(instanceId) ||
-                !System.Text.RegularExpressions.Regex.IsMatch(instanceId, "^[A-Za-z0-9_-]+$"))
-                return false;
+            var startInfo = NexvrLaunch.ForInstance(instanceId);
+            if (startInfo == null) return false;
 
             try
             {
-                Process.Start(new ProcessStartInfo($"nexvr://instances/{instanceId}/join")
-                {
-                    UseShellExecute = true
-                });
+                Process.Start(startInfo)?.Dispose();
                 return true;
             }
             catch (Exception e)

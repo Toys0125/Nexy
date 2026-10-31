@@ -47,16 +47,10 @@ jobs:
     steps:
       # download-artifact extracts the ZIP-wrapped Actions artifact, leaving
       # the original .exe ready to publish as a directly downloadable release asset.
-      - name: Extract Windows installer (.exe)
+      - name: Extract Windows Electron installer and portable ZIP
         uses: actions/download-artifact@v8
         with:
-          name: NexVR-Installer
-          path: release-assets
-
-      - name: Download Windows portable ZIP
-        uses: actions/download-artifact@v8
-        with:
-          name: Nexy-Zip
+          name: Electron-Windows-x64
           path: release-assets
 
       - name: Download Linux AppImages
@@ -79,7 +73,7 @@ jobs:
           shopt -s nullglob
           expected=(
             'Nexy_*_Setup_x64.exe'
-            'Nexy_*.zip'
+            'Nexy_*_x64.zip'
             'Nexy_*_x64.AppImage'
             'Nexy_*_arm64.AppImage'
             'Nexy_*_x64.dmg'

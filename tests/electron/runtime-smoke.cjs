@@ -7,6 +7,7 @@ const path = require('node:path');
 const { pathToFileURL } = require('node:url');
 const { createDesktopApi } = require('../../src-electron/desktop-api');
 const { createRendererSecurity } = require('../../src-electron/renderer-security');
+const { applyGpuPreferences } = require('../../src-electron/gpu-preferences');
 
 const profile = fs.mkdtempSync(path.join(os.tmpdir(), 'Nexy-Electron-Smoke-'));
 app.setPath('userData', profile);
@@ -16,6 +17,12 @@ require(path.join(root, 'build/Electron', rid, 'VRCX-Electron.cjs'));
 const dotnet = require('node-api-dotnet/net10.0');
 const program = new dotnet.VRCX.ProgramElectron();
 program.PreInit('Nexy Smoke Test', [`--config=${profile}`]);
+fs.writeFileSync(path.join(profile, 'Nexy.json'), JSON.stringify({ VRCX_DisableGpuAcceleration: 'true' }));
+const storage = new dotnet.VRCX.VRCXStorage();
+storage.Load();
+assert.equal(storage.Get('VRCX_DisableGpuAcceleration'), 'true');
+assert.equal(app.isReady(), false);
+applyGpuPreferences(app, storage);
 const stagedUpdate = path.join(profile, 'update.exe');
 fs.writeFileSync(stagedUpdate, 'inert legacy update fixture');
 program.Init();
@@ -28,6 +35,7 @@ const rendererIpc = createRendererSecurity(ipcMain);
 
 app.whenReady()
     .then(async () => {
+        assert.equal(app.isHardwareAccelerationEnabled(), false);
         window = new BrowserWindow({
             show: false,
             webPreferences: { preload: path.join(root, 'src-electron/preload.js') }

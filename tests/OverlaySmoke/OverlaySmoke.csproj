@@ -11,7 +11,7 @@
     <Compile Include="../../Dotnet/Overlay/Electron/D3DTextureWriter.cs" Link="D3DTextureWriter.cs" />
     <Compile Include="../../Dotnet/Overlay/Electron/OverlayTextureLayout.cs" Link="OverlayTextureLayout.cs" />
     <Compile Include="../../Dotnet/Overlay/Electron/GLTextureWriter.cs" Link="GLTextureWriter.cs" />
-    <Compile Include="../../Dotnet/AppApi/Electron/SteamLaunch.cs" Link="SteamLaunch.cs" />
+    <Compile Include="../../Dotnet/AppApi/Common/NexvrLaunch.cs" Link="NexvrLaunch.cs" />
     <Compile Include="../../Dotnet/AppApi/Electron/GameLaunch.cs" Link="GameLaunch.cs" />
     <Compile Include="../../Dotnet/AppApi/Electron/WindowsRegistryBridge.cs" Link="WindowsRegistryBridge.cs" />
   </ItemGroup>

@@ -6,13 +6,13 @@ namespace VRCX;
 
 internal static class GameLaunch
 {
-    /// <summary>Resolve a game directory or launcher path without allowing arbitrary executables.</summary>
+    /// <summary>Resolve an explicitly selected NexVR directory or client executable.</summary>
     internal static ProcessStartInfo WindowsStartInfo(string path, string arguments)
     {
         if (string.IsNullOrWhiteSpace(path)) return null;
         var executable = path.EndsWith(".exe", StringComparison.OrdinalIgnoreCase)
-            ? path : Path.Join(path, "launch.exe");
-        if (!string.Equals(Path.GetFileName(executable), "launch.exe", StringComparison.OrdinalIgnoreCase) || !File.Exists(executable))
+            ? path : Path.Join(path, "NexVR.exe");
+        if (!string.Equals(Path.GetFileName(executable), "NexVR.exe", StringComparison.OrdinalIgnoreCase) || !File.Exists(executable))
             return null;
 
         return new ProcessStartInfo(executable, arguments)

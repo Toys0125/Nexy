@@ -1,4 +1,5 @@
 import { readFileSync } from 'node:fs';
+import { createRequire } from 'node:module';
 import { describe, expect, test } from 'vitest';
 import { getNexyAsset, getNexyReleases, getNexyReleasePage, isNexyReleaseNewer } from '../nexyUpdater';
 
@@ -75,10 +76,12 @@ describe('Nexy release updater', () => {
         expect(getNexyReleases({ message: 'Not Found' }, 'Stable', 'win32', 'x64')).toEqual([]);
     });
     test('keeps Windows Nexy installation separate from the original VRCX app', () => {
-        const installer = readFileSync('Installer/installer.nsi', 'utf8');
-        expect(installer).toContain('InstallDir "$PROGRAMFILES64\\Nexy"');
-        expect(installer).toContain('OutFile "Nexy_Setup_x64.exe"');
-        expect(installer).not.toContain('InstallDir "$PROGRAMFILES64\\VRCX"');
+        const config = createRequire(import.meta.url)('../../../../electron-builder.config.js');
+        const installer = readFileSync('build-scripts/nsis-legacy-upgrade.nsh', 'utf8');
+        expect(config.appId).toBe('app.nexy');
+        expect(config.productName).toBe('Nexy');
+        expect(config.nsis.perMachine).toBe(true);
+        expect(config.protocols.flatMap((protocol) => protocol.schemes)).toEqual(['nexy']);
         expect(installer).not.toContain('taskkill /IM VRCX.exe');
         expect(installer).not.toContain('Software\\Classes\\vrcx');
     });

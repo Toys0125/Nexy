@@ -27,7 +27,7 @@
 
                 <InputGroupTextareaField
                     v-model="launchOptionsDialog.vrcLaunchPathOverride"
-                    placeholder="C:\Program Files (x86)\Steam\steamapps\common\VRChat"
+                    placeholder="C:\Games\NexVR"
                     :rows="1"
                     class="mb-4"
                     spellcheck="false"
@@ -110,8 +110,8 @@
         configRepository.setString('launchArguments', D.launchArguments);
         if (
             D.vrcLaunchPathOverride &&
-            D.vrcLaunchPathOverride.endsWith('.exe') &&
-            !D.vrcLaunchPathOverride.endsWith('launch.exe')
+            D.vrcLaunchPathOverride.toLowerCase().endsWith('.exe') &&
+            !/(^|[\\/])nexvr\.exe$/i.test(D.vrcLaunchPathOverride)
         ) {
             toast.error(t('message.launch.invalid_path'));
             return;

@@ -1,6 +1,5 @@
 using System;
 using System.Diagnostics;
-using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
 
@@ -77,64 +76,21 @@ namespace VRCX
 
         public override bool StartGame(string arguments)
         {
-            if (OperatingSystem.IsWindows())
+            var startInfo = NexvrLaunch.FromUrl(arguments);
+            if (startInfo == null)
             {
-                try
-                {
-                    var steamExecutable = Path.Join(_steamPath, "steam.exe");
-                    Process.Start(SteamLaunch.WindowsStartInfo(steamExecutable, arguments))?.Dispose();
-                    return true;
-                }
-                catch (Exception ex)
-                {
-                    logger.Error(ex, "Failed to launch NexVR through Steam on Windows");
-                    return false;
-                }
+                logger.Warn("NexVR launch requires a nexvr://instances/<id>/join link. Steam IDs and arbitrary launch options are unsupported.");
+                return false;
             }
 
             try
             {
-                Process.Start(new ProcessStartInfo
-                {
-                    FileName = "steam",
-                    Arguments = $"-applaunch 438100 {arguments}",
-                    UseShellExecute = false,
-                })?.Dispose();
-                return true; // Steam accepted launch command (no exception thrown)
-            }
-            catch (Exception e)
-            {
-                logger.Error($"Failed to start VRChat: {e.Message}, attempting to start via Steam path.");
-            }
-
-            try
-            {
-                var steamPath = _steamPath;
-                if (string.IsNullOrEmpty(steamPath))
-                {
-                    logger.Error("Steam path could not be determined.");
-                    return false;
-                }
-
-                var steamExecutable = Path.Join(steamPath, "steam.sh");
-                if (!File.Exists(steamExecutable))
-                {
-                    logger.Error("Steam executable not found.");
-                    return false;
-                }
-
-                Process.Start(new ProcessStartInfo
-                {
-                    FileName = steamExecutable,
-                    Arguments = $"-applaunch 438100 {arguments}",
-                    UseShellExecute = false,
-                })?.Dispose();
-
+                Process.Start(startInfo)?.Dispose();
                 return true;
             }
             catch (Exception ex)
             {
-                logger.Error($"Failed to start VRChat: {ex.Message}");
+                logger.Error(ex, "Failed to open NexVR through its installed protocol handler");
                 return false;
             }
         }
@@ -154,86 +110,9 @@ namespace VRCX
 
         public override Task<bool> TryOpenInstanceInVrc(string launchUrl)
         {
-            if (OperatingSystem.IsWindows())
-                return Task.FromResult(false); // Windows attaches via the standard game launch handler.
-
-            try
-            {
-                var pid = FindVRChatPid();
-                if (pid <= 0)
-                    return Task.FromResult(false);
-
-                var launchExe = Path.Join(_vrcInstallPath, "launch.exe");
-                if (!File.Exists(launchExe))
-                {
-                    logger.Error($"TryOpenInstanceInVrc: launch.exe not found at {launchExe}");
-                    return Task.FromResult(false);
-                }
-
-                // attach=1 tells launch.exe to forward into the running client instead of cold-starting
-                var url = launchUrl.Contains("attach=1") ? launchUrl : launchUrl + "&attach=1";
-
-                // enter the running game's user + mount namespaces (we own the pressure-vessel
-                // userns, so no privilege is required), re-import its environment, then run
-                // launch.exe inside the container so it reaches VRChat's URL pipe
-                const string inner =
-                    "while IFS= read -r -d '' kv; do export \"$kv\"; done < \"/proc/$1/environ\"; exec wine \"$2\" \"$3\"";
-
-                var psi = new ProcessStartInfo
-                {
-                    FileName = "nsenter",
-                    UseShellExecute = false,
-                    CreateNoWindow = true,
-                };
-                foreach (var arg in new[]
-                         {
-                             "-t", pid.ToString(), "-U", "-m", "--preserve-credentials", "--",
-                             "/bin/bash", "-c", inner, "_", pid.ToString(), launchExe, url
-                         })
-                    psi.ArgumentList.Add(arg);
-
-                // launch.exe hands the deeplink to the running client, then exits on wine's
-                // own schedule and its exit code is not a reliable success signal, so a clean
-                // spawn is treated as success. Gating on the exit code would race the frontend
-                // self-invite fallback and fire both. stdout/stderr are left un-redirected so
-                // wine log spam cannot fill an undrained pipe and stall the forward.
-                using var process = Process.Start(psi);
-                return Task.FromResult(process != null);
-            }
-            catch (Exception e)
-            {
-                logger.Error($"TryOpenInstanceInVrc failed: {e.Message}");
-                return Task.FromResult(false);
-            }
-        }
-
-        private static int FindVRChatPid()
-        {
-            var processes = Process.GetProcessesByName("VRChat.exe");
-            try
-            {
-                // prefer the VRChat whose environment points at the 438100 compat prefix
-                foreach (var process in processes)
-                {
-                    try
-                    {
-                        var environ = File.ReadAllText($"/proc/{process.Id}/environ");
-                        if (environ.Contains("compatdata/438100"))
-                            return process.Id;
-                    }
-                    catch
-                    {
-                        // unreadable environ, skip
-                    }
-                }
-
-                return processes.Length > 0 ? processes[0].Id : -1;
-            }
-            finally
-            {
-                foreach (var process in processes)
-                    process.Dispose();
-            }
+            // Keep the legacy API name for bridge compatibility; NexVR joins
+            // through its protocol handler on every platform.
+            return Task.FromResult(StartGame(launchUrl));
         }
     }
 }
