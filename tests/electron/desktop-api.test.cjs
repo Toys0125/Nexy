@@ -108,10 +108,23 @@ test('deep links survive startup and reload, and are delivered exactly once in o
 
 test('release signing fails closed when its configuration is incomplete', () => {
     assert.deepEqual(windowsSigning({}), { win: { signExecutable: false } });
+    assert.throws(() => windowsSigning({ NEXY_REQUIRE_WINDOWS_SIGNING: 'true' }), /release signing is required/);
+    assert.throws(
+        () => windowsSigning({ NEXY_REQUIRE_WINDOWS_SIGNING: 'true', NEXY_WINDOWS_SIGNING: 'none' }),
+        /release signing is required/
+    );
     assert.throws(() => windowsSigning({ NEXY_WINDOWS_SIGNING: 'invalid' }), /Unknown/);
     assert.throws(() => windowsSigning({ NEXY_WINDOWS_SIGNING: 'pfx' }), /CSC_LINK/);
     assert.throws(() => windowsSigning({ NEXY_WINDOWS_SIGNING: 'azure' }), /endpoint/);
     assert.equal(windowsSigning({ NEXY_WINDOWS_SIGNING: 'pfx', CSC_LINK: 'certificate.pfx' }).forceCodeSigning, true);
+    assert.equal(
+        windowsSigning({
+            NEXY_REQUIRE_WINDOWS_SIGNING: 'true',
+            NEXY_WINDOWS_SIGNING: 'pfx',
+            CSC_LINK: 'certificate.pfx'
+        }).forceCodeSigning,
+        true
+    );
     const signed = windowsSigning({
         NEXY_WINDOWS_SIGNING: 'azure',
         NEXY_AZURE_SIGNING_ENDPOINT: 'https://example.com',

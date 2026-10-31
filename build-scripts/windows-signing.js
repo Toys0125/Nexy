@@ -1,6 +1,9 @@
-/** Select a signing provider explicitly so release builds cannot silently become unsigned. */
+/** Explicit signing modes fail closed; development builds may be unsigned. */
 function windowsSigning(env = process.env) {
     const mode = env.NEXY_WINDOWS_SIGNING || 'none';
+    if (env.NEXY_REQUIRE_WINDOWS_SIGNING === 'true' && mode === 'none') {
+        throw new Error('Windows release signing is required: configure NEXY_WINDOWS_SIGNING as azure or pfx');
+    }
     if (mode === 'none') return { win: { signExecutable: false } };
     if (mode === 'pfx') {
         if (!(env.WIN_CSC_LINK || env.CSC_LINK)) throw new Error('PFX signing requires WIN_CSC_LINK or CSC_LINK');

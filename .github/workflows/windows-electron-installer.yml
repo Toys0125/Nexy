@@ -47,6 +47,8 @@ jobs:
         run: npm run test:electron
       - name: Validate Windows shortcut path comparisons
         run: ./tests/electron/installer-paths.test.ps1
+      - name: Validate signed/unsigned artifact verification
+        run: ./tests/electron/windows-signatures.test.ps1
       - name: Check renderer JavaScript types
         run: npm run typecheck:js
       - name: Build Windows .NET bridge
@@ -74,10 +76,7 @@ jobs:
         if: github.event_name != 'pull_request' && (vars.NEXY_WINDOWS_SIGNING == 'azure' || vars.NEXY_WINDOWS_SIGNING == 'pfx')
         run: |
           $version = (Get-Content Version -Raw).Trim()
-          foreach ($file in @("build/Nexy_${version}_Setup_x64.exe", 'build/win-unpacked/Nexy.exe', 'build/win-unpacked/resources/app.asar.unpacked/build/Electron/VRCX-Electron.dll')) {
-            $signature = Get-AuthenticodeSignature -LiteralPath $file
-            if ($signature.Status -ne 'Valid') { throw "Invalid signature: $file ($($signature.Status))" }
-          }
+          ./build-scripts/verify-windows-signatures.ps1 -Paths @("build/Nexy_${version}_Setup_x64.exe", 'build/win-unpacked/Nexy.exe', 'build/win-unpacked/resources/app.asar.unpacked/build/Electron/VRCX-Electron.dll')
       - name: Validate output files and portable package contents
         run: |
           $version = (Get-Content Version -Raw).Trim()
