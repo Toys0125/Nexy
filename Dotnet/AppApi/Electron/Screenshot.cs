@@ -13,7 +13,7 @@ namespace VRCX
     {
         public override string AddScreenshotMetadata(string path, string metadataString, string worldId, bool changeFilename = false)
         {
-            if (path.Length >= 3 && path[1] == ':' &&
+            if (!OperatingSystem.IsWindows() && path.Length >= 3 && path[1] == ':' &&
                 (path[2] == '\\' || path[2] == '/'))
             {
                 var driveLetter = path[0].ToString().ToLower();
