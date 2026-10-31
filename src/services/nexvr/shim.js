@@ -409,13 +409,15 @@ async function groupDetails(groupId) {
         return presence && presenceState(presence).state !== 'offline';
     }).length;
     const vrcGroup = toVrcGroup(group);
+    const myMember = toVrcMyMember(groupId, realtime.userId, membership, listed);
     return {
         ...vrcGroup,
         // the list can be fresher than the stored count; never show fewer than are listed
         memberCount: Math.max(vrcGroup.memberCount, members.length),
         onlineMemberCount,
         membershipStatus: toVrcMembershipStatus(membership?.status),
-        myMember: toVrcMyMember(groupId, realtime.userId, membership, listed),
+        // VRChat leaves myMember out for non-members; applyGroup writes into it, so null would crash
+        ...(myMember && { myMember }),
         rules: toVrcGroupRules(rules)
     };
 }
@@ -452,6 +454,19 @@ function toNexvrGroupBody(body) {
 /**
  * @param {URLSearchParams} query
  */
+/**
+ * Slices one page out of a full NexVR result list, by VRChat's n/offset.
+ *
+ * @template T
+ * @param {T[]} list
+ * @param {URLSearchParams} query
+ * @returns {T[]}
+ */
+function searchPage(list, query) {
+    const offset = Number(query.get('offset') || 0);
+    return list.slice(offset, offset + Number(query.get('n') || list.length));
+}
+
 async function worldSearch(query) {
     const user = query.get('userId') || (query.get('user') === 'me' ? realtime.userId : '');
     const worlds = await nexvr('/worlds/', {
@@ -461,10 +476,7 @@ async function worldSearch(query) {
             creator: user || undefined
         }
     });
-    const offset = Number(query.get('offset') || 0);
-    const n = Number(query.get('n') || worlds.length);
-    const page = worlds.slice(offset, offset + n);
-    return Promise.all(page.map(async (w) => toVrcWorld(w, await displayNameOf(w.owner))));
+    return Promise.all(searchPage(worlds, query).map(async (w) => toVrcWorld(w, await displayNameOf(w.owner))));
 }
 
 /**
@@ -548,10 +560,13 @@ const routes = [
         'GET',
         /^users$/,
         async (m, q) => {
-            const users = await nexvr('/users/search', {
-                query: { q: q.get('search'), limit: q.get('n') }
-            });
-            return users.map((u) => rememberTags(toVrcUser(u, realtime.friends.get(u.id))));
+            const search = q.get('search') || '';
+            if (!search) {
+                return [];
+            }
+            // NexVR rejects a limit over 50 and has no offset, so fetch the cap and page here
+            const users = await nexvr('/users/search', { query: { q: search, limit: 50 } });
+            return searchPage(users, q).map((u) => rememberTags(toVrcUser(u, realtime.friends.get(u.id))));
         }
     ],
     [
@@ -637,6 +652,17 @@ const routes = [
         'POST',
         /^groups$/,
         async (m, q, body) => toVrcGroup(await nexvr('/groups/', { method: 'POST', body: toNexvrGroupBody(body) }))
+    ],
+    [
+        'GET',
+        /^groups$/,
+        async (m, q) => {
+            // discovery hides the caller's own groups unless asked; search should find them too
+            const groups = await nexvr('/groups/', {
+                query: { search: q.get('query') || undefined, limit: 100, includeMine: 'true' }
+            });
+            return searchPage(groups, q).map(toVrcGroup);
+        }
     ],
     [
         'PUT',
