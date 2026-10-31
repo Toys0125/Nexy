@@ -17,6 +17,8 @@ const {
 const { spawnSync } = require('child_process');
 const fs = require('fs');
 const os = require('os');
+const { createDesktopApi } = require('./desktop-api');
+const { createLaunchCommands } = require('./launch-commands');
 
 //app.disableHardwareAcceleration();
 
@@ -68,14 +70,29 @@ const noInstall = args.includes('--no-install');
 const noDesktop = args.includes('--no-desktop');
 const startup = args.includes('--startup');
 const debug = args.includes('--hot-reload');
-const noUpdater = args.includes('--no-updater') || fs.existsSync(path.join(rootDir, '.no-updater'));
-if (app.isPackaged && process.defaultApp) {
+const noUpdater = true; // The inherited updater cannot replace Electron installations.
+if (process.defaultApp) {
     if (process.argv.length >= 2) {
         app.setAsDefaultProtocolClient(NEXY_URI_PREFIX, process.execPath, [path.resolve(process.argv[1])]);
-    } else {
-        app.setAsDefaultProtocolClient(NEXY_URI_PREFIX);
     }
+} else {
+    app.setAsDefaultProtocolClient(NEXY_URI_PREFIX);
 }
+
+// Acquire the lock before starting managed services or opening the database.
+if (!app.requestSingleInstanceLock()) app.exit(0);
+const launchCommands = createLaunchCommands();
+launchCommands.enqueue(args);
+app.on('open-url', (event, url) => {
+    event.preventDefault();
+    launchCommands.enqueue([url]);
+    flushLaunchCommands();
+});
+app.on('second-instance', (_event, commandLine) => {
+    launchCommands.enqueue(commandLine);
+    desktopApi.FocusWindow();
+    flushLaunchCommands();
+});
 
 const version = getVersion();
 const homePath = getHomePath();
@@ -120,14 +137,7 @@ const OVERLAY_HMD_FRAME_WIDTH = 1024;
 const OVERLAY_HMD_FRAME_HEIGHT = 1024;
 const OVERLAY_SHARED_HEIGHT = OVERLAY_WRIST_FRAME_HEIGHT + OVERLAY_HMD_FRAME_HEIGHT;
 const OVERLAY_SHARED_WIDTH = Math.max(OVERLAY_WRIST_FRAME_WIDTH, OVERLAY_HMD_FRAME_WIDTH);
-const OVERLAY_FRAME_SIZE = OVERLAY_SHARED_WIDTH * OVERLAY_SHARED_HEIGHT * 4;
-const OVERLAY_SHM_PATH = '/dev/shm/vrcx_overlay';
-const overlayFrameBuffer = Buffer.alloc(OVERLAY_FRAME_SIZE + 1);
 let activeNotification = null;
-
-function createOverlayWindowShm() {
-    fs.writeFileSync(OVERLAY_SHM_PATH, Buffer.alloc(OVERLAY_FRAME_SIZE + 1));
-}
 
 interopApi.getDotNetObject('ProgramElectron').PreInit(version, args);
 interopApi.getDotNetObject('VRCXStorage').Load();
@@ -142,6 +152,10 @@ interopApi.getDotNetObject('SystemMonitorElectron').Init();
 interopApi.getDotNetObject('AppApiVrElectron').Init();
 
 ipcMain.handle('callDotNetMethod', (_event, className, methodName, args) => {
+    if (className === 'AppApiElectron' && methodName === 'SetVR') return updateVr(...args);
+    if (className === 'AppApiElectron' && Object.hasOwn(desktopApi, methodName)) {
+        return desktopApi[methodName](...args);
+    }
     return interopApi.callMethod(className, methodName, args);
 });
 
@@ -158,57 +172,22 @@ function getCloseToTray() {
     return VRCXStorage.Get('VRCX_CloseToTray') === 'true';
 }
 
-const gotTheLock = app.requestSingleInstanceLock();
-const strip_nexy_prefix_regex = new RegExp('^' + NEXY_URI_PREFIX + '://');
-
-if (!gotTheLock) {
-    console.log('Another instance is already running. Exiting.');
-    app.quit();
-} else {
-    app.on('second-instance', (_event, commandLine, _workingDirectory) => {
-        if (mainWindow && commandLine.length >= 2) {
-            try {
-                mainWindow.webContents.send(
-                    'launch-command',
-                    commandLine.pop().trim().replace(strip_nexy_prefix_regex, '')
-                );
-            } catch (err) {
-                console.error('Error processing second-instance command:', err);
-            }
-        }
-    });
-
-    app.on('open-url', (_event, url) => {
-        if (mainWindow && url) {
-            mainWindow.webContents.send('launch-command', url.replace(strip_nexy_prefix_regex, ''));
-        }
-    });
+function flushLaunchCommands() {
+    if (!mainWindow || mainWindow.isDestroyed()) return;
+    launchCommands.flush((command) => mainWindow.webContents.send('launch-command', command));
 }
 
-ipcMain.handle('dialog:openFile', async () => {
-    const result = await dialog.showOpenDialog(mainWindow, {
-        properties: ['openFile'],
-        filters: [{ name: 'Images', extensions: ['png'] }]
-    });
-
-    if (!result.canceled && result.filePaths.length > 0) {
-        return result.filePaths[0];
-    }
-    return null;
+ipcMain.on('app:launchCommandsReady', (event) => {
+    if (event.sender !== mainWindow?.webContents) return;
+    launchCommands.setReady(true);
+    flushLaunchCommands();
 });
 
-ipcMain.handle('dialog:openDirectory', async () => {
-    const result = await dialog.showOpenDialog(mainWindow, {
-        properties: ['openDirectory']
-    });
+ipcMain.handle('dialog:openFile', (_event, ...args) => desktopApi.OpenFileSelectorDialog(...args));
+ipcMain.handle('dialog:openDirectory', (_event, ...args) => desktopApi.OpenFolderSelectorDialog(...args));
 
-    if (!result.canceled && result.filePaths.length > 0) {
-        return result.filePaths[0];
-    }
-    return null;
-});
-
-ipcMain.handle('notification:showNotification', (_event, title, body, icon) => {
+function showNotification(title, body = '', icon = '') {
+    if (!ElectronNotification.isSupported()) return;
     if (activeNotification) {
         activeNotification.close();
     }
@@ -225,10 +204,12 @@ ipcMain.handle('notification:showNotification', (_event, title, body, icon) => {
         }
     });
     activeNotification = notification;
+    notification.on('click', () => desktopApi.FocusWindow());
     notification.show();
-});
+}
+ipcMain.handle('notification:showNotification', (_event, ...args) => showNotification(...args));
 
-ipcMain.handle('app:restart', () => {
+function restartApp() {
     if (process.platform === 'linux') {
         const options = {
             execPath: process.execPath,
@@ -238,13 +219,31 @@ ipcMain.handle('app:restart', () => {
             options.execPath = appImagePath;
         }
         app.relaunch(options);
-        destroyTray();
-        app.exit(0);
+        app.quit();
     } else {
         app.relaunch();
         app.quit();
     }
+}
+ipcMain.handle('app:restart', restartApp);
+
+const desktopApi = createDesktopApi({
+    app,
+    clipboard,
+    dialog,
+    nativeImage,
+    nativeTheme,
+    shell,
+    getWindow: () => mainWindow,
+    storage: VRCXStorage,
+    version,
+    showNotification,
+    restart: restartApp,
+    setTrayIconNotification,
+    getLaunchCommand: () => launchCommands.take(),
+    decodeImage: (imagePath) => interopApi.getDotNetObject('AppApiElectron').DecodeClipboardImage(imagePath)
 });
+if (process.platform === 'win32') app.setAppUserModelId('app.nexy');
 
 ipcMain.handle('app:getOverlayWindow', () => {
     if (overlayWindow && overlayWindow.webContents) {
@@ -253,19 +252,21 @@ ipcMain.handle('app:getOverlayWindow', () => {
     return false;
 });
 
-ipcMain.handle('app:updateVr', (_event, active, hmdOverlay, wristOverlay, _menuButton, _overlayHand) => {
+function updateVr(active, hmdOverlay, wristOverlay, menuButton, overlayHand) {
+    if (!['linux', 'win32'].includes(process.platform)) active = false;
     if (!active || (!hmdOverlay && !wristOverlay)) {
         disposeOverlay();
-        return;
-    }
-    if (active && !overlayWindow) {
+    } else if (!overlayWindow) {
         try {
             createOverlayWindowOffscreen();
         } catch (err) {
-            console.error('Error creating overlay windows:', err);
+            disposeOverlay();
+            throw err;
         }
     }
-});
+    interopApi.getDotNetObject('AppApiElectron').SetVR(active, hmdOverlay, wristOverlay, menuButton, overlayHand);
+}
+ipcMain.handle('app:updateVr', (_event, ...args) => updateVr(...args));
 
 ipcMain.handle('app:getArch', () => {
     return process.arch.toString();
@@ -274,47 +275,11 @@ ipcMain.handle('app:getClipboardText', () => {
     return clipboard.readText();
 });
 
-ipcMain.handle('app:copyImageToClipboard', (_event, imagePath) => {
-    if (typeof imagePath !== 'string' || !imagePath) {
-        throw new Error('An image path is required');
-    }
-    const image = nativeImage.createFromPath(imagePath);
-    if (image.isEmpty()) {
-        throw new Error('Could not read an image from the selected file');
-    }
-    clipboard.writeImage(image);
-    return true;
-});
-
-ipcMain.handle('app:focusWindow', () => {
-    if (!mainWindow || mainWindow.isDestroyed()) return;
-    mainWindow.show();
-    mainWindow.focus();
-});
-
-ipcMain.handle('app:flashWindow', () => {
-    if (!mainWindow || mainWindow.isDestroyed()) return;
-    mainWindow.flashFrame(true);
-});
-
-ipcMain.handle('app:setStartup', (_event, enabled) => {
-    if (process.platform === 'win32' || process.platform === 'darwin') {
-        app.setLoginItemSettings({
-            openAtLogin: Boolean(enabled),
-            args: ['--startup']
-        });
-    }
-});
-
-ipcMain.handle('app:openCalendarFile', async (_event, content) => {
-    if (typeof content !== 'string' || !content.startsWith('BEGIN:VCALENDAR')) {
-        throw new Error('Invalid calendar file content');
-    }
-    const filePath = path.join(os.tmpdir(), `Nexy-calendar-${Date.now()}-${process.pid}.ics`);
-    fs.writeFileSync(filePath, content, 'utf8');
-    const error = await shell.openPath(filePath);
-    if (error) throw new Error(error);
-});
+ipcMain.handle('app:copyImageToClipboard', (_event, imagePath) => desktopApi.CopyImageToClipboard(imagePath));
+ipcMain.handle('app:focusWindow', () => desktopApi.FocusWindow());
+ipcMain.handle('app:flashWindow', () => desktopApi.FlashWindow());
+ipcMain.handle('app:setStartup', (_event, enabled) => desktopApi.SetStartup(enabled));
+ipcMain.handle('app:openCalendarFile', (_event, content) => desktopApi.OpenCalendarFile(content));
 
 ipcMain.handle('app:getNoUpdater', () => {
     return noUpdater;
@@ -353,7 +318,6 @@ function createWindow() {
     const y = parseInt(VRCXStorage.Get('VRCX_LocationY')) || 0;
     const width = parseInt(VRCXStorage.Get('VRCX_SizeWidth')) || 1920;
     const height = parseInt(VRCXStorage.Get('VRCX_SizeHeight')) || 1080;
-    const zoomLevel = parseFloat(VRCXStorage.Get('VRCX_ZoomLevel')) || 0;
     mainWindow = new BrowserWindow({
         x,
         y,
@@ -367,6 +331,8 @@ function createWindow() {
         }
     });
     applyWindowState();
+    mainWindow.webContents.setUserAgent(version);
+    mainWindow.webContents.on('did-start-loading', () => launchCommands.setReady(false));
     const indexPath = path.join(rootDir, 'build/html/index.html');
     mainWindow.loadFile(indexPath);
     if (debug) {
@@ -392,26 +358,19 @@ function createWindow() {
     // mainWindow.webContents.openDevTools()
 
     mainWindow.webContents.on('did-finish-load', () => {
-        mainWindow.webContents.setZoomLevel(zoomLevel);
+        desktopApi.SetZoom(parseFloat(VRCXStorage.Get('VRCX_ZoomLevel')) || 0);
     });
 
     mainWindow.webContents.on('before-input-event', (_event, input) => {
-        if (input.control && input.key === '=') {
-            mainWindow.webContents.setZoomLevel(mainWindow.webContents.getZoomLevel() + 1);
-        }
-        if (input.control && input.key === '-') {
-            mainWindow.webContents.setZoomLevel(mainWindow.webContents.getZoomLevel() - 1);
+        if (input.type !== 'keyDown' || !(input.control || input.meta)) return;
+        if (['=', '+', '-', '0'].includes(input.key)) {
+            _event.preventDefault();
+            desktopApi.SetZoom(input.key === '0' ? 0 : desktopApi.GetZoom() + (input.key === '-' ? -1 : 1));
         }
     });
 
     mainWindow.webContents.on('zoom-changed', (_event, zoomDirection) => {
-        let currentZoom = mainWindow.webContents.getZoomLevel();
-        if (zoomDirection === 'in') {
-            mainWindow.webContents.setZoomLevel(++currentZoom);
-        } else {
-            mainWindow.webContents.setZoomLevel(--currentZoom);
-        }
-        VRCXStorage.Set('VRCX_ZoomLevel', currentZoom.toString());
+        desktopApi.SetZoom(desktopApi.GetZoom() + (zoomDirection === 'in' ? 1 : -1));
     });
     mainWindow.webContents.setVisualZoomLevelLimits(1, 5);
 
@@ -453,6 +412,7 @@ function createWindow() {
     });
 
     mainWindow.on('focus', () => {
+        mainWindow.flashFrame(false);
         mainWindow.webContents.send('onBrowserFocus');
     });
 
@@ -462,16 +422,10 @@ function createWindow() {
 }
 
 let overlayWindow = undefined;
+let overlayInputTimer;
 
 function createOverlayWindowOffscreen() {
-    if (process.platform !== 'linux') {
-        console.error('Offscreen overlay is only supported on Linux.');
-        return;
-    }
     isOverlayActive = true;
-    if (!fs.existsSync(OVERLAY_SHM_PATH)) {
-        createOverlayWindowShm();
-    }
 
     const x = parseInt(VRCXStorage.Get('VRCX_LocationX')) || 0;
     const y = parseInt(VRCXStorage.Get('VRCX_LocationY')) || 0;
@@ -483,6 +437,7 @@ function createOverlayWindowOffscreen() {
         y,
         width,
         height,
+        useContentSize: true,
         icon: path.join(rootDir, 'images/Nexy.png'),
         autoHideMenuBar: true,
         transparent: true,
@@ -491,40 +446,36 @@ function createOverlayWindowOffscreen() {
         webPreferences: {
             partition: 'vrcx-vr-overlay',
             offscreen: true,
+            backgroundThrottling: false,
             preload: path.join(__dirname, 'preload.js')
         }
     });
+    // Offscreen paint bitmaps must have physical dimensions equal to the VR
+    // canvas even on Windows monitors with 125%/150% display scaling.
+    overlayWindow.webContents.setZoomFactor(1);
     overlayWindow.webContents.setFrameRate(48);
 
-    let fileUrl = `file://${path.join(rootDir, 'build/html/vr.html')}`;
-    if (debug) {
-        fileUrl = 'http://localhost:9000/vr.html';
-    }
-    overlayWindow.loadURL(fileUrl, { userAgent: version });
-    // Use paint event for offscreen rendering
     overlayWindow.webContents.on('paint', (_event, _dirty, image) => {
-        const buffer = image.toBitmap();
-        //console.log('Captured frame via paint event, size:', buffer.length);
-        writeOverlayFrame(buffer);
+        const size = image.getSize();
+        const frame = size.width === width && size.height === height ? image : image.resize({ width, height });
+        interopApi.getDotNetObject('AppApiVrElectron').SubmitOverlayFrame(frame.toBitmap());
     });
-}
+    overlayWindow.webContents.on('did-finish-load', () => mainWindow?.webContents.send('vr-overlay-ready'));
+    overlayWindow.webContents.once('render-process-gone', () => disposeOverlay());
+    overlayWindow.webContents.setUserAgent(version);
+    if (debug) overlayWindow.loadURL('http://localhost:9000/vr.html');
+    else overlayWindow.loadFile(path.join(rootDir, 'build/html/vr.html'));
 
-function writeOverlayFrame(imageBuffer) {
-    let fd;
-    try {
-        fd = fs.openSync(OVERLAY_SHM_PATH, 'r+');
-        overlayFrameBuffer[0] = 0; // not ready
-        imageBuffer.copy(overlayFrameBuffer, 1, 0, OVERLAY_FRAME_SIZE);
-        overlayFrameBuffer[0] = 1; // ready
-        fs.writeSync(fd, overlayFrameBuffer);
-        //console.log('Wrote frame to shared memory');
-    } catch (err) {
-        console.error('Error writing frame to shared memory:', err);
-    } finally {
-        if (typeof fd === 'number') {
-            fs.closeSync(fd);
+    let pointer = { x: 0, y: 0 };
+    overlayInputTimer = setInterval(() => {
+        if (!overlayWindow || overlayWindow.isDestroyed()) return;
+        for (const raw of interopApi.getDotNetObject('AppApiVrElectron').GetOverlayInputEvents()) {
+            const event = JSON.parse(raw);
+            if (event.type === 'mouseWheel') Object.assign(event, pointer);
+            else pointer = { x: event.x, y: event.y };
+            overlayWindow.webContents.sendInputEvent(event);
         }
-    }
+    }, 16);
 }
 
 function destroyTray() {
@@ -879,6 +830,9 @@ app.whenReady().then(() => {
 });
 
 function disposeOverlay() {
+    clearInterval(overlayInputTimer);
+    overlayInputTimer = undefined;
+    interopApi.getDotNetObject('AppApiElectron').SetVR(false, false, false, false, 0);
     if (!isOverlayActive) {
         return;
     }
@@ -888,13 +842,10 @@ function disposeOverlay() {
             webContents.removeAllListeners('paint');
             webContents.stopPainting();
         }
-        overlayWindow.close();
+        overlayWindow.destroy();
     }
     overlayWindow = undefined;
     isOverlayActive = false;
-    if (fs.existsSync(OVERLAY_SHM_PATH)) {
-        fs.unlinkSync(OVERLAY_SHM_PATH);
-    }
 }
 
 app.on('before-quit', function () {
@@ -904,6 +855,8 @@ app.on('before-quit', function () {
     appIsQuitting = true;
     disposeOverlay();
     destroyTray();
+    VRCXStorage.Save();
+    interopApi.getDotNetObject('ProgramElectron').Exit();
 
     app.exit(0);
 });

@@ -320,6 +320,15 @@ namespace VRCX
                 return;
             }
 
+            if (OperatingSystem.IsMacOS())
+            {
+                var startInfo = new ProcessStartInfo("open") { UseShellExecute = false };
+                if (!isFolder) startInfo.ArgumentList.Add("-R");
+                startInfo.ArgumentList.Add(path);
+                Process.Start(startInfo)?.Dispose();
+                return;
+            }
+
             string directoryPath = isFolder ? path : Path.GetDirectoryName(path);
             var commandAttempt = new Dictionary<string, string>
             {
@@ -389,17 +398,15 @@ namespace VRCX
             }
         }
 
-        public override async Task<string> OpenFolderSelectorDialog(string defaultPath = "")
+        public override Task<string> OpenFolderSelectorDialog(string defaultPath = "")
         {
-            // TODO: Implement
-            return string.Empty;
+            throw DesktopOnly();
         }
 
-        public override async Task<string> OpenFileSelectorDialog(string defaultPath = "", string defaultExt = "",
+        public override Task<string> OpenFileSelectorDialog(string defaultPath = "", string defaultExt = "",
             string defaultFilter = "All files (*.*)|*.*")
         {
-            // TODO: Implement
-            return string.Empty;
+            throw DesktopOnly();
         }
     }
 }

@@ -66,6 +66,7 @@
   </ItemGroup>
   <ItemGroup>
     <PackageReference Include="Microsoft.JavaScript.NodeApi" Version="0.9.31" />
+    <PackageReference Include="Vortice.Direct3D11" Version="3.8.3" />
     <PackageReference Include="Microsoft.JavaScript.NodeApi.Generator" Version="0.9.31" />
     <PackageReference Include="DiscordRichPresence" Version="1.6.1.70" />
     <PackageReference Include="Newtonsoft.Json" Version="13.0.4" />
