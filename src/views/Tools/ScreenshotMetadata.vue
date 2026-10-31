@@ -566,7 +566,7 @@
     async function getAndDisplayScreenshotFromFile() {
         let filePath = '';
 
-        if (LINUX) {
+        if (IS_LINUX) {
             filePath = await window.electron.openFileDialog();
         } else {
             filePath = await AppApi.OpenFileSelectorDialog(

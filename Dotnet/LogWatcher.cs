@@ -9,9 +9,6 @@ using System.Text.RegularExpressions;
 using System.Threading;
 using NLog;
 
-#if !LINUX
-using CefSharp;
-#endif
 
 namespace VRCX
 {
@@ -291,12 +288,7 @@ namespace VRCX
                 if (!m_FirstRun)
                 {
                     var logLine = JsonSerializer.Serialize(item);
-#if LINUX
                     m_LogQueue.Enqueue(logLine);
-#else
-                    if (MainForm.Instance != null && MainForm.Instance.Browser != null)
-                        MainForm.Instance.Browser.ExecuteScriptAsync("window?.$bridge?.addGameLogEvent", logLine);
-#endif
                 }
 
                 m_LogList.Add(item);

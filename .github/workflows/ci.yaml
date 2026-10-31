@@ -70,8 +70,8 @@ jobs:
       - uses: actions/cache@v5
         with:
           path: ~/.nuget/packages
-          key: ${{ runner.os }}-nuget-${{ hashFiles('**/Dotnet/VRCX-Cef.csproj') }}
+          key: ${{ runner.os }}-nuget-${{ hashFiles('**/Dotnet/VRCX-Electron.csproj') }}
           restore-keys: |
             ${{ runner.os }}-nuget-
-      - name: Build Cef .NET Application
-        run: dotnet build Dotnet/VRCX-Cef.csproj -p:Configuration=Release -p:WarningLevel=0 -p:Platform=x64 -t:"Clean;Build" -maxcpucount --runtime win-x64 --self-contained
+      - name: Build Electron .NET Application (win-x64)
+        run: dotnet build Dotnet/VRCX-Electron.csproj -p:Configuration=Release -p:WarningLevel=0 -p:Platform=x64 -t:"Clean;Build" -maxcpucount --runtime win-x64

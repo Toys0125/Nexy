@@ -76,15 +76,19 @@ namespace VRCX
         // 메모리 릭 때문에 미리 생성해놓고 계속 사용함
         public override void Init()
         {
-            _thread.Start();
+            if (!OperatingSystem.IsWindows())
+                _thread.Start();
         }
 
         public override void Exit()
         {
             var thread = _thread;
             _thread = null;
-            thread?.Interrupt();
-            thread?.Join();
+            if (thread != null && thread.ThreadState != ThreadState.Unstarted)
+            {
+                thread.Interrupt();
+                thread.Join();
+            }
 
             _overlayAccessor?.Dispose();
             _overlayAccessor = null;
@@ -101,7 +105,7 @@ namespace VRCX
             Instance = new VRCXVRElectron();
             Instance.Init();
             Program.VRCXVRInstance = Instance;
-            //MainForm.Instance.Browser.ExecuteScriptAsync("console.log('VRCXVR Restarted');");
+
         }
 
         private void SetupTextures()

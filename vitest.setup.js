@@ -3,7 +3,7 @@
  * Loads English locale messages into i18n so that
  * translation calls return expected values in tests.
  *
- * Provides global stubs for CefSharp IPC bindings.
+ * Provides global stubs for the Electron/.NET IPC bridge.
  */
 
 import { i18n } from './src/plugins/i18n';
@@ -11,6 +11,28 @@ import { i18n } from './src/plugins/i18n';
 import en from './src/localization/en.json';
 
 const noopAsync = () => Promise.resolve('');
+
+globalThis.ELECTRON = true;
+globalThis.IS_LINUX = false;
+globalThis.IS_WINDOWS = false;
+globalThis.IS_MACOS = false;
+// Legacy renderer conditionals are being migrated from backend flags to OS flags.
+globalThis.LINUX = true;
+globalThis.WINDOWS = false;
+window.electron = {
+    desktopNotification: vi.fn(),
+    getArch: vi.fn().mockResolvedValue('x64'),
+    getNoUpdater: vi.fn().mockResolvedValue(true),
+    restartApp: vi.fn(),
+    setTrayIconNotification: vi.fn(),
+    onSystemThemeChanged: vi.fn(),
+    onWindowPositionChanged: vi.fn(),
+    onWindowSizeChanged: vi.fn(),
+    onWindowStateChange: vi.fn(),
+    onBrowserFocus: vi.fn(),
+    onBrowserBlur: vi.fn(),
+    ipcRenderer: { on: vi.fn() }
+};
 
 globalThis.AppApi = new Proxy({}, { get: () => noopAsync });
 globalThis.WebApi = new Proxy({}, { get: () => noopAsync });

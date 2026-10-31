@@ -85,14 +85,6 @@
   <ItemGroup>
     <Content Remove="obj\**" />
     <Compile Remove="obj\**" />
-    <Content Remove="Cef\**" />
-    <Compile Remove="Cef\**" />
-    <Content Remove="AppApi\Cef\**" />
-    <Compile Remove="AppApi\Cef\**" />
-    <Content Remove="Overlay\Cef\**" />
-    <Compile Remove="Overlay\Cef\**" />
-    <Content Remove="OverlayWebSocket\**" />
-    <Compile Remove="OverlayWebSocket\**" />
     <Content Remove="DBMerger\**" />
     <Compile Remove="DBMerger\**" />
   </ItemGroup>

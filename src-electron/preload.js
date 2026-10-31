@@ -29,8 +29,14 @@ function registerManagedListener(channel, callback, mapKey = channel) {
     };
 }
 
+// LINUX remains a temporary compatibility alias for the Electron IPC backend.
+// Use IS_LINUX / IS_WINDOWS for real operating-system checks.
 contextBridge.exposeInMainWorld('LINUX', true);
 contextBridge.exposeInMainWorld('WINDOWS', false);
+contextBridge.exposeInMainWorld('ELECTRON', true);
+contextBridge.exposeInMainWorld('IS_LINUX', process.platform === 'linux');
+contextBridge.exposeInMainWorld('IS_WINDOWS', process.platform === 'win32');
+contextBridge.exposeInMainWorld('IS_MACOS', process.platform === 'darwin');
 
 contextBridge.exposeInMainWorld('interopApi', {
     callDotNetMethod: (className, methodName, args) => {

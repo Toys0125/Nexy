@@ -7,6 +7,10 @@ declare global {
 
     const WINDOWS: boolean;
     const LINUX: boolean;
+    const ELECTRON: boolean;
+    const IS_WINDOWS: boolean;
+    const IS_LINUX: boolean;
+    const IS_MACOS: boolean;
 
     interface Window {
         $pinia: any;
@@ -84,16 +88,6 @@ declare global {
         websocketDomain: string;
         websocketDomainVrchat: string;
     }
-
-    const CefSharp: {
-        PostMessage: (message: any) => void;
-        BindObjectAsync: (...args: string[]) => Promise<any>;
-        BindObject: (name: string) => any;
-        ExecuteScriptAsync: (script: string) => Promise<any>;
-        ExecuteScript: (script: string) => any;
-        RemoveObjectFromCache?: (name: string) => void;
-        DeleteBoundObject?: (name: string) => void;
-    };
 
     const VRCXStorage: {
         Get(key: string): Promise<string>;

@@ -89,9 +89,16 @@ module.exports = {
     },
     win: {
         artifactName: 'Nexy_Version.${ext}',
-        target: ['nsis'],
+        target: ['nsis', 'zip'],
         icon: 'images/Nexy.ico'
     },
+    nsis: {
+        artifactName: 'Nexy_Version.exe',
+        oneClick: false,
+        perMachine: true,
+        allowToChangeInstallationDirectory: true
+    },
+    protocols: [{ name: 'Nexy', schemes: ['nexy'] }],
     toolsets: {
         appimage: '1.0.3'
     }

@@ -16,6 +16,15 @@ namespace VRCX
 
         public override void SetVR(bool active, bool hmdOverlay, bool wristOverlay, bool menuButton, int overlayHand)
         {
+            // The native VR compositor still uses the Linux OpenGL/shm transport.
+            // Do not start that renderer on Windows until the D3D texture transport is ported.
+            if (OperatingSystem.IsWindows())
+            {
+                if (active)
+                    logger.Warn("Electron VR overlay is not yet supported on Windows");
+                return;
+            }
+
             Program.VRCXVRInstance.SetActive(active, hmdOverlay, wristOverlay, menuButton, overlayHand);
         }
 
