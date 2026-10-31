@@ -72,6 +72,8 @@ jobs:
           WIN_CSC_LINK: ${{ secrets.WIN_CSC_LINK }}
           WIN_CSC_KEY_PASSWORD: ${{ secrets.WIN_CSC_KEY_PASSWORD }}
         run: npm run build-electron
+      - name: Validate isolated NSIS protocol registration and removal
+        run: ./tests/electron/installer-protocol.test.ps1
       - name: Verify configured release signatures
         if: github.event_name != 'pull_request' && (vars.NEXY_WINDOWS_SIGNING == 'azure' || vars.NEXY_WINDOWS_SIGNING == 'pfx')
         run: |
