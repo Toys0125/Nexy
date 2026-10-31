@@ -12,5 +12,6 @@
     <Compile Include="../../Dotnet/Overlay/Electron/OverlayTextureLayout.cs" Link="OverlayTextureLayout.cs" />
     <Compile Include="../../Dotnet/Overlay/Electron/GLTextureWriter.cs" Link="GLTextureWriter.cs" />
     <Compile Include="../../Dotnet/AppApi/Electron/SteamLaunch.cs" Link="SteamLaunch.cs" />
+    <Compile Include="../../Dotnet/AppApi/Electron/WindowsRegistryBridge.cs" Link="WindowsRegistryBridge.cs" />
   </ItemGroup>
 </Project>

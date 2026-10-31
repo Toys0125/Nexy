@@ -13,6 +13,10 @@ on:
         required: false
         type: string
         default: ''
+      require-windows-signing:
+        description: Require signed Windows release artifacts
+        type: boolean
+        default: false
 
 concurrency:
   group: ${{ github.workflow }}-${{ inputs.ref || github.ref }}
@@ -68,6 +72,7 @@ jobs:
           path: build/Electron
       - name: Package Windows Electron installer and portable ZIP
         env:
+          NEXY_REQUIRE_WINDOWS_SIGNING: ${{ inputs.require-windows-signing && 'true' || 'false' }}
           NEXY_WINDOWS_SIGNING: ${{ vars.NEXY_WINDOWS_SIGNING }}
           NEXY_AZURE_SIGNING_ENDPOINT: ${{ vars.NEXY_AZURE_SIGNING_ENDPOINT }}
           NEXY_AZURE_SIGNING_ACCOUNT: ${{ vars.NEXY_AZURE_SIGNING_ACCOUNT }}
@@ -79,6 +84,12 @@ jobs:
           WIN_CSC_LINK: ${{ secrets.WIN_CSC_LINK }}
           WIN_CSC_KEY_PASSWORD: ${{ secrets.WIN_CSC_KEY_PASSWORD }}
         run: npm run build-electron
+      - name: Verify configured Windows signatures before upload
+        if: inputs.require-windows-signing || vars.NEXY_WINDOWS_SIGNING == 'azure' || vars.NEXY_WINDOWS_SIGNING == 'pfx'
+        shell: pwsh
+        run: |
+          $version = (Get-Content Version -Raw).Trim()
+          ./build-scripts/verify-windows-signatures.ps1 -Paths @("build/Nexy_${version}_Setup_x64.exe", 'build/win-unpacked/Nexy.exe', 'build/win-unpacked/resources/app.asar.unpacked/build/Electron/VRCX-Electron.dll')
       - uses: actions/upload-artifact@v7
         with:
           name: Electron-Windows-x64

@@ -50,6 +50,7 @@ Console.WriteLine("Overlay frame size, latest-frame delivery, and concurrency ch
 
 if (OperatingSystem.IsWindows())
 {
+    RegistryBridgeTests.Run();
     using var writer = new D3DTextureWriter(8, 8, 0);
     var pixels = new byte[8 * 8 * 4];
     for (var i = 0; i < pixels.Length; i++) pixels[i] = (byte)i;
