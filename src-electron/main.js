@@ -102,9 +102,11 @@ function getRid() {
 }
 
 if (app.isPackaged) {
-    require(path.join(rootDir, 'build/Electron/VRCX-Electron.cjs'));
+    // The managed bridge is placed in extraResources (outside app.asar).
+    // Requiring app.asar/build/Electron here fails because that entry is not
+    // part of the asar header, even though the DLLs exist on disk.
+    require(path.join(process.resourcesPath, 'app.asar.unpacked', 'build', 'Electron', 'VRCX-Electron.cjs'));
 } else {
-    // if debugging, we need to get from the platform dir ourselves
     const rid = getRid();
     require(path.join(rootDir, `build/Electron/${rid}/VRCX-Electron.cjs`));
 }
