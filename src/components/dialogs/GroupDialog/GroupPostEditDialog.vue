@@ -37,7 +37,7 @@
                     <Button variant="secondary" @click="groupPostEditDialog.visible = false">
                         {{ t('dialog.group_post_edit.cancel') }}
                     </Button>
-                    <Button :disabled="!groupPostEditDialog.text?.trim()" @click="createGroupPost">
+                    <Button :disabled="posting || !groupPostEditDialog.text?.trim()" @click="createGroupPost">
                         {{ t('dialog.group.announcements.post') }}
                     </Button>
                 </div>
@@ -50,7 +50,7 @@
     import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
     import { Field, FieldContent, FieldGroup, FieldLabel } from '@/components/ui/field';
     import { InputGroupField, InputGroupTextareaField } from '@/components/ui/input-group';
-    import { computed } from 'vue';
+    import { computed, ref } from 'vue';
     import { Button } from '@/components/ui/button';
     import { toast } from 'vue-sonner';
     import { useI18n } from 'vue-i18n';
@@ -80,19 +80,26 @@
         }
     });
 
+    const posting = ref(false);
+
     function createGroupPost() {
         const D = groupPostEditDialog.value;
         const text = D.text?.trim();
-        if (!D.groupId || !text) {
+        if (!D.groupId || !text || posting.value) {
             return;
         }
+        posting.value = true;
         groupRequest
             .createGroupPost({ groupId: D.groupId, title: D.title?.trim() || '', text })
             .then((args) => {
                 handleGroupPost(args);
                 toast.success(t('dialog.group.announcements.posted'));
+                // close only once it's posted, so a failed post keeps the draft for a retry
+                D.visible = false;
             })
-            .catch(() => toast.error(t('dialog.group.announcements.post_failed')));
-        D.visible = false;
+            .catch(() => toast.error(t('dialog.group.announcements.post_failed')))
+            .finally(() => {
+                posting.value = false;
+            });
     }
 </script>

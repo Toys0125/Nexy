@@ -687,7 +687,8 @@ const routes = [
         async (m, q, body) => {
             const id = encodeURIComponent(m[2]);
             const patch = toNexvrEventBody(body);
-            // VRChat has no admins-only events; saving one as "group" must not widen it to members
+            // VRChat has no admins-only events; saving one as "group" must not widen it to members.
+            // The editor only sends visibility when it was changed, so this is a backstop.
             if (patch.visibility === 'members') {
                 const current = await nexvr(`/calendar/events/${id}`);
                 if (current.visibility === 'admins') {
