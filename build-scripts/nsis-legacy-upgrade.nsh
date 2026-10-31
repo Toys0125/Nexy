@@ -54,8 +54,31 @@
   ${EndIf}
 !macroend
 
+; The top-level protocols option does not generate NSIS registry entries.
+; Register during installation so silent installs work before the first launch.
+!macro registerNexyProtocol ROOT KEY
+  WriteRegStr ${ROOT} "${KEY}" "" "URL:Nexy Protocol"
+  WriteRegStr ${ROOT} "${KEY}" "URL Protocol" ""
+  WriteRegStr ${ROOT} "${KEY}\DefaultIcon" "" '$\"$INSTDIR\${APP_EXECUTABLE_FILENAME}$\",0'
+  WriteRegStr ${ROOT} "${KEY}\shell\open\command" "" '$\"$INSTDIR\${APP_EXECUTABLE_FILENAME}$\" $\"%1$\"'
+!macroend
+
+!macro unregisterNexyProtocol ROOT KEY
+  ReadRegStr $R0 ${ROOT} "${KEY}\shell\open\command" ""
+  ; Leave a handler belonging to another installation intact.
+  ${If} $R0 == '$\"$INSTDIR\${APP_EXECUTABLE_FILENAME}$\" $\"%1$\"'
+    DeleteRegKey ${ROOT} "${KEY}"
+  ${EndIf}
+!macroend
+
 !macro customInstall
   !insertmacro removeLegacyRegistration 32
   !insertmacro removeLegacyRegistration 64
   SetRegView 64
+  !insertmacro registerNexyProtocol SHELL_CONTEXT "Software\Classes\nexy"
+!macroend
+
+!macro customUnInstall
+  SetRegView 64
+  !insertmacro unregisterNexyProtocol SHELL_CONTEXT "Software\Classes\nexy"
 !macroend

@@ -25,7 +25,7 @@ function Assert-Installed([string]$InstallDirectory) {
     Assert-NexyExecutableTarget -Actual $shortcut.TargetPath -Expected (Join-Path $InstallDirectory 'Nexy.exe') -Source 'Start menu shortcut'
     $protocol = (Get-ItemProperty 'Registry::HKEY_LOCAL_MACHINE\Software\Classes\nexy\shell\open\command').'(default)'
     Write-Host "Registered protocol command: $protocol"
-    if ($protocol -notmatch '^"([^"]+)"') { throw "Protocol has an invalid executable command: $protocol" }
+    if ($protocol -notmatch '^"([^"]+)" "%1"$') { throw "Protocol has an invalid executable command: $protocol" }
     Assert-NexyExecutableTarget -Actual $Matches[1] -Expected (Join-Path $InstallDirectory 'Nexy.exe') -Source 'Protocol'
 }
 
@@ -43,6 +43,7 @@ function Uninstall-Nexy([string]$InstallDirectory) {
         -ArgumentList "/S _?=$InstallDirectory" -WindowStyle Hidden -Wait -PassThru
     if ($process.ExitCode -ne 0) { throw "Uninstallation failed: $($process.ExitCode)" }
     if (Test-Path -LiteralPath (Join-Path $InstallDirectory 'Nexy.exe')) { throw 'Uninstall left the application executable behind' }
+    if (Test-Path 'Registry::HKEY_LOCAL_MACHINE\Software\Classes\nexy') { throw 'Uninstall left the Nexy protocol registration behind' }
 }
 
 # This script is intended for a disposable CI runner, never a developer's installed Nexy.
