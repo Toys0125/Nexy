@@ -134,7 +134,8 @@ export const useVRCXUpdaterStore = defineStore('VRCXUpdater', () => {
         if (!appVersion.value) {
             return;
         }
-        if (currentVersion.value.includes('Nexy Nightly')) {
+        // "Nexy v2026.11.01-nightly", or the older "Nexy Nightly <version>-<hash>"
+        if (currentVersion.value.includes('Nexy Nightly') || /-nightly$/i.test(currentVersion.value)) {
             branch.value = 'Nightly';
         } else {
             branch.value = 'Stable';

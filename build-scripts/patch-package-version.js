@@ -17,6 +17,12 @@ try {
     if (!version || version === 'Nightly Build') {
         version = new Date().toISOString().split('T')[0].replaceAll('-', '.');
     }
+    // package.json needs a plain semver: "v2026.11.01-nightly" → "2026.11.1".
+    // The Version file keeps the full string for the app and the file names.
+    const date = version.match(/(\d{4})\.(\d{1,2})\.(\d{1,2})/);
+    if (date) {
+        version = date.slice(1).map(Number).join('.');
+    }
 } catch (err) {
     console.error('Error reading Version file:', err);
     process.exit(1);

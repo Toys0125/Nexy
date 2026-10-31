@@ -41,8 +41,10 @@ jobs:
           FORCE: ${{ inputs.force || false }}
         run: |
           sha="$(gh api "repos/$GH_REPO/commits/master" --jq '.sha')"
-          version="$(date -u +%Y.%m.%d)"
-          tag="v${version}-nightly"
+          # Stamped into the build as-is. The app shows it, reads the -nightly suffix as the
+          # Nightly channel, and marks the release whose title "Nexy <version>" matches as current.
+          version="v$(date -u +%Y.%m.%d)-nightly"
+          tag="${version}"
           echo "sha=${sha}" >> "$GITHUB_OUTPUT"
           echo "version=${version}" >> "$GITHUB_OUTPUT"
           echo "tag=${tag}" >> "$GITHUB_OUTPUT"
@@ -143,7 +145,7 @@ jobs:
           gh release create "$TAG" release-assets/* \
             --prerelease \
             --target "$SHA" \
-            --title "Nexy Nightly ${VERSION}" \
+            --title "Nexy ${VERSION}" \
             --notes "Automated nightly build of master at ${SHA}. Nightly builds are untested and may be unstable."
 
       - name: Prune old nightlies
