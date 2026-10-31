@@ -16,7 +16,7 @@ if (args.Length > 0 && args[0] == "--helper")
 }
 
 OverlayRegionTests.Run();
-SteamLaunchTests.Run();
+NexvrLaunchTests.Run();
 GameLaunchTests.Run();
 
 static void Check(bool condition, string message)

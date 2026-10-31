@@ -22,8 +22,7 @@ const { createLaunchCommands } = require('./launch-commands');
 const { createRendererSecurity } = require('./renderer-security');
 const { pathToFileURL } = require('node:url');
 const rendererIpc = createRendererSecurity(ipcMain);
-
-//app.disableHardwareAcceleration();
+const { applyGpuPreferences } = require('./gpu-preferences');
 
 function dotnetSetup() {
     const bundledDotNetPath = path.join(process.resourcesPath, 'dotnet-runtime');
@@ -143,7 +142,9 @@ const OVERLAY_SHARED_WIDTH = Math.max(OVERLAY_WRIST_FRAME_WIDTH, OVERLAY_HMD_FRA
 let activeNotification = null;
 
 interopApi.getDotNetObject('ProgramElectron').PreInit(version, args);
-interopApi.getDotNetObject('VRCXStorage').Load();
+const VRCXStorage = interopApi.getDotNetObject('VRCXStorage');
+VRCXStorage.Load();
+applyGpuPreferences(app, VRCXStorage);
 interopApi.getDotNetObject('ProgramElectron').Init();
 interopApi.getDotNetObject('SQLite').Init();
 interopApi.getDotNetObject('AppApiElectron').Init();
@@ -165,7 +166,6 @@ rendererIpc.handle('callDotNetMethod', (_event, className, methodName, args) => 
 /** @type {Electron.CrossProcessExports.BrowserWindow} */
 let mainWindow = undefined;
 
-const VRCXStorage = interopApi.getDotNetObject('VRCXStorage');
 const hasAskedToMoveAppImage = VRCXStorage.Get('VRCX_HasAskedToMoveAppImage') === 'true';
 
 function getCloseToTray() {

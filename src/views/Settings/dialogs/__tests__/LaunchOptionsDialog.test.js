@@ -35,6 +35,11 @@ vi.mock('../../../../stores', () => ({
     useLaunchStore: () => ({})
 }));
 
+// DialogOverlay imports this store directly even when the dialog is stubbed.
+vi.mock('../../../../stores/settings/general', () => ({
+    useGeneralSettingsStore: () => ({})
+}));
+
 vi.mock('../../../../services/config', () => ({
     default: mocks.configRepository
 }));
@@ -94,7 +99,7 @@ describe('LaunchOptionsDialog.vue', () => {
         isLaunchOptionsDialogVisible.value = true;
         mocks.configRepository.getString.mockResolvedValue('');
         vi.clearAllMocks();
-        globalThis.LINUX = false;
+        globalThis.IS_LINUX = false;
     });
 
     describe('rendering', () => {
@@ -126,14 +131,14 @@ describe('LaunchOptionsDialog.vue', () => {
         });
 
         test('renders path override section when not Linux', async () => {
-            globalThis.LINUX = false;
+            globalThis.IS_LINUX = false;
             const wrapper = mountComponent();
             await flushPromises();
             expect(wrapper.text()).toContain('dialog.launch_options.path_override');
         });
 
         test('hides path override section on Linux', async () => {
-            globalThis.LINUX = true;
+            globalThis.IS_LINUX = true;
             const wrapper = mountComponent();
             await flushPromises();
             expect(wrapper.text()).not.toContain('dialog.launch_options.path_override');
@@ -206,10 +211,10 @@ describe('LaunchOptionsDialog.vue', () => {
             expect(mocks.toast.error).toHaveBeenCalledWith('message.launch.invalid_path');
         });
 
-        test('accepts valid launch.exe path', async () => {
+        test('accepts valid NexVR.exe path', async () => {
             mocks.configRepository.getString.mockImplementation((key) => {
                 if (key === 'launchArguments') return Promise.resolve('');
-                if (key === 'vrcLaunchPathOverride') return Promise.resolve('C:\\VRChat\\launch.exe');
+                if (key === 'vrcLaunchPathOverride') return Promise.resolve('C:\\Games\\NexVR\\NexVR.exe');
                 return Promise.resolve('');
             });
 

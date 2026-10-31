@@ -867,7 +867,9 @@
                     "minimized": "Start Minimized at System Startup",
                     "tray": "Minimize to Tray When Closing",
                     "disable_gpu_acceleration": "Disable GPU Acceleration",
-                    "disable_gpu_acceleration_tooltip": "Only change this option if you know what you're doing, may fix issues with UI, requires restarting Nexy",
+                    "disable_gpu_acceleration_tooltip": "Use software rendering for the app interface to troubleshoot graphics issues. Restart Nexy to apply this setting.",
+                    "vr_overlay_rendering": "VR overlay rendering",
+                    "vr_overlay_gpu_requirement": "SteamVR overlays still require a Direct3D 11 device on Windows or OpenGL on Linux for texture sharing. There is no separate software overlay mode. Turn off VR overlays in the VR settings if your graphics device is incompatible.",
                     "disable_vr_overlay_gpu_acceleration": "Disable VR Overlay GPU Acceleration",
                     "proxy": "Proxy Settings",
                     "startup_linux": "Add \"--startup\" arg to startup Nexy.desktop file to start Nexy minimized at system startup"
@@ -2220,7 +2222,7 @@
             "header": "VRChat Launch Options",
             "description": "These options are for advanced users only.",
             "example": "(to change max fps: --fps=<N> e.g.)",
-            "path_override": "VRChat Path Override",
+            "path_override": "NexVR Client Path Override",
             "vrchat_docs": "VRChat Docs",
             "unity_manual": "Unity Manual",
             "save": "Save"
@@ -3224,7 +3226,7 @@
             "response_photo_sent": "Invite response photo message sent"
         },
         "launch": {
-            "invalid_path": "Invalid path, you must enter VRChat folder or launch.exe"
+            "invalid_path": "Invalid path, enter the NexVR folder or NexVR.exe"
         },
         "gallery": {
             "uploaded": "Gallery image uploaded",
