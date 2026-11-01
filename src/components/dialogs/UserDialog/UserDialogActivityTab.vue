@@ -938,6 +938,9 @@
     );
 
     onBeforeUnmount(() => {
+        // A settings load still pending must not call refreshData, which would
+        // advance the shared request ids and supersede the remounted tab's load
+        ++loadInvocationId;
         clearTimeout(easterEggTimer);
         clearTimeout(topWorldsLoadingTimer);
         clearOverlapLoadingTimer();
