@@ -23,8 +23,10 @@ runs:
         dotnet-version: '10.0.x'
     - name: Set version
       shell: pwsh
+      env:
+        NEXY_VERSION: ${{ inputs.nexy-version }}
       run: |
-        echo "${{ inputs.nexy-version }}" > Version
+        Set-Content -LiteralPath Version -Value $env:NEXY_VERSION
         cat Version
     - uses: actions/cache@v5
       with:

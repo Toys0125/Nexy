@@ -25,7 +25,13 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
           RELEASE_TAG: ${{ github.event.release.tag_name || inputs.tag }}
-        run: gh release view "$RELEASE_TAG" --json tagName --jq '.tagName'
+        run: |
+          # The tag is stamped into the build as its version.
+          if ! [[ "$RELEASE_TAG" =~ ^v[0-9]{4}\.[0-9]{1,2}\.[0-9]{1,2}(-[0-9A-Za-z.]+)?$ ]]; then
+            echo "Release tag '$RELEASE_TAG' is not a version like v2026.11.1" >&2
+            exit 1
+          fi
+          gh release view "$RELEASE_TAG" --json tagName --jq '.tagName'
 
   builds:
     name: Build Nexy release packages
