@@ -378,6 +378,12 @@
     }
 
     function resetActivityState() {
+        // Requests still in flight belong to the previous user; advancing the
+        // ids makes them discard their responses instead of passing the guards
+        // again if the dialog comes back to that user before they return
+        ++userActivity.value.activeRequestId;
+        ++userActivity.value.activeOverlapRequestId;
+        ++userActivity.value.activeTopWorldsRequestId;
         isLoading.value = false;
         filteredEventCount.value = 0;
         peakDayText.value = '';
