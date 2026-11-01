@@ -105,6 +105,16 @@ namespace VRCX
             {
                 var message = $"Failed to install the update: {e.Message}";
                 logger.Error(e, message);
+                // Put the installer back so the update dialog can retry it.
+                try
+                {
+                    if (!File.Exists(UpdateExecutable) && File.Exists(NexySetupExecutable))
+                        File.Move(NexySetupExecutable, UpdateExecutable);
+                }
+                catch (Exception restoreError)
+                {
+                    logger.Warn(restoreError, "Failed to restore the staged installer");
+                }
 #if !LINUX
                 MessageBox.Show(message, "Update failed", MessageBoxButtons.OK, MessageBoxIcon.Error);
 #endif

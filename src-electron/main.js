@@ -215,10 +215,11 @@ rendererIpc.handle('notification:showNotification', (_event, ...args) => showNot
 function restartApp(isUpgrade = false) {
     if (process.platform === 'win32' && isUpgrade === true) {
         // The installer replaces the app files and relaunches Nexy once it finishes.
+        // If it cannot start, stay open so the staged installer can be retried.
         if (interopApi.getDotNetObject('Update').LaunchInstaller()) {
             app.quit();
-            return;
         }
+        return;
     }
     if (process.platform === 'linux') {
         const options = {
@@ -297,7 +298,8 @@ rendererIpc.handle('app:getNoUpdater', () => {
 
 // In-place updates need the Windows installer or a running AppImage to replace.
 rendererIpc.handle('app:getCanInstallUpdates', () => {
-    return process.platform === 'win32' || (process.platform === 'linux' && Boolean(appImagePath) && !noUpdater);
+    if (noUpdater) return false;
+    return process.platform === 'win32' || (process.platform === 'linux' && Boolean(appImagePath));
 });
 
 rendererIpc.handle('app:setTrayIconNotification', (_event, notify) => {
