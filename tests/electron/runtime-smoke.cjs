@@ -47,7 +47,8 @@ applyGpuPreferences(app, storage);
 const stagedUpdate = path.join(profile, 'update.exe');
 fs.writeFileSync(stagedUpdate, 'inert legacy update fixture');
 program.Init();
-assert.equal(fs.readFileSync(stagedUpdate, 'utf8'), 'inert legacy update fixture');
+// A staged installer from an earlier run is discarded at startup, never executed.
+assert.equal(fs.existsSync(stagedUpdate), false);
 const managed = new dotnet.VRCX.AppApiElectron();
 const vr = new dotnet.VRCX.AppApiVrElectron();
 let window;

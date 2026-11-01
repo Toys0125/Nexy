@@ -224,7 +224,8 @@ namespace VRCX
 
             if (string.IsNullOrEmpty(hashString))
             {
-                logger.Error("Hash string is empty, skipping hash check");
+                File.Delete(TempDownload);
+                throw new Exception("Update is missing a SHA-256 hash");
             }
             else
             {
@@ -254,21 +255,13 @@ namespace VRCX
             }
             else
             {
-                // Linux
-                if (File.Exists(AppImagePathOld))
-                    File.Delete(AppImagePathOld);
-                File.Move(AppImagePath, AppImagePathOld);
-                File.Move(TempDownload, AppImagePath);
-                var process = new Process
-                {
-                    StartInfo = new ProcessStartInfo
-                    {
-                        FileName = "chmod",
-                        Arguments = $"+x {AppImagePath}"
-                    }
-                };
-                process.Start();
-                await process.WaitForExitAsync();
+                // Linux: stage next to the AppImage so the swap stays on one filesystem,
+                // then replace it in one step so the launch path never goes missing.
+                var stagedAppImage = AppImagePath + ".new";
+                File.Move(TempDownload, stagedAppImage, true);
+                if (!OperatingSystem.IsWindows())
+                    File.SetUnixFileMode(stagedAppImage, File.GetUnixFileMode(AppImagePath) | UnixFileMode.UserExecute);
+                File.Replace(stagedAppImage, AppImagePath, AppImagePathOld);
             }
 
             UpdateProgress = 0;
