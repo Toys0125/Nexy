@@ -123,6 +123,25 @@ test('excludes a legacy ID resolved from a cached display name', async () => {
     expect(mocks.userRequest.getPublicProfile).not.toHaveBeenCalled();
 });
 
+test('skips unresolved joins while restoring a user found by display name', async () => {
+    const known = { id: '6a54382813df04bba917772a', displayName: 'Known' };
+    mocks.user.cachedUsers.set(known.id, known);
+    mocks.database.getGamelogDatabase.mockResolvedValue([
+        { type: 'OnPlayerLeft' },
+        history()[1],
+        { type: 'OnPlayerJoined', userId: '', displayName: 'Unknown one', created_at: '2026-10-31' },
+        { type: 'OnPlayerJoined', displayName: 'Unknown two', created_at: '2026-10-31' },
+        { type: 'OnPlayerJoined', displayName: known.displayName, created_at: '2026-10-31' }
+    ]);
+
+    await tryLoadPlayerList();
+
+    expect([...locationStore.lastLocation.playerList.keys()]).toEqual([known.id]);
+    expect(locationStore.lastLocation.playerList.get(known.id).displayName).toBe(known.displayName);
+    expect(mocks.userRequest.getUser).not.toHaveBeenCalled();
+    expect(mocks.userRequest.getPublicProfile).toHaveBeenCalledExactlyOnceWith({ userId: known.id });
+});
+
 test('does not restore stale state if the game stops during the database read', async () => {
     let finishRead;
     mocks.database.getGamelogDatabase.mockImplementationOnce(

@@ -113,7 +113,7 @@ export async function tryLoadPlayerList() {
                             userStore.cachedUserIdsByDisplayName
                         )?.id ?? '';
                 }
-                if (ctx.userId?.startsWith('usr_')) {
+                if (!ctx.userId || ctx.userId.startsWith('usr_')) {
                     continue;
                 }
                 const userMap = {
