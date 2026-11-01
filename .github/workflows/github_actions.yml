@@ -149,8 +149,10 @@ jobs:
         with:
           ref: ${{ inputs.ref || github.ref }}
       - name: Set version
+        env:
+          NEXY_VERSION: ${{ needs.set_version.outputs.version }}
         run: |
-          echo "${{ needs.set_version.outputs.version }}" > Version
+          echo "$NEXY_VERSION" > Version
           cat Version
       - name: Node.js
         uses: actions/setup-node@v6
@@ -213,8 +215,10 @@ jobs:
         with:
           ref: ${{ inputs.ref || github.ref }}
       - name: Set version
+        env:
+          NEXY_VERSION: ${{ needs.set_version.outputs.version }}
         run: |
-          echo "${{ needs.set_version.outputs.version }}" > Version
+          echo "$NEXY_VERSION" > Version
           cat Version
       - name: Use Node.js
         uses: actions/setup-node@v6
