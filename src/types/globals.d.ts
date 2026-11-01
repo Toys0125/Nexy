@@ -47,6 +47,7 @@ declare global {
             setStartup: (enabled: boolean) => Promise<void>;
             openCalendarFile: (content: string) => Promise<void>;
             getNoUpdater: () => Promise<boolean>;
+            getCanInstallUpdates: () => Promise<boolean>;
             setTrayIconNotification: (notify: boolean) => Promise<void>;
             setThemeSource: (source: 'system' | 'light' | 'dark') => Promise<void>;
             onSystemThemeChanged: (Function: (event: any, isDark: boolean) => void) => () => void;
@@ -61,7 +62,7 @@ declare global {
             onBrowserFocus: (Function: (event: any) => void) => () => void;
             onBrowserBlur: (Function: (event: any) => void) => () => void;
             onVrOverlayReady: (callback: (event: any) => void) => () => void;
-            restartApp: () => Promise<void>;
+            restartApp: (isUpgrade?: boolean) => Promise<void>;
             getOverlayWindow: () => Promise<boolean>;
             updateVr: (
                 active: boolean,

@@ -131,8 +131,8 @@ namespace VRCX
         public static void Init()
         {
             ConfigureLogger();
-            // Nexy uses manual Electron installers. Never execute a staged
-            // legacy update.exe from a previous CefSharp installation.
+            // Staged installers are only launched from the update dialog, never on startup.
+            Update.Cleanup();
 
             logger.Info("{0} Starting...", Version);
             logger.Info("Args: {0}", JsonSerializer.Serialize(StartupArgs.Args));

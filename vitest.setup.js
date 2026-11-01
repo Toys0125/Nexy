@@ -23,6 +23,7 @@ window.electron = {
     desktopNotification: vi.fn(),
     getArch: vi.fn().mockResolvedValue('x64'),
     getNoUpdater: vi.fn().mockResolvedValue(true),
+    getCanInstallUpdates: vi.fn().mockResolvedValue(false),
     restartApp: vi.fn(),
     copyImageToClipboard: vi.fn().mockResolvedValue(true),
     focusWindow: vi.fn(),

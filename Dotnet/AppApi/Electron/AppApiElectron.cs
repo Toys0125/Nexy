@@ -31,7 +31,7 @@ namespace VRCX
         public override void SetTrayIconNotification(bool notify) => throw DesktopOnly();
         public override void OpenCalendarFile(string icsContent) => throw DesktopOnly();
 
-        public override bool CheckForUpdateExe() => false;
+        public override bool CheckForUpdateExe() => Update.HasPendingInstaller();
 
         public override void SetVR(bool active, bool hmdOverlay, bool wristOverlay, bool menuButton, int overlayHand)
         {
