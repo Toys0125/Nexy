@@ -295,6 +295,11 @@ rendererIpc.handle('app:getNoUpdater', () => {
     return noUpdater;
 });
 
+// In-place updates need the Windows installer or a running AppImage to replace.
+rendererIpc.handle('app:getCanInstallUpdates', () => {
+    return process.platform === 'win32' || (process.platform === 'linux' && Boolean(appImagePath) && !noUpdater);
+});
+
 rendererIpc.handle('app:setTrayIconNotification', (_event, notify) => {
     setTrayIconNotification(notify);
 });

@@ -21,9 +21,9 @@ public partial class AppApi
         return Update.DownloadUpdate(fileUri.AbsoluteUri, hashString, downloadSize);
     }
 
-    public void CancelUpdate()
+    public Task CancelUpdate()
     {
-        Update.CancelUpdate();
+        return Update.CancelUpdate();
     }
 
     public int CheckUpdateProgress()

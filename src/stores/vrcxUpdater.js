@@ -60,7 +60,7 @@ export const useVRCXUpdaterStore = defineStore('VRCXUpdater', () => {
             noUpdater.value = await window.electron.getNoUpdater();
             console.log('Architecture:', arch.value);
         }
-        canInstallUpdates.value = IS_WINDOWS || (IS_LINUX && !noUpdater.value);
+        canInstallUpdates.value = await window.electron.getCanInstallUpdates();
 
         const [VRCX_autoUpdateVRCX, VRCX_id] = await Promise.all([
             configRepository.getString('VRCX_autoUpdateVRCX', 'Notify'),

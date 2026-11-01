@@ -55,6 +55,7 @@ contextBridge.exposeInMainWorld('electron', {
     setStartup: (enabled) => ipcRenderer.invoke('app:setStartup', enabled),
     openCalendarFile: (content) => ipcRenderer.invoke('app:openCalendarFile', content),
     getNoUpdater: () => ipcRenderer.invoke('app:getNoUpdater'),
+    getCanInstallUpdates: () => ipcRenderer.invoke('app:getCanInstallUpdates'),
     setTrayIconNotification: (notify) => ipcRenderer.invoke('app:setTrayIconNotification', notify),
     setThemeSource: (source) => ipcRenderer.invoke('app:setThemeSource', source),
     onSystemThemeChanged: (callback) => registerManagedListener('systemThemeChanged', callback),

@@ -22,6 +22,7 @@ namespace VRCX
         private static readonly string TempDownload = Path.Join(Program.AppDataDirectory, "tempDownload");
         private static readonly HttpClient httpClient;
         private static CancellationTokenSource _downloadCancellation = new();
+        private static Task _activeDownload = Task.CompletedTask;
         public static int UpdateProgress;
         private static string AppImagePath = string.Empty;
         private static string AppImagePathOld = string.Empty;
@@ -175,113 +176,137 @@ namespace VRCX
             throw new Exception("Unable to extract file name from content-disposition header.");
         }
 
-        public static async Task DownloadUpdate(string fileUrl, string hashString, int downloadSize)
+        public static Task DownloadUpdate(string fileUrl, string hashString, int downloadSize)
         {
             if (!OperatingSystem.IsWindows() && string.IsNullOrEmpty(AppImagePath))
                 throw new NotSupportedException("Automatic updates are only supported for the Windows installer and AppImage.");
 
             var cancellation = new CancellationTokenSource();
             _downloadCancellation = cancellation;
-            var cancellationToken = cancellation.Token;
+            var download = DownloadAndStageUpdate(fileUrl, hashString, downloadSize, cancellation.Token);
+            _activeDownload = download;
+            return download;
+        }
+
+        private static async Task DownloadAndStageUpdate(string fileUrl, string hashString, int downloadSize, CancellationToken cancellationToken)
+        {
             const int chunkSize = 8192;
-
-            if (File.Exists(TempDownload))
-                File.Delete(TempDownload);
-
-            await using var destination = File.OpenWrite(TempDownload);
-            using var response = await httpClient.GetAsync(fileUrl, HttpCompletionOption.ResponseHeadersRead, cancellationToken);
-            response.EnsureSuccessStatusCode();
-            await using var download = await response.Content.ReadAsStreamAsync(cancellationToken);
-            var contentLength = response.Content.Headers.ContentLength;
-            var buffer = new byte[chunkSize];
-            long totalBytesRead = 0;
-
-            while (true)
+            try
             {
-                if (contentLength.HasValue)
+                if (File.Exists(TempDownload))
+                    File.Delete(TempDownload);
+
+                await using var destination = File.OpenWrite(TempDownload);
+                using var response = await httpClient.GetAsync(fileUrl, HttpCompletionOption.ResponseHeadersRead, cancellationToken);
+                response.EnsureSuccessStatusCode();
+                await using var download = await response.Content.ReadAsStreamAsync(cancellationToken);
+                var contentLength = response.Content.Headers.ContentLength;
+                var buffer = new byte[chunkSize];
+                long totalBytesRead = 0;
+
+                while (true)
                 {
-                    var percentage = Math.Round((double)totalBytesRead / contentLength.Value * 100, 2);
-                    UpdateProgress = (int)percentage;
-                }
-                var bytesRead = await download.ReadAsync(buffer.AsMemory(0, chunkSize), cancellationToken);
-                if (bytesRead == 0)
-                    break;
-
-                cancellationToken.ThrowIfCancellationRequested();
-
-                await destination.WriteAsync(buffer.AsMemory(0, bytesRead), cancellationToken);
-                totalBytesRead += bytesRead;
-            }
-
-            destination.Close();
-
-            var data = new FileInfo(TempDownload);
-            if (data.Length != downloadSize)
-            {
-                File.Delete(TempDownload);
-                logger.Error("Downloaded file size does not match expected size");
-                throw new Exception("Downloaded file size does not match expected size");
-            }
-
-            if (string.IsNullOrEmpty(hashString))
-            {
-                File.Delete(TempDownload);
-                throw new Exception("Update is missing a SHA-256 hash");
-            }
-            else
-            {
-                logger.Info("Checking hash");
-                using (var sha256 = SHA256.Create())
-                await using (var stream = File.OpenRead(TempDownload))
-                {
-                    var fileHashBytes = await sha256.ComputeHashAsync(stream, cancellationToken);
-                    var fileHashString = Convert.ToHexString(fileHashBytes);
-                    if (!hashString.Equals(fileHashString, StringComparison.OrdinalIgnoreCase))
+                    if (contentLength.HasValue)
                     {
-                        logger.Error($"Hash check failed file:{fileHashString} web:{hashString}");
-                        throw new Exception("Hash check failed");
-                        // can't delete file yet because it's in use
+                        var percentage = Math.Round((double)totalBytesRead / contentLength.Value * 100, 2);
+                        UpdateProgress = (int)percentage;
                     }
+                    var bytesRead = await download.ReadAsync(buffer.AsMemory(0, chunkSize), cancellationToken);
+                    if (bytesRead == 0)
+                        break;
+
+                    cancellationToken.ThrowIfCancellationRequested();
+
+                    await destination.WriteAsync(buffer.AsMemory(0, bytesRead), cancellationToken);
+                    totalBytesRead += bytesRead;
                 }
 
-                logger.Info("Hash check passed");
-            }
+                destination.Close();
 
-            if (string.IsNullOrEmpty(AppImagePath))
-            {
-                // Windows
-                if (File.Exists(UpdateExecutable))
-                    File.Delete(UpdateExecutable);
-                File.Move(TempDownload, UpdateExecutable);
-            }
-            else
-            {
-                // Linux: stage next to the AppImage so the swap stays on one filesystem,
-                // then replace it in one step so the launch path never goes missing.
-                var stagedAppImage = AppImagePath + ".new";
-                File.Move(TempDownload, stagedAppImage, true);
-                if (!OperatingSystem.IsWindows())
-                    File.SetUnixFileMode(stagedAppImage, File.GetUnixFileMode(AppImagePath) | UnixFileMode.UserExecute);
-                File.Replace(stagedAppImage, AppImagePath, AppImagePathOld);
-            }
+                var data = new FileInfo(TempDownload);
+                if (data.Length != downloadSize)
+                {
+                    File.Delete(TempDownload);
+                    logger.Error("Downloaded file size does not match expected size");
+                    throw new Exception("Downloaded file size does not match expected size");
+                }
 
-            UpdateProgress = 0;
+                if (string.IsNullOrEmpty(hashString))
+                {
+                    File.Delete(TempDownload);
+                    throw new Exception("Update is missing a SHA-256 hash");
+                }
+                else
+                {
+                    logger.Info("Checking hash");
+                    using (var sha256 = SHA256.Create())
+                    await using (var stream = File.OpenRead(TempDownload))
+                    {
+                        var fileHashBytes = await sha256.ComputeHashAsync(stream, cancellationToken);
+                        var fileHashString = Convert.ToHexString(fileHashBytes);
+                        if (!hashString.Equals(fileHashString, StringComparison.OrdinalIgnoreCase))
+                        {
+                            logger.Error($"Hash check failed file:{fileHashString} web:{hashString}");
+                            throw new Exception("Hash check failed");
+                            // can't delete file yet because it's in use
+                        }
+                    }
+
+                    logger.Info("Hash check passed");
+                }
+
+                if (string.IsNullOrEmpty(AppImagePath))
+                {
+                    // Windows
+                    if (File.Exists(UpdateExecutable))
+                        File.Delete(UpdateExecutable);
+                    File.Move(TempDownload, UpdateExecutable);
+                }
+                else
+                {
+                    // Linux: stage next to the AppImage so the swap stays on one filesystem,
+                    // then replace it in one step so the launch path never goes missing.
+                    var stagedAppImage = AppImagePath + ".new";
+                    File.Move(TempDownload, stagedAppImage, true);
+                    if (!OperatingSystem.IsWindows())
+                        File.SetUnixFileMode(stagedAppImage, File.GetUnixFileMode(AppImagePath) | UnixFileMode.UserExecute);
+                    File.Replace(stagedAppImage, AppImagePath, AppImagePathOld);
+                }
+
+            }
+            catch
+            {
+                // Streams are closed by now, so a failed or cancelled download can be removed.
+                try
+                {
+                    if (File.Exists(TempDownload))
+                        File.Delete(TempDownload);
+                }
+                catch (Exception e)
+                {
+                    logger.Warn(e, "Failed to remove the incomplete update download");
+                }
+                throw;
+            }
+            finally
+            {
+                UpdateProgress = 0;
+            }
         }
 
         public static async Task CancelUpdate()
         {
             _downloadCancellation.Cancel();
-            UpdateProgress = 0;
-            await Task.Delay(100);
+            // Wait for the download to stop and clean up, so a retry cannot race its temp file.
             try
             {
-                if (File.Exists(TempDownload))
-                    File.Delete(TempDownload);
+                await _activeDownload;
             }
             catch
             {
-                // ignored
+                // The cancelled download reports its own failure to the caller.
             }
+            UpdateProgress = 0;
         }
     }
 }
