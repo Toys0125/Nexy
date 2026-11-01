@@ -36,6 +36,8 @@ jobs:
     uses: ./.github/workflows/github_actions.yml
     with:
       ref: ${{ github.event.release.tag_name || inputs.tag }}
+      # Stamp the release tag; the Version file in the repo is not bumped per release.
+      version: ${{ github.event.release.tag_name || inputs.tag }}
       require-windows-signing: false
     secrets: inherit
 
