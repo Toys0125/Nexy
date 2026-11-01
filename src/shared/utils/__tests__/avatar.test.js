@@ -1,7 +1,7 @@
 import { describe, expect, test, vi } from 'vitest';
 import { ref } from 'vue';
 
-import { getPlatformInfo, parseAvatarUrl, storeAvatarImage } from '../avatar';
+import { compareUnityVersion, getPlatformInfo, parseAvatarUrl, storeAvatarImage } from '../avatar';
 
 vi.mock('../../../views/Feed/Feed.vue', () => ({
     default: { template: '<div />' }
@@ -17,6 +17,21 @@ vi.mock('../../../plugins/router', () => ({
     },
     initRouter: vi.fn()
 }));
+
+describe('compareUnityVersion', () => {
+    test('NexVR metadata without Unity versions is unavailable without logging an error', () => {
+        const error = vi.spyOn(console, 'error').mockImplementation(() => {});
+        expect(compareUnityVersion(undefined, undefined)).toBe(false);
+        expect(compareUnityVersion('20220306000', undefined)).toBe(false);
+        expect(error).not.toHaveBeenCalled();
+        error.mockRestore();
+    });
+
+    test('still compares supplied Unity versions', () => {
+        expect(compareUnityVersion('20220306000', '2022.3.6f1')).toBe(true);
+        expect(compareUnityVersion('20220307000', '2022.3.6f1')).toBe(false);
+    });
+});
 
 describe('storeAvatarImage', () => {
     function makeArgs(name, ownerId, createdAt = '2024-01-01T00:00:00Z') {

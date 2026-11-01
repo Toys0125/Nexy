@@ -1,4 +1,5 @@
 import dayjs from 'dayjs';
+import { watch } from 'vue';
 
 import {
     createJoinLeaveEntry,
@@ -36,10 +37,6 @@ import { useUserStore } from '../stores/user';
 import { useVrStore } from '../stores/vr';
 import { useVrcxStore } from '../stores/vrcx';
 
-import gameLogService from '../services/gameLog.js';
-
-import * as workerTimers from 'worker-timers';
-
 /**
  * Loads the player list from game log history and syncs it to
  * locationStore, instanceStore, vrStore, and userStore.
@@ -58,14 +55,41 @@ export async function tryLoadPlayerList() {
     console.log('Loading player list from game log...');
     let ctx;
     let i;
-    const data = await database.getGamelogDatabase();
-    if (data.length === 0) {
+    let sessionChanged = false;
+    // Live updates (including in-place player changes) take precedence over
+    // history. Watch synchronously across both asynchronous reads.
+    const stopWatching = watch(
+        [() => gameStore.isGameRunning, () => locationStore.lastLocation],
+        () => {
+            sessionChanged = true;
+        },
+        { deep: true, flush: 'sync' }
+    );
+    let data;
+    let isProcessRunning;
+    try {
+        data = await database.getGamelogDatabase();
+        if (!gameStore.isGameRunning || data.length === 0 || sessionChanged) {
+            return;
+        }
+        // The polling loop awaits this restore, so its stored flag alone
+        // cannot detect a process exit during the history read.
+        isProcessRunning = await AppApi.IsGameRunning();
+    } finally {
+        stopWatching();
+    }
+    if (!isProcessRunning || !gameStore.isGameRunning || sessionChanged) {
         return;
     }
     let length = 0;
     for (i = data.length - 1; i > -1; i--) {
         ctx = data[i];
         if (ctx.type === 'Location') {
+            // Older Nexy builds imported VRChat logs. Keep that history, but
+            // never restore its player list or request those IDs from NexVR.
+            if (ctx.location?.startsWith('wrld_')) {
+                return;
+            }
             locationStore.setLastLocation({
                 date: Date.parse(ctx.created_at),
                 location: ctx.location,
@@ -88,6 +112,9 @@ export async function tryLoadPlayerList() {
                             ctx.displayName,
                             userStore.cachedUserIdsByDisplayName
                         )?.id ?? '';
+                }
+                if (!ctx.userId || ctx.userId.startsWith('usr_')) {
+                    continue;
                 }
                 const userMap = {
                     displayName: ctx.displayName,
@@ -471,55 +498,6 @@ async function checkYoutubeBotError(videoError) {
     }
     if (ok) {
         AppApi.OpenSteamStorePage(4296960);
-    }
-}
-
-/**
- * Parses raw game log JSON and delegates to addGameLogEntry.
- * Called from C# / updateLoop.
- *
- * @param {string} json
- */
-export async function addGameLogEvent(json) {
-    const locationStore = useLocationStore();
-
-    const rawLogs = JSON.parse(json);
-    const gameLog = gameLogService.parseRawGameLog(rawLogs[1], rawLogs[2], rawLogs.slice(3));
-    if (
-        AppDebug.debugGameLog &&
-        gameLog.type !== 'photon-id' &&
-        gameLog.type !== 'api-request' &&
-        gameLog.type !== 'udon-exception'
-    ) {
-        console.log('gameLog:', gameLog);
-    }
-    await addGameLogEntry(gameLog, locationStore.lastLocation.location);
-}
-
-/**
- * Starts game log processing from the database tail.
- */
-export async function getGameLogTable() {
-    const dateTill = await database.getLastDateGameLogDatabase();
-    await updateGameLog(dateTill);
-}
-
-/**
- * Fetches all game log entries since dateTill and processes them.
- *
- * @param {string} dateTill
- */
-async function updateGameLog(dateTill) {
-    await gameLogService.setDateTill(dateTill);
-    await new Promise((resolve) => {
-        workerTimers.setTimeout(resolve, 10000);
-    });
-    let location = '';
-    for (const gameLog of await gameLogService.getAll()) {
-        if (gameLog.type === 'location') {
-            location = gameLog.location;
-        }
-        await addGameLogEntry(gameLog, location);
     }
 }
 

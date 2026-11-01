@@ -79,8 +79,8 @@ function getPlatformInfo(unityPackages) {
  * @returns {boolean}
  */
 function compareUnityVersion(unitySortNumber, sdkUnityVersion) {
-    if (!sdkUnityVersion) {
-        console.error('No sdkUnityVersion provided');
+    // NexVR platform metadata has no VRChat SDK version or Unity sort number.
+    if (!unitySortNumber || !sdkUnityVersion) {
         return false;
     }
 

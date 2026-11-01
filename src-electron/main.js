@@ -150,7 +150,7 @@ interopApi.getDotNetObject('SQLite').Init();
 interopApi.getDotNetObject('AppApiElectron').Init();
 interopApi.getDotNetObject('Discord').Init();
 interopApi.getDotNetObject('WebApi').Init();
-interopApi.getDotNetObject('LogWatcher').Init();
+// NexVR game sessions come from realtime; the legacy watcher reads VRChat logs.
 
 interopApi.getDotNetObject('SystemMonitorElectron').Init();
 interopApi.getDotNetObject('AppApiVrElectron').Init();

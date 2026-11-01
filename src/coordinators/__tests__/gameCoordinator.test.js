@@ -25,7 +25,8 @@ const mocks = vi.hoisted(() => ({
         setNextDiscordUpdate: vi.fn()
     },
     gameLogStore: {
-        clearNowPlaying: vi.fn()
+        clearNowPlaying: vi.fn(),
+        resetNowPlayingProducers: vi.fn()
     },
     vrStore: {
         updateVRLastLocation: vi.fn(),
@@ -102,6 +103,8 @@ vi.mock('../../stores/location', () => ({
 vi.mock('../locationCoordinator', () => ({
     runLastLocationResetFlow: (...args) => mocks.runLastLocationResetFlow(...args)
 }));
+
+vi.mock('../gameLogCoordinator', () => ({ tryLoadPlayerList: vi.fn() }));
 
 vi.mock('../../stores/modal', () => ({
     useModalStore: () => ({})
