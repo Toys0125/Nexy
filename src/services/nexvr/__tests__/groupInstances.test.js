@@ -244,3 +244,17 @@ test('shim group routes return the real snapshot cache without REST discovery', 
     expect(native).not.toHaveBeenCalled();
     expect(instances.cachedInstances.size).toBe(1);
 });
+
+test('shim group routes reject requests for another user instead of returning the caller snapshot', async () => {
+    snapshot('g1', [instance('i1')]);
+    const native = vi.fn();
+    for (const path of ['users/other/instances/groups', 'users/other/instances/groups/g1']) {
+        const result = await handleShimRequest({ url: `https://nexvr.test/api/${path}`, method: 'GET' }, native);
+        expect(result.status).toBe(403);
+        expect(JSON.parse(result.data)).toEqual({
+            error: { message: 'User ID must be your own.', status_code: 403 }
+        });
+    }
+    expect(native).not.toHaveBeenCalled();
+    expect(realtime.getGroupInstances()).toHaveLength(1);
+});

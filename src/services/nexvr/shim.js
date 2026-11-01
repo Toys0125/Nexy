@@ -648,8 +648,26 @@ const routes = [
     ],
     ['GET', /^users\/([^/]+)\/groups\/represented$/, () => ({})],
     // Discovery comes from GROUP_INSTANCES realtime snapshots, not REST scans.
-    ['GET', /^users\/([^/]+)\/instances\/groups$/, () => ({ instances: realtime.getGroupInstances() })],
-    ['GET', /^users\/([^/]+)\/instances\/groups\/([^/]+)$/, (m) => ({ instances: realtime.getGroupInstances([m[2]]) })],
+    [
+        'GET',
+        /^users\/([^/]+)\/instances\/groups$/,
+        (m) => {
+            if (m[1] !== realtime.userId) {
+                throw new ShimError(403, 'User ID must be your own.');
+            }
+            return { instances: realtime.getGroupInstances() };
+        }
+    ],
+    [
+        'GET',
+        /^users\/([^/]+)\/instances\/groups\/([^/]+)$/,
+        (m) => {
+            if (m[1] !== realtime.userId) {
+                throw new ShimError(403, 'User ID must be your own.');
+            }
+            return { instances: realtime.getGroupInstances([m[2]]) };
+        }
+    ],
     ['GET', /^profile\/([^/]+)$/, async (m) => toVrcPublicProfile(await fetchUser(m[1]))],
     ['GET', /^user\/([^/]+)\/friendStatus$/, (m) => friendStatus(m[1])],
     [
