@@ -289,6 +289,7 @@
     const worldStore = useWorldStore();
 
     const isLoading = ref(false);
+    let loadingUserId = null;
     const currentRangeDays = ref(30);
     const cachedSessions = ref([]);
     const filteredEventCount = ref(0);
@@ -520,6 +521,7 @@
 
         const requestId = ++userActivity.value.activeRequestId;
         const overlapRequestId = ++userActivity.value.activeOverlapRequestId;
+        loadingUserId = userId;
         if (!silent) {
             isLoading.value = true;
         }
@@ -860,7 +862,9 @@
         }
         if (userId !== userActivity.value.lastLoadedUserId) {
             resetActivityState();
-        } else if (isLoading.value || filteredEventCount.value > 0) {
+        } else if ((isLoading.value && loadingUserId === userId) || filteredEventCount.value > 0) {
+            // A pending load for another user is discarded once it returns,
+            // so only one for this user counts as already loading
             return;
         }
 
