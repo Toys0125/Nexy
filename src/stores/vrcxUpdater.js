@@ -53,6 +53,9 @@ export const useVRCXUpdaterStore = defineStore('VRCXUpdater', () => {
     const updateInProgress = ref(false);
     const updateProgress = ref(0);
     const updateToastRelease = ref('');
+    // Identifies the current download so a cancelled one cannot touch later state.
+    let updateOperation = 0;
+    let cancellingUpdate = false;
 
     async function initVRCXUpdaterSettings() {
         if (LINUX) {
@@ -382,26 +385,42 @@ export const useVRCXUpdaterStore = defineStore('VRCXUpdater', () => {
     }
     async function downloadVRCXUpdate(downloadUrl, hashString, size, releaseName) {
         if (!canInstallUpdates.value) return openReleasePage();
-        if (updateInProgress.value) {
+        if (updateInProgress.value || cancellingUpdate) {
             return;
         }
+        const operation = ++updateOperation;
         try {
             updateInProgress.value = true;
-            await downloadFileProgress();
+            await downloadFileProgress(operation);
+            if (operation !== updateOperation) {
+                return;
+            }
             await AppApi.DownloadUpdate(downloadUrl, hashString, size);
-            pendingVRCXInstall.value = releaseName;
+            if (operation === updateOperation) {
+                pendingVRCXInstall.value = releaseName;
+            }
         } catch (err) {
+            if (operation !== updateOperation) {
+                // Cancelled by the user.
+                return;
+            }
             console.error(err);
             toast.error(`${t('message.vrcx_updater.failed_install')} ${err}`);
         } finally {
-            updateInProgress.value = false;
-            updateProgress.value = 0;
+            if (operation === updateOperation) {
+                updateInProgress.value = false;
+                updateProgress.value = 0;
+            }
         }
     }
-    async function downloadFileProgress() {
-        updateProgress.value = await AppApi.CheckUpdateProgress();
+    async function downloadFileProgress(operation) {
+        const progress = await AppApi.CheckUpdateProgress();
+        if (operation !== updateOperation) {
+            return;
+        }
+        updateProgress.value = progress;
         if (updateInProgress.value) {
-            workerTimers.setTimeout(() => downloadFileProgress(), 150);
+            workerTimers.setTimeout(() => downloadFileProgress(operation), 150);
         }
     }
     function installVRCXUpdate() {
@@ -461,9 +480,18 @@ export const useVRCXUpdaterStore = defineStore('VRCXUpdater', () => {
         return `${updateProgress.value}%`;
     }
     async function cancelUpdate() {
-        await AppApi.CancelUpdate();
-        updateInProgress.value = false;
-        updateProgress.value = 0;
+        if (cancellingUpdate) {
+            return;
+        }
+        cancellingUpdate = true;
+        updateOperation++;
+        try {
+            await AppApi.CancelUpdate();
+        } finally {
+            cancellingUpdate = false;
+            updateInProgress.value = false;
+            updateProgress.value = 0;
+        }
     }
 
     initVRCXUpdaterSettings();

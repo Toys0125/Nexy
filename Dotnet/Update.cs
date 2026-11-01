@@ -255,6 +255,8 @@ namespace VRCX
                     logger.Info("Hash check passed");
                 }
 
+                // Last point where Cancel applies; the swap below is not interrupted.
+                cancellationToken.ThrowIfCancellationRequested();
                 if (string.IsNullOrEmpty(AppImagePath))
                 {
                     // Windows
@@ -268,11 +270,19 @@ namespace VRCX
                     // then replace it in one step so the launch path never goes missing.
                     var stagedAppImage = AppImagePath + ".new";
                     File.Move(TempDownload, stagedAppImage, true);
-                    if (!OperatingSystem.IsWindows())
-                        File.SetUnixFileMode(stagedAppImage, File.GetUnixFileMode(AppImagePath) | UnixFileMode.UserExecute);
-                    File.Replace(stagedAppImage, AppImagePath, AppImagePathOld);
+                    try
+                    {
+                        if (!OperatingSystem.IsWindows())
+                            File.SetUnixFileMode(stagedAppImage, File.GetUnixFileMode(AppImagePath) | UnixFileMode.UserExecute);
+                        File.Replace(stagedAppImage, AppImagePath, AppImagePathOld);
+                    }
+                    catch
+                    {
+                        if (File.Exists(stagedAppImage))
+                            File.Delete(stagedAppImage);
+                        throw;
+                    }
                 }
-
             }
             catch
             {
