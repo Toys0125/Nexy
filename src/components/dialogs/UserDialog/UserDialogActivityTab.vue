@@ -290,6 +290,7 @@
 
     const isLoading = ref(false);
     let loadingUserId = null;
+    let loadInvocationId = 0;
     const currentRangeDays = ref(30);
     const cachedSessions = ref([]);
     const filteredEventCount = ref(0);
@@ -352,7 +353,7 @@
     const ACTIVITY_SELF_TOP_WORLDS_SORT_KEY = 'VRCX_activitySelfTopWorldsSortBy';
     const ACTIVITY_SELF_EXCLUDE_HOME_WORLD_KEY = 'VRCX_activitySelfExcludeHomeWorld';
 
-    async function applySettingsAndRefresh() {
+    async function applySettingsAndRefresh(invocationId) {
         isRestoringSettings.value = true;
         const [sortBy, excludeHomeWorld, overlapExcludeEnabled, overlapExcludeStart, overlapExcludeEnd] =
             await Promise.all([
@@ -369,6 +370,10 @@
         excludeEndHour.value = String(overlapExcludeEnd);
         await nextTick();
         isRestoringSettings.value = false;
+        // A newer load started while the settings were read; let it refresh
+        if (invocationId !== loadInvocationId) {
+            return;
+        }
         await refreshData();
     }
 
@@ -868,7 +873,7 @@
             return;
         }
 
-        await applySettingsAndRefresh();
+        await applySettingsAndRefresh(++loadInvocationId);
     }
 
     watch(
