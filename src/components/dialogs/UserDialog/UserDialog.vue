@@ -77,7 +77,7 @@
 </template>
 
 <script setup>
-    import { computed, ref, watch } from 'vue';
+    import { computed, onMounted, ref, watch } from 'vue';
     import { DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
     import { TabsUnderline } from '@/components/ui/tabs';
     import { storeToRefs } from 'pinia';
@@ -216,23 +216,24 @@
         showEditProfileDialog
     });
 
+    // Watching the id too: a cached user can load within one tick, so loading
+    // flips true and back to false unseen and the open tab kept the last user
     watch(
-        () => userDialog.value.loading,
+        () => [userDialog.value.visible, userDialog.value.loading, userDialog.value.id],
         () => {
-            if (userDialog.value.visible) {
-                !userDialog.value.loading && loadLastActiveTab();
-            }
-        }
-    );
-
-    watch(
-        () => userDialog.value.visible,
-        (visible) => {
-            if (visible && !userDialog.value.loading) {
+            if (userDialog.value.visible && !userDialog.value.loading) {
                 loadLastActiveTab();
             }
         }
     );
+
+    // The dialog can finish loading before this mounts, so the watcher above
+    // never fires for it
+    onMounted(() => {
+        if (userDialog.value.visible && !userDialog.value.loading) {
+            loadLastActiveTab();
+        }
+    });
 
     /** @type {import('vue').Ref<any>} */
     const treeData = ref({});
