@@ -363,17 +363,21 @@
                 configRepository.getString('VRCX_overlapExcludeStart', '1'),
                 configRepository.getString('VRCX_overlapExcludeEnd', '6')
             ]);
+        // A newer load started while the settings were read; it restores them
+        // and refreshes, so this one must not touch them or the restoring flag
+        if (invocationId !== loadInvocationId) {
+            return;
+        }
         topWorldsSortBy.value = ['time', 'count'].includes(sortBy) ? sortBy : 'count';
         excludeHomeWorldEnabled.value = excludeHomeWorld;
         excludeHoursEnabled.value = overlapExcludeEnabled;
         excludeStartHour.value = String(overlapExcludeStart);
         excludeEndHour.value = String(overlapExcludeEnd);
         await nextTick();
-        isRestoringSettings.value = false;
-        // A newer load started while the settings were read; let it refresh
         if (invocationId !== loadInvocationId) {
             return;
         }
+        isRestoringSettings.value = false;
         await refreshData();
     }
 
