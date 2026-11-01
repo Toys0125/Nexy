@@ -427,8 +427,6 @@
         setUserDialogGroupSorting
     );
 
-    let userGroupsRequestId = 0;
-
     const groupSearchQuery = ref('');
     const groupSearchActive = computed(() => groupSearchQuery.value.trim().length > 0);
     // NexVR needs no VRC+ and enforces each account's own group limit when
@@ -466,7 +464,7 @@
      * @param userId
      */
     async function getUserGroups(userId) {
-        const requestId = ++userGroupsRequestId;
+        const requestId = ++userDialog.value.groupsRequestId;
         exitEditModeCurrentUserGroups();
         userDialog.value.isGroupsLoading = true;
         userDialog.value.userGroups = {
@@ -479,7 +477,7 @@
             const args = await groupRequest.getGroups({ userId });
             // A newer request owns the lists now, even one for this same user, so
             // a stale response must not touch them or the shared group caches
-            if (requestId !== userGroupsRequestId) {
+            if (requestId !== userDialog.value.groupsRequestId) {
                 return;
             }
             handleGroupList(args);
@@ -529,7 +527,7 @@
             }
             await sortCurrentUserGroups();
         } finally {
-            if (requestId === userGroupsRequestId) {
+            if (requestId === userDialog.value.groupsRequestId) {
                 userDialog.value.isGroupsLoading = false;
             }
         }

@@ -219,7 +219,7 @@
     // Watching the id too: a cached user can load within one tick, so loading
     // flips true and back to false unseen and the open tab kept the last user
     watch(
-        () => [userDialog.value.visible, userDialog.value.loading, userDialog.value.id],
+        [() => userDialog.value.visible, () => userDialog.value.loading, () => userDialog.value.id],
         () => {
             if (userDialog.value.visible && !userDialog.value.loading) {
                 loadLastActiveTab();

@@ -139,6 +139,8 @@ function mountComponent(overrides = {}) {
             worldSorting: userDialogWorldSortingOptions.name,
             worldOrder: userDialogWorldOrderOptions.descending,
             isWorldsLoading: false,
+            worldsRequestId: 0,
+            worldsRequestUserId: null,
             ...overrides
         },
         currentUser: {

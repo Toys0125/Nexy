@@ -117,9 +117,6 @@
     const { userDialog, currentUser } = storeToRefs(userStore);
     const { cachedWorlds } = useWorldStore();
 
-    const userDialogWorldsRequestId = ref(0);
-    let userDialogWorldsRequestUserId = null;
-
     const searchQuery = ref('');
     const filteredWorlds = computed(() => {
         const worlds = userDialog.value.worlds;
@@ -151,11 +148,11 @@
         const D = userDialog.value;
         // A pending request for another user must not block this one; the
         // newer request id makes the old one discard its result
-        if (D.isWorldsLoading && userDialogWorldsRequestUserId === D.id) {
+        if (D.isWorldsLoading && D.worldsRequestUserId === D.id) {
             return;
         }
-        const requestId = ++userDialogWorldsRequestId.value;
-        userDialogWorldsRequestUserId = D.id;
+        const requestId = ++D.worldsRequestId;
+        D.worldsRequestUserId = D.id;
         D.isWorldsLoading = true;
         const params = {
             n: 50,
@@ -180,7 +177,7 @@
                         ...params,
                         offset
                     });
-                    if (requestId !== userDialogWorldsRequestId.value || D.id !== params.userId) {
+                    if (requestId !== D.worldsRequestId || D.id !== params.userId) {
                         return;
                     }
                     for (const world of args.json) {
@@ -194,11 +191,11 @@
                     }
                     offset += params.n;
                 }
-                if (requestId === userDialogWorldsRequestId.value && D.id === params.userId) {
+                if (requestId === D.worldsRequestId && D.id === params.userId) {
                     userDialog.value.worlds = worlds;
                 }
             } finally {
-                if (requestId === userDialogWorldsRequestId.value) {
+                if (requestId === D.worldsRequestId) {
                     D.isWorldsLoading = false;
                 }
             }
