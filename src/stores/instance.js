@@ -456,6 +456,9 @@ export const useInstanceStore = defineStore('Instance', () => {
             json.$fetchedAt = new Date().toJSON();
         }
         let ref = cachedInstances.get(json.id);
+        if (json.world?.id && !json.world.name && ref?.world?.id === json.world.id) {
+            json.world = ref.world;
+        }
         if (typeof ref === 'undefined') {
             ref = createDefaultInstanceRef(json);
             cachedInstances.set(ref.id, ref);
@@ -818,7 +821,7 @@ export const useInstanceStore = defineStore('Instance', () => {
             return;
         }
         const instances = {};
-        for (instance of D.instances) {
+        for (instance of typeof inputInstances === 'undefined' ? D.instances : []) {
             instances[instance.tag] = {
                 ...instance,
                 friendCount: 0,

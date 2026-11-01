@@ -195,6 +195,8 @@ export const useGroupStore = defineStore('Group', () => {
             currentUserGroupsInit.value = false;
             cachedGroups.clear();
             currentUserGroups.clear();
+            groupInstances.value = [];
+            groupDialog.value.instances = [];
             if (isLoggedIn) {
                 initUserGroups();
             }

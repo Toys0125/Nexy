@@ -2,7 +2,6 @@ import { defineStore } from 'pinia';
 import { watch } from 'vue';
 
 import { database } from '../services/database';
-import { groupRequest } from '../api';
 import { runRefreshFriendsListFlow } from '../coordinators/friendSyncCoordinator';
 import { runUpdateIsGameRunningFlow } from '../coordinators/gameCoordinator';
 import { runRefreshPlayerModerationsFlow } from '../coordinators/moderationCoordinator';
@@ -10,7 +9,6 @@ import { clearVRCXCache } from '../coordinators/vrcxCoordinator';
 import { useAuthStore } from './auth';
 import { useDiscordPresenceSettingsStore } from './settings/discordPresence';
 import { useFriendStore } from './friend';
-import { handleGroupUserInstances } from '../coordinators/groupCoordinator';
 import { getCurrentUser, updateAutoStateChange } from '../coordinators/userCoordinator';
 import { useNotificationStore } from './notification';
 import { useUserStore } from './user';
@@ -85,8 +83,6 @@ export const useUpdateLoopStore = defineStore('UpdateLoop', () => {
                 if (--state.nextGroupInstanceRefresh <= 0) {
                     if (watchState.isFriendsLoaded) {
                         state.nextGroupInstanceRefresh = 300; // 5min
-                        const args = await groupRequest.getUsersGroupInstances();
-                        handleGroupUserInstances(args);
                     }
                     AppApi.CheckGameRunning();
                 }
