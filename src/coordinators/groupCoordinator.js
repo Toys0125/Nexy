@@ -8,7 +8,7 @@ import {
     hasGroupPermission,
     sanitizeEntityJson
 } from '../shared/utils';
-import { groupRequest, instanceRequest, queryRequest } from '../api';
+import { groupRequest, queryRequest } from '../api';
 import { database } from '../services/database';
 import { FILTER_EVERYONE } from '../shared/constants/';
 import { patchGroupFromEvent } from '../queries';
@@ -20,7 +20,6 @@ import { useUiStore } from '../stores/ui';
 import { useUserStore } from '../stores/user';
 import { useGroupStore } from '../stores/group';
 import { syncGroupSearchIndex, removeGroupSearchIndex, clearGroupSearchIndex } from './searchIndexCoordinator';
-import { watchState } from '../services/watchState';
 
 import configRepository from '../services/config';
 
@@ -610,21 +609,6 @@ export function getGroupDialogGroup(groupId, existingRef) {
                         if (groupStore.groupDialog.id === args.params.groupId) {
                             instanceStore.applyGroupDialogInstances(args.json.instances);
                         }
-                        for (const json of args.json.instances) {
-                            instanceStore.applyInstance(json);
-                            queryRequest
-                                .fetch('world.dialog', {
-                                    worldId: json.world.id
-                                })
-                                .then((args1) => {
-                                    json.world = args1.ref;
-                                });
-                            // get queue size etc
-                            instanceRequest.getInstance({
-                                worldId: json.worldId,
-                                instanceId: json.instanceId
-                            });
-                        }
                     });
                 getGroupDialogCalendar(groupId);
             }
@@ -1088,29 +1072,24 @@ export function handleGroupMember(args) {
 /**
  * @param args
  */
-export async function handleGroupUserInstances(args) {
+export function handleGroupUserInstances(args) {
     const groupStore = useGroupStore();
     const instanceStore = useInstanceStore();
-    groupStore.setGroupInstances([]);
+    const next = [];
     for (const json of args.json.instances) {
         if (args.json.fetchedAt) {
             // tack on fetchedAt
             json.$fetchedAt = args.json.fetchedAt;
         }
-        const instanceRef = instanceStore.applyInstance(json);
-        const groupRef = groupStore.cachedGroups.get(json.ownerId);
+        const groupRef = groupStore.cachedGroups.get(json.ownerId) ?? groupStore.currentUserGroups.get(json.ownerId);
         if (typeof groupRef === 'undefined') {
-            if (watchState.isFriendsLoaded) {
-                const args = await groupRequest.getGroup({
-                    groupId: json.ownerId
-                });
-                applyGroup(args.json);
-            }
-            return;
+            continue;
         }
-        groupStore.groupInstances.push({
+        const instanceRef = instanceStore.applyInstance(json);
+        next.push({
             group: groupRef,
             instance: instanceRef
         });
     }
+    groupStore.setGroupInstances(next);
 }

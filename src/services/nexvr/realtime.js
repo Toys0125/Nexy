@@ -7,6 +7,7 @@ import {
     ServerMessageSchema
 } from './realtimeSchema';
 import { AppDebug } from '../appConfig';
+import { toVrcRealtimeInstance } from './mappers';
 
 const AUTH_TIMEOUT = 10000;
 const REQUEST_TIMEOUT = 10000;
@@ -22,6 +23,7 @@ const REQUEST_TIMEOUT = 10000;
  * - `close`: { code, reason, authFailed }
  * - `message`: byteLength of each frame, for the status bar
  * - `instanceModeration`: { instanceId, moderation } for a watched instance
+ * - `groupInstances`: the group id whose full instance snapshot changed
  */
 class RealtimeClient {
     /** @type {WebSocket | null} */
@@ -47,10 +49,15 @@ class RealtimeClient {
         notifications: new Set(),
         close: new Set(),
         message: new Set(),
-        instanceModeration: new Set()
+        instanceModeration: new Set(),
+        groupInstances: new Set()
     };
     /** @type {string[]} instances whose occupant list is watched */
     watchedInstances = [];
+    /** @type {string[]} groups whose instance lists are watched */
+    watchedGroups = [];
+    /** @type {Map<string, any[]>} Full snapshots, keyed by group id */
+    groupInstances = new Map();
 
     /**
      * @param {string} event
@@ -92,6 +99,7 @@ class RealtimeClient {
             this.hasSnapshot = false;
             this.friends.clear();
             this.notifications = [];
+            this.watchedGroups = [];
         }
 
         const socket = new WebSocket(AppDebug.websocketDomain);
@@ -115,6 +123,9 @@ class RealtimeClient {
                 this.send({ case: 'auth', value: { accessToken } });
             };
             socket.onmessage = ({ data }) => {
+                if (this.ws !== socket) {
+                    return;
+                }
                 if (!(data instanceof ArrayBuffer)) {
                     return;
                 }
@@ -155,6 +166,7 @@ class RealtimeClient {
                     resolvePending(null);
                 }
                 this.pending.clear();
+                this.clearGroupInstances();
                 this.emit('close', { code, reason, authFailed: this.authFailed });
             };
         }).finally(() => {
@@ -179,6 +191,7 @@ class RealtimeClient {
             }
         }
         this.releaseSnapshotWaiters();
+        this.clearGroupInstances();
     }
 
     /**
@@ -187,6 +200,7 @@ class RealtimeClient {
     reset() {
         this.disconnect();
         this.watchedInstances = [];
+        this.watchedGroups = [];
         this.userId = '';
         this.hasSnapshot = false;
         this.friends.clear();
@@ -215,7 +229,43 @@ class RealtimeClient {
         if (this.watchedInstances.length) {
             subscriptions.push({ type: DataObjectType.INSTANCE_MODERATION, keys: this.watchedInstances });
         }
+        if (this.watchedGroups.length) {
+            subscriptions.push({ type: DataObjectType.GROUP_INSTANCES, keys: this.watchedGroups });
+        }
         this.send({ case: 'subscribe', value: { subscriptions } });
+    }
+
+    /** @param {string[]} groupIds */
+    watchGroups(groupIds) {
+        const next = [...new Set(groupIds.filter(Boolean))].sort();
+        if (next.join() === this.watchedGroups.join()) {
+            return;
+        }
+        this.watchedGroups = next;
+        for (const groupId of this.groupInstances.keys()) {
+            if (!next.includes(groupId)) {
+                this.groupInstances.delete(groupId);
+                this.emit('groupInstances', groupId);
+            }
+        }
+        if (this.connected) {
+            this.subscribe();
+        }
+    }
+
+    clearGroupInstances() {
+        const groupIds = [...this.groupInstances.keys()];
+        this.groupInstances.clear();
+        for (const groupId of groupIds) {
+            this.emit('groupInstances', groupId);
+        }
+    }
+
+    /** @param {string[]} [groupIds] */
+    getGroupInstances(groupIds = this.watchedGroups) {
+        return groupIds.flatMap((groupId) =>
+            (this.groupInstances.get(groupId) ?? []).map((instance) => toVrcRealtimeInstance(instance, groupId))
+        );
     }
 
     /**
@@ -316,6 +366,22 @@ class RealtimeClient {
             return;
         }
         const { key, data } = msg.payload.value;
+        if (data.case === 'groupInstances') {
+            if (this.watchedGroups.includes(key)) {
+                this.groupInstances.set(
+                    key,
+                    data.value.instances.filter(
+                        (instance) =>
+                            instance.id &&
+                            instance.worldId &&
+                            (!instance.groupId || instance.groupId === key) &&
+                            instance.status !== 'closed'
+                    )
+                );
+                this.emit('groupInstances', key);
+            }
+            return;
+        }
         if (data.case === 'instanceModeration') {
             if (this.watchedInstances.includes(key)) {
                 this.emit('instanceModeration', { instanceId: key, moderation: data.value });

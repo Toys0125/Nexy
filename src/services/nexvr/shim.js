@@ -647,9 +647,9 @@ const routes = [
         }
     ],
     ['GET', /^users\/([^/]+)\/groups\/represented$/, () => ({})],
-    // NexVR has no aggregate group-instance discovery endpoint. Startup polls
-    // this VRChat route, so supply its empty response shape locally.
-    ['GET', /^users\/([^/]+)\/instances\/groups$/, () => ({ instances: [] })],
+    // Discovery comes from GROUP_INSTANCES realtime snapshots, not REST scans.
+    ['GET', /^users\/([^/]+)\/instances\/groups$/, () => ({ instances: realtime.getGroupInstances() })],
+    ['GET', /^users\/([^/]+)\/instances\/groups\/([^/]+)$/, (m) => ({ instances: realtime.getGroupInstances([m[2]]) })],
     ['GET', /^profile\/([^/]+)$/, async (m) => toVrcPublicProfile(await fetchUser(m[1]))],
     ['GET', /^user\/([^/]+)\/friendStatus$/, (m) => friendStatus(m[1])],
     [

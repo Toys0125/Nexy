@@ -466,6 +466,40 @@ const GROUP_ACCESS = {
     'group-public': 'public'
 };
 
+// WorldInstance uses protobuf enums and id/worldId/groupId, while REST uses
+// strings and _id/world/group. Keep both paths on the same location mapper.
+const REALTIME_INSTANCE_TYPES = [
+    '',
+    'private',
+    'friends-only',
+    'hidden',
+    'public',
+    'group-private',
+    'group-plus',
+    'group-public',
+    'favourite-friends-only',
+    'friends-of-friends'
+];
+const REALTIME_CONTENT_MODES = ['', 'sfw', 'nsfw', 'nsfw_plus', 'sfw_plus'];
+
+/**
+ * @param {any} instance NexVR realtime WorldInstance
+ * @param {string} groupId Subscription key
+ */
+export function toVrcRealtimeInstance(instance, groupId) {
+    return {
+        ...toVrcInstance({
+            ...instance,
+            _id: instance.id,
+            world: instance.worldId,
+            group: groupId,
+            type: REALTIME_INSTANCE_TYPES[instance.type],
+            contentMode: REALTIME_CONTENT_MODES[instance.contentMode]
+        }),
+        world: { id: instance.worldId, name: '' }
+    };
+}
+
 /**
  * @param {any} instance NexVR instance
  * @returns {object} VRChat Instance
