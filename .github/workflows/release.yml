@@ -28,7 +28,7 @@ jobs:
         run: |
           # The tag is stamped into the build as its version. Further releases on the
           # same day add a build number (v2026.11.1-2, -3, ...) so the updater sees them as newer.
-          if ! [[ "$RELEASE_TAG" =~ ^v[0-9]{4}\.[0-9]{1,2}\.[0-9]{1,2}(-[0-9]{1,3})?$ ]]; then
+          if ! [[ "$RELEASE_TAG" =~ ^v[0-9]{4}\.[0-9]{1,2}\.[0-9]{1,2}(-[1-9][0-9]{0,2})?$ ]]; then
             echo "Release tag '$RELEASE_TAG' is not a version like v2026.11.1 or v2026.11.1-2" >&2
             exit 1
           fi
