@@ -1,4 +1,7 @@
 // Mock router to avoid transitive i18n.global error from columns.jsx
+vi.mock('../../stores', () => ({}));
+vi.mock('../../coordinators/userCoordinator', () => ({ getCurrentUser: vi.fn() }));
+vi.mock('../appConfig.js', () => ({ AppDebug: { endpointDomain: 'https://nexvr.net/api' } }));
 vi.mock('../../plugins/router.js', () => ({
     router: { beforeEach: vi.fn(), push: vi.fn() },
     initRouter: vi.fn()

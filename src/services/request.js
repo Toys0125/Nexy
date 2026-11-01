@@ -216,8 +216,12 @@ export function request(endpoint, options) {
             $throw(status, data, endpoint);
         });
     if (init.method === 'GET') {
-        req.finally(() => {
-            pendingGetRequests.delete(init.url);
+        // Return the cleanup chain too: finally() creates a new promise which
+        // would otherwise reject unhandled even when the caller catches req.
+        req = req.finally(() => {
+            if (pendingGetRequests.get(init.url)?.req === req) {
+                pendingGetRequests.delete(init.url);
+            }
         });
         pendingGetRequests.set(init.url, {
             req,
@@ -282,8 +286,9 @@ export function $throw(code, error, endpoint) {
         }
     }
     if (typeof error !== 'undefined') {
+        const detail = error instanceof Error ? error.message : error;
         message.push(
-            `${t('api.error.message.error_message')}: ${typeof error === 'string' ? error : JSON.stringify(error)}`
+            `${t('api.error.message.error_message')}: ${typeof detail === 'string' ? detail : JSON.stringify(detail)}`
         );
     }
     if (typeof endpoint !== 'undefined') {
@@ -304,7 +309,7 @@ export function $throw(code, error, endpoint) {
         });
     }
     /** @type {any} */
-    const e = new Error(text);
+    const e = new Error(text, { cause: error });
     e.status = code;
     e.endpoint = endpoint;
     throw e;

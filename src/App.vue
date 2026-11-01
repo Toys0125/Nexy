@@ -24,7 +24,6 @@
 <script setup>
     import { computed, onBeforeMount, onMounted } from 'vue';
 
-    import { addGameLogEvent, getGameLogTable } from './coordinators/gameLogCoordinator';
     import {
         runCheckVRChatDebugLoggingFlow,
         runUpdateIsGameRunningFlow,
@@ -61,8 +60,7 @@
         window.$pinia = store;
         window.$bridge = {
             updateIsGameRunning: runUpdateIsGameRunningFlow,
-            updateIsHmdAfk: runUpdateIsHmdAfkFlow,
-            addGameLogEvent
+            updateIsHmdAfk: runUpdateIsHmdAfkFlow
         };
     }
 
@@ -72,7 +70,6 @@
 
     onMounted(async () => {
         if (await store.vrcx.waitForDatabaseInit()) {
-            getGameLogTable();
             await store.auth.migrateStoredUsers();
             store.auth.autoLoginAfterMounted();
             store.vrcx.checkAutoBackupRestoreVrcRegistry();
