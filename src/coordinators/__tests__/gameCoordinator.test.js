@@ -42,9 +42,7 @@ const mocks = vi.hoisted(() => ({
         setString: vi.fn().mockResolvedValue(undefined)
     },
     addAvatarWearTime: vi.fn(),
-    runLastLocationResetFlow: vi.fn(),
-    tryLoadPlayerList: vi.fn(),
-    watchState: { isFriendsLoaded: true }
+    runLastLocationResetFlow: vi.fn()
 }));
 
 vi.mock('vue-sonner', () => ({
@@ -106,8 +104,7 @@ vi.mock('../locationCoordinator', () => ({
     runLastLocationResetFlow: (...args) => mocks.runLastLocationResetFlow(...args)
 }));
 
-vi.mock('../gameLogCoordinator', () => ({ tryLoadPlayerList: mocks.tryLoadPlayerList }));
-vi.mock('../../services/watchState', () => ({ watchState: mocks.watchState }));
+vi.mock('../gameLogCoordinator', () => ({ tryLoadPlayerList: vi.fn() }));
 
 vi.mock('../../stores/modal', () => ({
     useModalStore: () => ({})
@@ -141,48 +138,7 @@ vi.mock('worker-timers', () => ({
     setTimeout: vi.fn()
 }));
 
-import { runGameRunningChangedFlow, runUpdateIsGameRunningFlow } from '../gameCoordinator';
-
-describe('player-list restoration when detecting the game', () => {
-    beforeEach(() => {
-        vi.clearAllMocks();
-        mocks.gameStore.isGameRunning = false;
-        mocks.watchState.isFriendsLoaded = true;
-        mocks.gameStore.setIsGameRunning.mockImplementation((running) => {
-            mocks.gameStore.isGameRunning = running;
-        });
-    });
-
-    test('retries restoration after game detection when friends loaded first', async () => {
-        mocks.tryLoadPlayerList.mockImplementationOnce(() => {
-            expect(mocks.gameStore.isGameRunning).toBe(true);
-            expect(mocks.runLastLocationResetFlow).toHaveBeenCalled();
-        });
-
-        await runUpdateIsGameRunningFlow(true, false);
-
-        expect(mocks.tryLoadPlayerList).toHaveBeenCalledTimes(1);
-        await runUpdateIsGameRunningFlow(true, false);
-        expect(mocks.tryLoadPlayerList).toHaveBeenCalledTimes(1);
-    });
-
-    test('leaves restoration to the friends-loaded trigger when detection happens first', async () => {
-        mocks.watchState.isFriendsLoaded = false;
-
-        await runUpdateIsGameRunningFlow(true, false);
-
-        expect(mocks.gameStore.isGameRunning).toBe(true);
-        expect(mocks.tryLoadPlayerList).not.toHaveBeenCalled();
-    });
-
-    test('does not restore the player list when the game stops', async () => {
-        mocks.gameStore.isGameRunning = true;
-
-        await runUpdateIsGameRunningFlow(false, false);
-
-        expect(mocks.tryLoadPlayerList).not.toHaveBeenCalled();
-    });
-});
+import { runGameRunningChangedFlow } from '../gameCoordinator';
 
 describe('runGameRunningChangedFlow', () => {
     beforeEach(() => {

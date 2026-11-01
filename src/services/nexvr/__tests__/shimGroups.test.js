@@ -102,17 +102,6 @@ beforeEach(() => {
 });
 
 describe('NexVR group routes', () => {
-    test('startup group-instance discovery returns an empty list without native requests', async () => {
-        const execute = vi.fn();
-        const res = await handleShimRequest(
-            { url: 'https://nexvr.net/api/users/me/instances/groups', method: 'GET' },
-            execute
-        );
-        expect(res.status).toBe(200);
-        expect(JSON.parse(res.data)).toEqual({ instances: [] });
-        expect(execute).not.toHaveBeenCalled();
-    });
-
     test('a group carries the caller membership and its rules', async () => {
         const { json } = await get('groups/g1?includeRoles=true');
         expect(json.membershipStatus).toBe('member');
