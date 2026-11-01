@@ -567,6 +567,11 @@
             case 'inGame':
                 sortMethod = sortGroupsByInGame;
                 await updateInGameGroupOrder();
+                // Another user's groups may have loaded and been sorted
+                // another way meanwhile; leave them to that sort
+                if (D.groupSorting.value !== 'inGame') {
+                    return;
+                }
                 break;
         }
 
