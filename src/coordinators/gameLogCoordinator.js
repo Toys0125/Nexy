@@ -55,7 +55,8 @@ export async function tryLoadPlayerList() {
     let ctx;
     let i;
     const data = await database.getGamelogDatabase();
-    if (data.length === 0) {
+    // A stop may have reset the location while the database read was pending.
+    if (!gameStore.isGameRunning || data.length === 0) {
         return;
     }
     let length = 0;

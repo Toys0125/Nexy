@@ -55,6 +55,7 @@ import { findUserByDisplayName } from '../../shared/utils';
 
 beforeEach(() => {
     vi.clearAllMocks();
+    mocks.game.isGameRunning = true;
     mocks.user.cachedUsers.clear();
     mocks.user.cachedProfiles.clear();
     mocks.location.setLastLocation.mockImplementation((location) => {
@@ -106,4 +107,31 @@ test('excludes a legacy ID resolved from a cached display name', async () => {
     expect(mocks.location.lastLocation.playerList.size).toBe(0);
     expect(mocks.userRequest.getUser).not.toHaveBeenCalled();
     expect(mocks.userRequest.getPublicProfile).not.toHaveBeenCalled();
+});
+
+test('does not restore stale state if the game stops during the database read', async () => {
+    let finishRead;
+    mocks.database.getGamelogDatabase.mockImplementationOnce(
+        () =>
+            new Promise((resolve) => {
+                finishRead = resolve;
+            })
+    );
+    const restoration = tryLoadPlayerList();
+    mocks.game.isGameRunning = false;
+    const stoppedLocation = { location: '', playerList: new Map(), friendList: new Map() };
+    mocks.location.lastLocation = stoppedLocation;
+    finishRead([
+        { type: 'OnPlayerLeft' },
+        { type: 'Location', location: '6a335eb4fa3baa6c11dae00d:6a40aa000000000000000001', created_at: '2026-10-31' },
+        { type: 'OnPlayerJoined', userId: '6a54382813df04bba917772a', displayName: 'NexVR', created_at: '2026-10-31' }
+    ]);
+
+    await restoration;
+
+    expect(mocks.location.setLastLocation).not.toHaveBeenCalled();
+    expect(mocks.location.lastLocation).toBe(stoppedLocation);
+    expect(mocks.userRequest.getUser).not.toHaveBeenCalled();
+    expect(mocks.userRequest.getPublicProfile).not.toHaveBeenCalled();
+    expect(mocks.instance.updateCurrentInstanceWorld).not.toHaveBeenCalled();
 });
