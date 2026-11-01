@@ -11,12 +11,14 @@ import { useInstanceStore } from '../stores/instance';
 import { useLaunchStore } from '../stores/launch';
 import { useLocationStore } from '../stores/location';
 import { runLastLocationResetFlow } from './locationCoordinator';
+import { tryLoadPlayerList } from './gameLogCoordinator';
 import { useModalStore } from '../stores/modal';
 import { useNotificationStore } from '../stores/notification';
 import { useUpdateLoopStore } from '../stores/updateLoop';
 import { useUserStore } from '../stores/user';
 import { useVrStore } from '../stores/vr';
 import { useWorldStore } from '../stores/world';
+import { watchState } from '../services/watchState';
 
 import configRepository from '../services/config';
 
@@ -84,6 +86,11 @@ export async function runUpdateIsGameRunningFlow(isGameRunningArg, isSteamVRRunn
     if (isGameRunningArg !== gameStore.isGameRunning) {
         gameStore.setIsGameRunning(isGameRunningArg);
         await runGameRunningChangedFlow(isGameRunningArg);
+        if (isGameRunningArg && watchState.isFriendsLoaded) {
+            // Friends may have loaded before game detection. Restore after
+            // the running-state flow finishes resetting the previous location.
+            await tryLoadPlayerList();
+        }
         console.log(new Date(), 'isGameRunning', isGameRunningArg);
     }
 

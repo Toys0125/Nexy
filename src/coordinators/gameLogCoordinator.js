@@ -82,9 +82,6 @@ export async function tryLoadPlayerList() {
         for (i = length + 1; i < data.length; i++) {
             ctx = data[i];
             if (ctx.type === 'OnPlayerJoined') {
-                if (ctx.userId?.startsWith('usr_')) {
-                    continue;
-                }
                 if (!ctx.userId) {
                     ctx.userId =
                         findUserByDisplayName(
@@ -92,6 +89,9 @@ export async function tryLoadPlayerList() {
                             ctx.displayName,
                             userStore.cachedUserIdsByDisplayName
                         )?.id ?? '';
+                }
+                if (ctx.userId?.startsWith('usr_')) {
+                    continue;
                 }
                 const userMap = {
                     displayName: ctx.displayName,

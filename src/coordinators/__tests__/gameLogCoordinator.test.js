@@ -51,9 +51,12 @@ vi.mock('../../stores/vrcx', () => ({ useVrcxStore: () => ({}) }));
 vi.mock('../../services/config', () => ({ default: {} }));
 
 import { tryLoadPlayerList } from '../gameLogCoordinator';
+import { findUserByDisplayName } from '../../shared/utils';
 
 beforeEach(() => {
     vi.clearAllMocks();
+    mocks.user.cachedUsers.clear();
+    mocks.user.cachedProfiles.clear();
     mocks.location.setLastLocation.mockImplementation((location) => {
         mocks.location.lastLocation = location;
     });
@@ -85,4 +88,22 @@ test('restores NexVR players while excluding legacy VRChat IDs from mixed histor
     expect([...mocks.location.lastLocation.playerList.keys()]).toEqual(['6a54382813df04bba917772a']);
     expect(mocks.userRequest.getUser).toHaveBeenCalledExactlyOnceWith({ userId: '6a54382813df04bba917772a' });
     expect(mocks.userRequest.getPublicProfile).toHaveBeenCalledExactlyOnceWith({ userId: '6a54382813df04bba917772a' });
+});
+
+test('excludes a legacy ID resolved from a cached display name', async () => {
+    const legacy = { id: 'usr_legacy', displayName: 'Legacy' };
+    mocks.user.cachedUsers.set(legacy.id, legacy);
+    findUserByDisplayName.mockReturnValueOnce(legacy);
+    mocks.database.getGamelogDatabase.mockResolvedValue([
+        { type: 'OnPlayerLeft' },
+        { type: 'Location', location: '6a335eb4fa3baa6c11dae00d:6a40aa000000000000000001', created_at: '2026-10-31' },
+        { type: 'OnPlayerJoined', userId: '', displayName: 'Legacy', created_at: '2026-10-31' }
+    ]);
+
+    await tryLoadPlayerList();
+
+    expect(findUserByDisplayName).toHaveBeenCalled();
+    expect(mocks.location.lastLocation.playerList.size).toBe(0);
+    expect(mocks.userRequest.getUser).not.toHaveBeenCalled();
+    expect(mocks.userRequest.getPublicProfile).not.toHaveBeenCalled();
 });
