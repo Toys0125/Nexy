@@ -83,8 +83,10 @@ export function getNexyReleases(data, channel, platform, arch) {
 }
 
 function parseVersion(value) {
+    // "-N" numbers extra releases on the same day: v2026.11.1 < v2026.11.1-2 < v2026.11.1-3.
+    // Capped at 3 digits so a 7-character commit hash suffix is never read as one.
     const match = String(value || '').match(
-        /^(?:Nexy\s+)?(?:Nightly\s+)?v?(\d{4})\.(\d{1,2})\.(\d{1,2})(?:T(\d{1,2})(?:[.:](\d{2}))?)?/i
+        /^(?:Nexy\s+)?(?:Nightly\s+)?v?(\d{4})\.(\d{1,2})\.(\d{1,2})(?:T(\d{1,2})(?:[.:](\d{2}))?)?(?:-(\d{1,3})(?![\w.]))?/i
     );
     return match ? match.slice(1).map((part) => Number(part || 0)) : null;
 }

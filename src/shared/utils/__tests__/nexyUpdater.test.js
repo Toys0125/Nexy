@@ -93,4 +93,14 @@ describe('Nexy release updater', () => {
         expect(isNexyReleaseNewer(release('Nexy 2026.11.1'), 'Nexy Nightly 2026.10.31-abcdefg')).toBe(true);
         expect(isNexyReleaseNewer(release('bad-version'), 'Nexy 2026.10.31')).toBe(false);
     });
+
+    test('orders same-day releases by their build number', () => {
+        expect(isNexyReleaseNewer(release('v2026.11.1-2'), 'Nexy v2026.11.1')).toBe(true);
+        expect(isNexyReleaseNewer(release('v2026.11.1-3'), 'Nexy v2026.11.1-2')).toBe(true);
+        expect(isNexyReleaseNewer(release('v2026.11.1-10'), 'Nexy v2026.11.1-9')).toBe(true);
+        expect(isNexyReleaseNewer(release('v2026.11.1'), 'Nexy v2026.11.1-2')).toBe(false);
+        expect(isNexyReleaseNewer(release('v2026.11.1-2'), 'Nexy v2026.11.1-2')).toBe(false);
+        expect(isNexyReleaseNewer(release('v2026.11.2'), 'Nexy v2026.11.1-5')).toBe(true);
+        expect(isNexyReleaseNewer(release('v2026.11.1-2'), 'Nexy Nightly 2026.11.1-1234567')).toBe(true);
+    });
 });
