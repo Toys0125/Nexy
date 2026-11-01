@@ -5,9 +5,15 @@ namespace VRCX;
 
 public partial class AppApi
 {
+    private const string NexyReleaseDownloadPrefix = "https://github.com/valzzu/Nexy/releases/download/";
+
     public Task DownloadUpdate(string fileUrl, string hashString, int downloadSize)
     {
-        throw new NotSupportedException("Automatic updates are disabled. Install Nexy updates from Releases.");
+        // Only accept installers published on Nexy's own GitHub releases.
+        if (string.IsNullOrEmpty(fileUrl) || !fileUrl.StartsWith(NexyReleaseDownloadPrefix, StringComparison.Ordinal))
+            throw new ArgumentException("Update downloads must come from Nexy's GitHub releases.");
+
+        return Update.DownloadUpdate(fileUrl, hashString, downloadSize);
     }
 
     public void CancelUpdate()

@@ -67,7 +67,7 @@ contextBridge.exposeInMainWorld('electron', {
     onBrowserBlur: (callback) => registerManagedListener('onBrowserBlur', callback),
     onVrOverlayReady: (callback) => registerManagedListener('vr-overlay-ready', callback),
     desktopNotification: (title, body, icon) => ipcRenderer.invoke('notification:showNotification', title, body, icon),
-    restartApp: () => ipcRenderer.invoke('app:restart'),
+    restartApp: (isUpgrade = false) => ipcRenderer.invoke('app:restart', isUpgrade),
     getOverlayWindow: () => ipcRenderer.invoke('app:getOverlayWindow'),
     updateVr: (active, hmdOverlay, wristOverlay, menuButton, overlayHand) =>
         ipcRenderer.invoke('app:updateVr', active, hmdOverlay, wristOverlay, menuButton, overlayHand),

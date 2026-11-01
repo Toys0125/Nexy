@@ -61,7 +61,7 @@ declare global {
             onBrowserFocus: (Function: (event: any) => void) => () => void;
             onBrowserBlur: (Function: (event: any) => void) => () => void;
             onVrOverlayReady: (callback: (event: any) => void) => () => void;
-            restartApp: () => Promise<void>;
+            restartApp: (isUpgrade?: boolean) => Promise<void>;
             getOverlayWindow: () => Promise<boolean>;
             updateVr: (
                 active: boolean,

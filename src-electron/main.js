@@ -212,7 +212,14 @@ function showNotification(title, body = '', icon = '') {
 }
 rendererIpc.handle('notification:showNotification', (_event, ...args) => showNotification(...args));
 
-function restartApp() {
+function restartApp(isUpgrade = false) {
+    if (process.platform === 'win32' && isUpgrade === true) {
+        // The installer replaces the app files and relaunches Nexy once it finishes.
+        if (interopApi.getDotNetObject('Update').LaunchInstaller()) {
+            app.quit();
+            return;
+        }
+    }
     if (process.platform === 'linux') {
         const options = {
             execPath: process.execPath,
@@ -228,7 +235,7 @@ function restartApp() {
         app.quit();
     }
 }
-rendererIpc.handle('app:restart', restartApp);
+rendererIpc.handle('app:restart', (_event, isUpgrade) => restartApp(isUpgrade));
 
 const desktopApi = createDesktopApi({
     app,

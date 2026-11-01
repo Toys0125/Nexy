@@ -25,7 +25,7 @@ export const useVRCXUpdaterStore = defineStore('VRCXUpdater', () => {
 
     const arch = ref('x64');
     const noUpdater = ref(false);
-    // Release discovery works without granting download/install capability.
+    // Windows installer and AppImage builds can update in place; macOS links to GitHub Releases.
     const canInstallUpdates = ref(false);
     const latestRelease = ref(null);
 
@@ -60,6 +60,7 @@ export const useVRCXUpdaterStore = defineStore('VRCXUpdater', () => {
             noUpdater.value = await window.electron.getNoUpdater();
             console.log('Architecture:', arch.value);
         }
+        canInstallUpdates.value = IS_WINDOWS || (IS_LINUX && !noUpdater.value);
 
         const [VRCX_autoUpdateVRCX, VRCX_id] = await Promise.all([
             configRepository.getString('VRCX_autoUpdateVRCX', 'Notify'),
@@ -306,7 +307,7 @@ export const useVRCXUpdaterStore = defineStore('VRCXUpdater', () => {
                         duration: 5000,
                         action: {
                             label: t('nav_menu.update'),
-                            onClick: () => openReleasePage(latest)
+                            onClick: () => (canInstallUpdates.value ? showVRCXUpdateDialog() : openReleasePage(latest))
                         }
                     });
                 }
@@ -450,8 +451,8 @@ export const useVRCXUpdaterStore = defineStore('VRCXUpdater', () => {
         }
         return checkForVRCXUpdate();
     }
-    function restartVRCX(_isUpgrade) {
-        window.electron.restartApp();
+    function restartVRCX(isUpgrade) {
+        window.electron.restartApp(isUpgrade === true);
     }
     function updateProgressText() {
         if (updateProgress.value === 100) {

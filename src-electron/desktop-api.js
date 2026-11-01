@@ -44,7 +44,6 @@ function createDesktopApi({
         SetUserAgent: () => getWindow().webContents.setUserAgent(version),
         DesktopNotification: showNotification,
         RestartApplication: restart,
-        CheckForUpdateExe: () => false, // Nexy updates are installed manually.
         FocusWindow: focus,
         FlashWindow: () => getWindow().flashFrame(true),
         ChangeTheme: (value) => {

@@ -46,23 +46,40 @@ namespace VRCX
             logger.Info($"AppImagePath: {AppImagePath}");
         }
 
-        public static void Check()
+        public static bool HasPendingInstaller()
         {
-            if (Process.GetProcessesByName("Nexy_Setup").Length > 0)
-                Environment.Exit(0);
-
-            if (File.Exists(TempDownload))
-                File.Delete(TempDownload);
-            if (File.Exists(NexySetupExecutable))
-                File.Delete(NexySetupExecutable);
-
-            if (File.Exists(UpdateExecutable))
-                InstallUpdate();
+            return OperatingSystem.IsWindows() && File.Exists(UpdateExecutable);
         }
 
-        private static void InstallUpdate()
+        /// <summary>
+        /// Removes leftovers from a previous run, including any staged update.exe: it may be a
+        /// legacy CefSharp installer or an outdated download, so it is never installed later.
+        /// </summary>
+        public static void Cleanup()
         {
-            var setupArguments = string.Empty;
+            try
+            {
+                if (File.Exists(TempDownload))
+                    File.Delete(TempDownload);
+                if (File.Exists(UpdateExecutable))
+                    File.Delete(UpdateExecutable);
+                if (File.Exists(NexySetupExecutable) && Process.GetProcessesByName("Nexy_Setup").Length == 0)
+                    File.Delete(NexySetupExecutable);
+            }
+            catch (Exception e)
+            {
+                logger.Warn(e, "Failed to clean up previous update files");
+            }
+        }
+
+        /// <summary>
+        /// Starts the staged Windows installer. The caller must quit the app afterwards so the
+        /// installer can replace its files; the installer relaunches Nexy when it finishes.
+        /// </summary>
+        public bool LaunchInstaller()
+        {
+            if (!HasPendingInstaller())
+                return false;
 
             try
             {
@@ -74,21 +91,23 @@ namespace VRCX
                     StartInfo = new ProcessStartInfo
                     {
                         FileName = NexySetupExecutable,
-                        Arguments = setupArguments,
+                        // Same arguments electron-updater uses: silent upgrade, relaunch afterwards.
+                        Arguments = "--updated /S --force-run",
                         UseShellExecute = true,
                         WorkingDirectory = Program.AppDataDirectory
                     }
                 };
                 nexyProcess.Start();
-                Environment.Exit(0);
+                return true;
             }
             catch (Exception e)
             {
                 var message = $"Failed to install the update: {e.Message}";
-                logger.Info(message);
+                logger.Error(e, message);
 #if !LINUX
                 MessageBox.Show(message, "Update failed", MessageBoxButtons.OK, MessageBoxIcon.Error);
 #endif
+                return false;
             }
         }
 
@@ -158,6 +177,9 @@ namespace VRCX
 
         public static async Task DownloadUpdate(string fileUrl, string hashString, int downloadSize)
         {
+            if (!OperatingSystem.IsWindows() && string.IsNullOrEmpty(AppImagePath))
+                throw new NotSupportedException("Automatic updates are only supported for the Windows installer and AppImage.");
+
             _cancellationToken = CancellationToken.None;
             const int chunkSize = 8192;
 
@@ -166,6 +188,7 @@ namespace VRCX
 
             await using var destination = File.OpenWrite(TempDownload);
             using var response = await httpClient.GetAsync(fileUrl, HttpCompletionOption.ResponseHeadersRead, _cancellationToken);
+            response.EnsureSuccessStatusCode();
             await using var download = await response.Content.ReadAsStreamAsync(_cancellationToken);
             var contentLength = response.Content.Headers.ContentLength;
             var buffer = new byte[chunkSize];
