@@ -21,7 +21,7 @@ namespace VRCX
         private static readonly string UpdateExecutable = Path.Join(Program.AppDataDirectory, "update.exe");
         private static readonly string TempDownload = Path.Join(Program.AppDataDirectory, "tempDownload");
         private static readonly HttpClient httpClient;
-        private static CancellationToken _cancellationToken;
+        private static CancellationTokenSource _downloadCancellation = new();
         public static int UpdateProgress;
         private static string AppImagePath = string.Empty;
         private static string AppImagePathOld = string.Empty;
@@ -180,16 +180,18 @@ namespace VRCX
             if (!OperatingSystem.IsWindows() && string.IsNullOrEmpty(AppImagePath))
                 throw new NotSupportedException("Automatic updates are only supported for the Windows installer and AppImage.");
 
-            _cancellationToken = CancellationToken.None;
+            var cancellation = new CancellationTokenSource();
+            _downloadCancellation = cancellation;
+            var cancellationToken = cancellation.Token;
             const int chunkSize = 8192;
 
             if (File.Exists(TempDownload))
                 File.Delete(TempDownload);
 
             await using var destination = File.OpenWrite(TempDownload);
-            using var response = await httpClient.GetAsync(fileUrl, HttpCompletionOption.ResponseHeadersRead, _cancellationToken);
+            using var response = await httpClient.GetAsync(fileUrl, HttpCompletionOption.ResponseHeadersRead, cancellationToken);
             response.EnsureSuccessStatusCode();
-            await using var download = await response.Content.ReadAsStreamAsync(_cancellationToken);
+            await using var download = await response.Content.ReadAsStreamAsync(cancellationToken);
             var contentLength = response.Content.Headers.ContentLength;
             var buffer = new byte[chunkSize];
             long totalBytesRead = 0;
@@ -201,14 +203,13 @@ namespace VRCX
                     var percentage = Math.Round((double)totalBytesRead / contentLength.Value * 100, 2);
                     UpdateProgress = (int)percentage;
                 }
-                var bytesRead = await download.ReadAsync(buffer.AsMemory(0, chunkSize), _cancellationToken);
+                var bytesRead = await download.ReadAsync(buffer.AsMemory(0, chunkSize), cancellationToken);
                 if (bytesRead == 0)
                     break;
 
-                if (_cancellationToken.IsCancellationRequested)
-                    throw new OperationCanceledException("Download was cancelled.");
+                cancellationToken.ThrowIfCancellationRequested();
 
-                await destination.WriteAsync(buffer.AsMemory(0, bytesRead), _cancellationToken);
+                await destination.WriteAsync(buffer.AsMemory(0, bytesRead), cancellationToken);
                 totalBytesRead += bytesRead;
             }
 
@@ -233,7 +234,7 @@ namespace VRCX
                 using (var sha256 = SHA256.Create())
                 await using (var stream = File.OpenRead(TempDownload))
                 {
-                    var fileHashBytes = await sha256.ComputeHashAsync(stream, _cancellationToken);
+                    var fileHashBytes = await sha256.ComputeHashAsync(stream, cancellationToken);
                     var fileHashString = Convert.ToHexString(fileHashBytes);
                     if (!hashString.Equals(fileHashString, StringComparison.OrdinalIgnoreCase))
                     {
@@ -265,12 +266,11 @@ namespace VRCX
             }
 
             UpdateProgress = 0;
-            _cancellationToken = CancellationToken.None;
         }
 
         public static async Task CancelUpdate()
         {
-            _cancellationToken = new CancellationToken(true);
+            _downloadCancellation.Cancel();
             UpdateProgress = 0;
             await Task.Delay(100);
             try

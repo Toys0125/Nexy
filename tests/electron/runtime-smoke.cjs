@@ -149,8 +149,21 @@ app.whenReady()
         assert.equal(nativeImage.createFromBuffer(Buffer.from(png, 'base64')).isEmpty(), false);
         assert.throws(() => vr.SubmitOverlayFrame(Buffer.alloc(4)), /Invalid overlay frame size/);
         assert.throws(
-            () => managed.DownloadUpdate('https://example.com/setup.exe', '', 0),
-            /Automatic updates are disabled/
+            () => managed.DownloadUpdate('https://example.com/setup.exe', 'a'.repeat(64), 1),
+            /must come from Nexy's GitHub releases/
+        );
+        assert.throws(
+            () =>
+                managed.DownloadUpdate(
+                    'https://github.com/valzzu/Nexy/releases/download/../../../../other/repo/releases/download/v1/setup.exe',
+                    'a'.repeat(64),
+                    1
+                ),
+            /must come from Nexy's GitHub releases/
+        );
+        assert.throws(
+            () => managed.DownloadUpdate('https://github.com/valzzu/Nexy/releases/download/v1/setup.exe', '', 1),
+            /must include a SHA-256 hash/
         );
 
         offscreen = new BrowserWindow({
