@@ -1,5 +1,6 @@
 const mocks = vi.hoisted(() => ({
     database: { getGamelogDatabase: vi.fn() },
+    isGameRunning: vi.fn(),
     userRequest: { getUser: vi.fn(), getPublicProfile: vi.fn() },
     game: { isGameRunning: true },
     location: { lastLocation: {}, setLastLocation: vi.fn() },
@@ -52,16 +53,31 @@ vi.mock('../../services/config', () => ({ default: {} }));
 
 import { tryLoadPlayerList } from '../gameLogCoordinator';
 import { findUserByDisplayName } from '../../shared/utils';
+import { reactive } from 'vue';
+
+mocks.game = reactive(mocks.game);
+mocks.location = reactive(mocks.location);
+
+const history = () => [
+    { type: 'OnPlayerLeft' },
+    { type: 'Location', location: '6a335eb4fa3baa6c11dae00d:6a40aa000000000000000001', created_at: '2026-10-31' },
+    { type: 'OnPlayerJoined', userId: '6a54382813df04bba917772a', displayName: 'NexVR', created_at: '2026-10-31' }
+];
 
 beforeEach(() => {
     vi.clearAllMocks();
+    mocks.isGameRunning.mockResolvedValue(true);
+    vi.stubGlobal('AppApi', { IsGameRunning: mocks.isGameRunning });
     mocks.game.isGameRunning = true;
+    mocks.location.lastLocation = { location: '', playerList: new Map(), friendList: new Map() };
     mocks.user.cachedUsers.clear();
     mocks.user.cachedProfiles.clear();
     mocks.location.setLastLocation.mockImplementation((location) => {
         mocks.location.lastLocation = location;
     });
 });
+
+afterEach(() => vi.unstubAllGlobals());
 
 test('startup does not restore a VRChat session imported by an older build', async () => {
     mocks.database.getGamelogDatabase.mockResolvedValue([
@@ -119,7 +135,7 @@ test('does not restore stale state if the game stops during the database read', 
     );
     const restoration = tryLoadPlayerList();
     mocks.game.isGameRunning = false;
-    const stoppedLocation = { location: '', playerList: new Map(), friendList: new Map() };
+    const stoppedLocation = reactive({ location: '', playerList: new Map(), friendList: new Map() });
     mocks.location.lastLocation = stoppedLocation;
     finishRead([
         { type: 'OnPlayerLeft' },
@@ -134,4 +150,77 @@ test('does not restore stale state if the game stops during the database read', 
     expect(mocks.userRequest.getUser).not.toHaveBeenCalled();
     expect(mocks.userRequest.getPublicProfile).not.toHaveBeenCalled();
     expect(mocks.instance.updateCurrentInstanceWorld).not.toHaveBeenCalled();
+});
+
+test('checks the native process after the read even when the poll loop still reports running', async () => {
+    mocks.database.getGamelogDatabase.mockResolvedValue(history());
+    mocks.isGameRunning.mockResolvedValue(false);
+
+    await tryLoadPlayerList();
+
+    expect(mocks.game.isGameRunning).toBe(true);
+    expect(mocks.isGameRunning).toHaveBeenCalledOnce();
+    expect(mocks.location.setLastLocation).not.toHaveBeenCalled();
+    expect(mocks.userRequest.getUser).not.toHaveBeenCalled();
+});
+
+test.each(['location', 'player joins', 'player leaves', 'player changes'])(
+    'keeps live state when %s changes during the history read',
+    async (change) => {
+        mocks.location.lastLocation.playerList.set('live', { userId: 'live', displayName: 'Live' });
+        let finishRead;
+        mocks.database.getGamelogDatabase.mockImplementationOnce(
+            () =>
+                new Promise((resolve) => {
+                    finishRead = resolve;
+                })
+        );
+        const restoration = tryLoadPlayerList();
+        if (change === 'location') {
+            mocks.location.lastLocation = {
+                location: 'live-world:live-instance',
+                playerList: new Map(),
+                friendList: new Map()
+            };
+        } else if (change === 'player joins') {
+            mocks.location.lastLocation.playerList.set('new', { userId: 'new', displayName: 'New' });
+        } else if (change === 'player leaves') {
+            mocks.location.lastLocation.playerList.delete('live');
+        } else {
+            mocks.location.lastLocation.playerList.get('live').displayName = 'Changed';
+        }
+        const liveLocation = mocks.location.lastLocation;
+        const livePlayers = [...liveLocation.playerList.entries()];
+        finishRead(history());
+
+        await restoration;
+
+        expect(mocks.location.setLastLocation).not.toHaveBeenCalled();
+        expect(mocks.location.lastLocation).toBe(liveLocation);
+        expect([...liveLocation.playerList.entries()]).toEqual(livePlayers);
+        expect(mocks.userRequest.getUser).not.toHaveBeenCalled();
+        expect(mocks.userRequest.getPublicProfile).not.toHaveBeenCalled();
+    }
+);
+
+test('keeps live updates made while the native process check is pending', async () => {
+    mocks.database.getGamelogDatabase.mockResolvedValue(history());
+    let finishCheck;
+    mocks.isGameRunning.mockImplementationOnce(
+        () =>
+            new Promise((resolve) => {
+                finishCheck = resolve;
+            })
+    );
+    const restoration = tryLoadPlayerList();
+    await Promise.resolve();
+    expect(mocks.isGameRunning).toHaveBeenCalledOnce();
+    mocks.location.lastLocation.playerList.set('live', { userId: 'live', displayName: 'Live' });
+    finishCheck(true);
+
+    await restoration;
+
+    expect(mocks.location.setLastLocation).not.toHaveBeenCalled();
+    expect(mocks.location.lastLocation.playerList.has('live')).toBe(true);
+    expect(mocks.userRequest.getUser).not.toHaveBeenCalled();
 });

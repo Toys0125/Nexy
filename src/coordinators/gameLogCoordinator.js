@@ -1,4 +1,5 @@
 import dayjs from 'dayjs';
+import { watch } from 'vue';
 
 import {
     createJoinLeaveEntry,
@@ -54,9 +55,30 @@ export async function tryLoadPlayerList() {
     console.log('Loading player list from game log...');
     let ctx;
     let i;
-    const data = await database.getGamelogDatabase();
-    // A stop may have reset the location while the database read was pending.
-    if (!gameStore.isGameRunning || data.length === 0) {
+    let sessionChanged = false;
+    // Live updates (including in-place player changes) take precedence over
+    // history. Watch synchronously across both asynchronous reads.
+    const stopWatching = watch(
+        [() => gameStore.isGameRunning, () => locationStore.lastLocation],
+        () => {
+            sessionChanged = true;
+        },
+        { deep: true, flush: 'sync' }
+    );
+    let data;
+    let isProcessRunning;
+    try {
+        data = await database.getGamelogDatabase();
+        if (!gameStore.isGameRunning || data.length === 0 || sessionChanged) {
+            return;
+        }
+        // The polling loop awaits this restore, so its stored flag alone
+        // cannot detect a process exit during the history read.
+        isProcessRunning = await AppApi.IsGameRunning();
+    } finally {
+        stopWatching();
+    }
+    if (!isProcessRunning || !gameStore.isGameRunning || sessionChanged) {
         return;
     }
     let length = 0;
