@@ -118,6 +118,7 @@
     const { cachedWorlds } = useWorldStore();
 
     const userDialogWorldsRequestId = ref(0);
+    let userDialogWorldsRequestUserId = null;
 
     const searchQuery = ref('');
     const filteredWorlds = computed(() => {
@@ -148,10 +149,13 @@
 
     function refreshUserDialogWorlds() {
         const D = userDialog.value;
-        if (D.isWorldsLoading) {
+        // A pending request for another user must not block this one; the
+        // newer request id makes the old one discard its result
+        if (D.isWorldsLoading && userDialogWorldsRequestUserId === D.id) {
             return;
         }
         const requestId = ++userDialogWorldsRequestId.value;
+        userDialogWorldsRequestUserId = D.id;
         D.isWorldsLoading = true;
         const params = {
             n: 50,
