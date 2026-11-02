@@ -57,6 +57,16 @@ describe('instance details coordinator', () => {
         await expect(fetchInstanceDetails('world:room')).rejects.toThrow('Unavailable');
         await expect(fetchInstanceDetails('world:room')).resolves.toEqual({ id: 'world:room' });
     });
+    it('fetches complete details even when a realtime snapshot was just cached', async () => {
+        mocks.cachedInstances.set('world:room', {
+            id: 'world:room',
+            $fetchedAt: new Date().toISOString(),
+            $nexvr: { detailsFetched: false }
+        });
+        mocks.getInstance.mockResolvedValue({ ref: { id: 'world:room', creatorId: 'owner' } });
+        expect(await fetchInstanceDetails('world:room')).toMatchObject({ creatorId: 'owner' });
+        expect(mocks.getInstance).toHaveBeenCalledTimes(1);
+    });
     it.each(['offline', 'private', 'traveling', 'local:room', 'world'])(
         'does not fetch or open a non-instance location: %s',
         async (location) => {

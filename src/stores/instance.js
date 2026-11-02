@@ -467,6 +467,15 @@ export const useInstanceStore = defineStore('Instance', () => {
             json.$fetchedAt = new Date().toJSON();
         }
         let ref = cachedInstances.get(json.id);
+        if (json.$nexvr?.detailsFetched === false && ref?.$nexvr?.detailsFetched) {
+            // Group snapshots carry live counts and access, but omit REST-only details.
+            const { creatorName, createdAt, closesAt, ephemeral } = ref.$nexvr;
+            json = {
+                ...json,
+                creatorId: json.creatorId || ref.creatorId,
+                $nexvr: { ...json.$nexvr, creatorName, createdAt, closesAt, ephemeral, detailsFetched: true }
+            };
+        }
         if (json.world?.id && !json.world.name && ref?.world?.id === json.world.id) {
             json.world = ref.world;
         }

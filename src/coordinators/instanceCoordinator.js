@@ -19,7 +19,12 @@ export function fetchInstanceDetails(location, force = false) {
     const key = location.split('~')[0];
     if (pendingInstances.has(key)) return pendingInstances.get(key);
     const cached = getCachedInstance(location);
-    if (!force && cached && Date.now() - Date.parse(cached.$fetchedAt) < 60000) {
+    if (
+        !force &&
+        cached &&
+        cached.$nexvr?.detailsFetched !== false &&
+        Date.now() - Date.parse(cached.$fetchedAt) < 60000
+    ) {
         return Promise.resolve(cached);
     }
     const pending = instanceRequest

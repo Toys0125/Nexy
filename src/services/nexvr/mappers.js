@@ -488,23 +488,27 @@ const REALTIME_CONTENT_MODES = ['', 'sfw', 'nsfw', 'nsfw_plus', 'sfw_plus'];
  */
 export function toVrcRealtimeInstance(instance, groupId) {
     return {
-        ...toVrcInstance({
-            ...instance,
-            _id: instance.id,
-            world: instance.worldId,
-            group: groupId,
-            type: REALTIME_INSTANCE_TYPES[instance.type],
-            contentMode: REALTIME_CONTENT_MODES[instance.contentMode]
-        }),
+        ...toVrcInstance(
+            {
+                ...instance,
+                _id: instance.id,
+                world: instance.worldId,
+                group: groupId,
+                type: REALTIME_INSTANCE_TYPES[instance.type],
+                contentMode: REALTIME_CONTENT_MODES[instance.contentMode]
+            },
+            { detailsFetched: false }
+        ),
         world: { id: instance.worldId, name: '' }
     };
 }
 
 /**
  * @param {any} instance NexVR instance
+ * @param {{ detailsFetched?: boolean }} [options]
  * @returns {object} VRChat Instance
  */
-export function toVrcInstance(instance) {
+export function toVrcInstance(instance, { detailsFetched = true } = {}) {
     const world = typeof instance.world === 'object' && instance.world ? instance.world : null;
     const worldId = world ? world._id : instance.world;
     const location = makeLocation(worldId, instance._id, {
@@ -542,6 +546,7 @@ export function toVrcInstance(instance) {
         ageGate: instance.contentMode === 'nsfw' || instance.contentMode === 'nsfw_plus',
         world: world ? toVrcWorld(world) : undefined,
         $nexvr: {
+            detailsFetched,
             type: instance.type,
             creatorName: instance.creatorName || '',
             contentMode: instance.contentMode,

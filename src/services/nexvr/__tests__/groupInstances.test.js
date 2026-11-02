@@ -75,6 +75,7 @@ import { useGroupStore } from '../../../stores/group';
 import { useInstanceStore } from '../../../stores/instance';
 import { i18n } from '../../../plugins/i18n';
 import { handleShimRequest } from '../shim';
+import { toVrcInstance } from '../mappers';
 
 class Socket {
     static OPEN = 1;
@@ -175,6 +176,36 @@ test('protobuf snapshots populate real sidebar and dialog stores and replace rem
     snapshot('g1', []);
     expect(groups.groupInstances).toEqual([]);
     expect(groups.groupDialog.instances).toEqual([]);
+});
+
+test('live snapshots preserve fetched owner and lifetime details while updating counts', () => {
+    const detail = toVrcInstance({
+        _id: 'i1',
+        world: '6a335eb4fa3baa6c11dae00d',
+        group: 'g1',
+        type: 'group-plus',
+        region: 'eu-central',
+        creator: 'owner-id',
+        creatorName: 'Owner',
+        createdAt: '2026-11-01T12:00:00Z',
+        closesAt: '2026-11-02T12:00:00Z',
+        ephemeral: true,
+        contentMode: 'sfw',
+        playerCount: 1,
+        maxPlayers: 10
+    });
+    instances.applyInstance(detail);
+    snapshot('g1', [instance('i1', { playerCount: 5, contentMode: 3 })]);
+    const updated = instances.cachedInstances.get(detail.id);
+    expect(updated).toMatchObject({ creatorId: 'owner-id', userCount: 5 });
+    expect(updated.$nexvr).toMatchObject({
+        detailsFetched: true,
+        creatorName: 'Owner',
+        contentMode: 'nsfw_plus',
+        ephemeral: true,
+        createdAt: '2026-11-01T12:00:00Z',
+        closesAt: '2026-11-02T12:00:00Z'
+    });
 });
 
 test('membership and dialog subscriptions preserve friends, notifications and moderation', async () => {

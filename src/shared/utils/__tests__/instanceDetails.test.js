@@ -3,6 +3,7 @@ import { getInstanceContentLabel, sameInstanceLocation } from '../instanceDetail
 describe('instance metadata', () => {
     test.each([
         ['sfw', 'SFW'],
+        ['sfw_plus', 'SFW+'],
         ['nsfw', 'NSFW'],
         ['nsfw_plus', 'ERP'],
         [undefined, ''],

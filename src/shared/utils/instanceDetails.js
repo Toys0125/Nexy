@@ -4,6 +4,8 @@ export function getInstanceContentLabel(instance) {
     switch (mode) {
         case 'sfw':
             return 'SFW';
+        case 'sfw_plus':
+            return 'SFW+';
         case 'nsfw':
             return 'NSFW';
         case 'nsfw_plus':
