@@ -8,14 +8,18 @@ import { assertRequestSession, getRequestSession } from '../services/requestSess
 import { useInstanceStore } from '../stores';
 
 const instanceReq = {
-    getInstance(params: {
-        worldId: string;
-        instanceId: string;
-    }): Promise<{ json: Json<Instance>; ref: Json<Instance>; params: { worldId: string; instanceId: string } }> {
+    getInstance(
+        params: {
+            worldId: string;
+            instanceId: string;
+        },
+        force = false
+    ): Promise<{ json: Json<Instance>; ref: Json<Instance>; params: { worldId: string; instanceId: string } }> {
         const instanceStore = useInstanceStore();
         const session = getRequestSession();
         return request(`instances/${params.worldId}:${params.instanceId}`, {
-            method: 'GET'
+            method: 'GET',
+            force
         }).then((json) => {
             assertRequestSession(session);
             return {

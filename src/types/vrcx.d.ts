@@ -131,6 +131,8 @@ export interface VrcxFavorite extends Json<Favorite> {
 
 export interface RequestOptions {
     method?: 'GET' | 'POST' | 'PUT' | 'DELETE';
+    /** Bypass pending and failed GET caches when explicitly refreshing an instance. */
+    force?: boolean;
     headers?: Record<string, string>;
     body?: string;
     params?: any;

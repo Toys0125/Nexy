@@ -87,9 +87,26 @@ export function request(endpoint, options) {
         throw `API request blocked while logged out: ${endpoint}`;
     }
     let req;
-    const init = buildRequestInit(endpoint, options);
+    const { force = false, ...requestOptions } = options || {};
+    const init = buildRequestInit(endpoint, requestOptions);
     const instanceSession = init.method === 'GET' && endpoint.startsWith('instances/') ? getRequestSession() : null;
-    const requestKey = instanceSession === null ? init.url : `${instanceSession}:${init.url}`;
+    const instanceAttempt = { current: true };
+    /** Reject superseded instance responses and errors before their shared-cache or UI side effects. */
+    function assertCurrentInstance() {
+        if (instanceSession === null) return;
+        assertRequestSession(instanceSession);
+        if (!instanceAttempt.current) throw new Error('Instance request superseded by a newer refresh');
+    }
+    // Access-tag variants identify the same instance; refresh must supersede every variant.
+    const instanceDetail = instanceSession !== null && /^instances\/[^/]+:[^/]+$/.test(endpoint);
+    const failureKey = instanceDetail ? endpoint.split('~')[0] : endpoint;
+    let cacheUrl = init.url;
+    if (instanceDetail) {
+        const url = new URL(init.url);
+        url.pathname = url.pathname.split('~')[0];
+        cacheUrl = url.toString();
+    }
+    const requestKey = instanceSession === null ? cacheUrl : `${instanceSession}:${cacheUrl}`;
     if (instanceSession !== null && instanceSession !== instanceFailureSession) {
         for (const failedEndpoint of failedGetRequests.keys()) {
             if (failedEndpoint.startsWith('instances/')) failedGetRequests.delete(failedEndpoint);
@@ -97,14 +114,20 @@ export function request(endpoint, options) {
         instanceFailureSession = instanceSession;
     }
     if (init.method === 'GET') {
+        if (force && instanceSession !== null) {
+            failedGetRequests.delete(failureKey);
+            const previous = pendingGetRequests.get(requestKey);
+            if (previous) previous.instanceAttempt.current = false;
+            pendingGetRequests.delete(requestKey);
+        }
         // don't retry recent 404/403
-        if (failedGetRequests.has(endpoint)) {
-            const lastRun = failedGetRequests.get(endpoint);
+        if (failedGetRequests.has(failureKey)) {
+            const lastRun = failedGetRequests.get(failureKey);
             if (lastRun >= Date.now() - 900000) {
                 // 15mins
                 $throw(-1, t('api.error.message.403_404_bailing_request'), endpoint);
             }
-            failedGetRequests.delete(endpoint);
+            failedGetRequests.delete(failureKey);
         }
         // merge requests
         req = pendingGetRequests.get(requestKey);
@@ -113,17 +136,18 @@ export function request(endpoint, options) {
                 // 10s
                 return req.req;
             }
+            if (instanceSession !== null) req.instanceAttempt.current = false;
             pendingGetRequests.delete(requestKey);
         }
     }
     req = webApiService
         .execute(init)
         .catch((err) => {
-            if (instanceSession !== null) assertRequestSession(instanceSession);
+            assertCurrentInstance();
             $throw(0, err, endpoint);
         })
         .then((response) => {
-            if (instanceSession !== null) assertRequestSession(instanceSession);
+            assertCurrentInstance();
             if (!watchState.isLoggedIn && endpoint.startsWith('/auth') && endpoint !== 'config') {
                 throw `API request blocked while logged out: ${endpoint}`;
             }
@@ -181,7 +205,7 @@ export function request(endpoint, options) {
             return parsed;
         })
         .then(({ data, status }) => {
-            if (instanceSession !== null) assertRequestSession(instanceSession);
+            assertCurrentInstance();
             if (status === 200) {
                 if (!data) {
                     return data;
@@ -208,7 +232,7 @@ export function request(endpoint, options) {
                 return null;
             }
             if (init.method === 'GET' && (status === 404 || status === 403) && !endpoint.startsWith('auth/user')) {
-                failedGetRequests.set(endpoint, Date.now());
+                failedGetRequests.set(failureKey, Date.now());
             }
             if (
                 init.method === 'GET' &&
@@ -238,7 +262,8 @@ export function request(endpoint, options) {
         });
         pendingGetRequests.set(requestKey, {
             req,
-            time: Date.now()
+            time: Date.now(),
+            instanceAttempt
         });
     }
     return req;

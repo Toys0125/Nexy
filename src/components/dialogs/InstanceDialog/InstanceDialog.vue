@@ -37,33 +37,39 @@
         const id = ++requestId;
         clearTimeout(loadingTimer);
         const location = instanceDialog.value.location;
-        const parsed = parseLocation(location);
-        instance.value = getCachedInstance(location) || null;
-        world.value = instance.value?.world?.id ? instance.value.world : null;
         loading.value = true;
         error.value = false;
-        loadingTimer = setTimeout(() => {
-            if (id !== requestId) return;
-            loading.value = false;
-            error.value = true;
-        }, DETAIL_LOAD_TIMEOUT);
         try {
+            const parsed = parseLocation(location);
+            instance.value = getCachedInstance(location) || null;
+            world.value = instance.value?.world?.id ? instance.value.world : null;
+            loadingTimer = setTimeout(() => {
+                if (id !== requestId) return;
+                loading.value = false;
+                error.value = true;
+            }, DETAIL_LOAD_TIMEOUT);
             const results = await Promise.allSettled([
-                fetchInstanceDetails(location, force).then((result) => {
-                    if (id !== requestId) return;
-                    instance.value = result;
-                    uiStore.setDialogCrumbLabel(
-                        'instance',
-                        location,
-                        instance.value?.displayName || `#${parsed.instanceName}`
-                    );
-                }),
-                worldRequest.getWorld({ worldId: parsed.worldId }).then((result) => {
-                    if (id === requestId) world.value = result.ref;
-                })
+                Promise.resolve()
+                    .then(() => fetchInstanceDetails(location, force))
+                    .then((result) => {
+                        if (id !== requestId) return;
+                        instance.value = result;
+                        uiStore.setDialogCrumbLabel(
+                            'instance',
+                            location,
+                            instance.value?.displayName || `#${parsed.instanceName}`
+                        );
+                    }),
+                Promise.resolve()
+                    .then(() => worldRequest.getWorld({ worldId: parsed.worldId }))
+                    .then((result) => {
+                        if (id === requestId) world.value = result.ref;
+                    })
             ]);
             if (id !== requestId) return;
             error.value = results.some((result) => result.status === 'rejected');
+        } catch {
+            if (id === requestId) error.value = true;
         } finally {
             if (id === requestId) {
                 clearTimeout(loadingTimer);

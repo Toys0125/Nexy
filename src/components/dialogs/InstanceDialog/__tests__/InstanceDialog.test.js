@@ -218,3 +218,34 @@ it('ends loading immediately on settled failures without waiting for the deadlin
     expect(wrapper.find('[role="alert"]').exists()).toBe(true);
     expect(vi.getTimerCount()).toBe(0);
 });
+
+it.each(['instance', 'world'])(
+    'handles a synchronous %s request failure and still applies the other result',
+    async (failed) => {
+        mocks.fetchInstanceDetails.mockResolvedValue({ location, displayName: 'Available instance' });
+        mocks.getWorld.mockResolvedValue({ ref: { name: 'Available world' } });
+        const throwCachedFailure = () => {
+            throw new Error('Cached 403/404');
+        };
+        if (failed === 'instance') mocks.fetchInstanceDetails.mockImplementationOnce(throwCachedFailure);
+        else mocks.getWorld.mockImplementationOnce(throwCachedFailure);
+        const wrapper = render();
+        await flushPromises();
+        expect(wrapper.find('[role="alert"]').exists()).toBe(true);
+        expect(button(wrapper, 'Join instance').attributes('disabled')).toBeUndefined();
+        expect(wrapper.text()).toContain(failed === 'instance' ? 'Available world' : 'Available instance');
+        expect(vi.getTimerCount()).toBe(0);
+    }
+);
+
+it('handles unexpected setup errors without leaving a rejected watched load', async () => {
+    const read = vi.spyOn(mocks.cached, 'get').mockImplementationOnce(() => {
+        throw new Error('Cache failure');
+    });
+    const wrapper = render();
+    await flushPromises();
+    expect(wrapper.find('[role="alert"]').exists()).toBe(true);
+    expect(button(wrapper, 'Join instance').attributes('disabled')).toBeUndefined();
+    expect(vi.getTimerCount()).toBe(0);
+    read.mockRestore();
+});

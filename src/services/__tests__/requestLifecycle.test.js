@@ -1,10 +1,15 @@
-const instanceMocks = vi.hoisted(() => ({ applyInstance: vi.fn((json) => json) }));
+const instanceMocks = vi.hoisted(() => ({ applyInstance: vi.fn((json) => json), cachedInstances: new Map() }));
+vi.mock('../../api', async () => ({ instanceRequest: (await import('../../api/instance')).default }));
 vi.mock('../../stores', () => ({
     useAuthStore: () => ({}),
     useModalStore: () => ({}),
     useNotificationStore: () => ({}),
     useUpdateLoopStore: () => ({}),
-    useInstanceStore: () => ({ applyInstance: instanceMocks.applyInstance })
+    useUiStore: () => ({}),
+    useInstanceStore: () => ({
+        applyInstance: instanceMocks.applyInstance,
+        cachedInstances: instanceMocks.cachedInstances
+    })
 }));
 vi.mock('../../coordinators/userCoordinator', () => ({ getCurrentUser: vi.fn() }));
 vi.mock('../appConfig.js', () => ({
@@ -20,6 +25,7 @@ import webApiService from '../webapi';
 import { watchState } from '../watchState';
 import instanceRequest from '../../api/instance';
 import { toast } from 'vue-sonner';
+import { fetchInstanceDetails } from '../../coordinators/instanceCoordinator';
 
 beforeEach(() => {
     watchState.isLoggedIn = false;
@@ -133,5 +139,80 @@ describe('request failure handling', () => {
         finish({ status: 200, data: '{"id":"shared"}' });
         await expect(first).resolves.toEqual({ id: 'shared' });
         expect(webApiService.execute).toHaveBeenCalledTimes(1);
+    });
+});
+
+describe('forced instance refresh through the coordinator, API, and transport', () => {
+    test.each(['success', 'forbidden', 'network failure'])(
+        'replaces stalled work and rejects its late %s without changing the current request',
+        async (outcome) => {
+            let finishOld, failOld, finishCurrent;
+            webApiService.execute
+                .mockImplementationOnce(
+                    () =>
+                        new Promise((resolve, reject) => {
+                            finishOld = resolve;
+                            failOld = reject;
+                        })
+                )
+                .mockImplementationOnce(
+                    () =>
+                        new Promise((resolve) => {
+                            finishCurrent = resolve;
+                        })
+                );
+            const old = fetchInstanceDetails('world:room~region(ca)');
+            const rejected = expect(old).rejects.toThrow('superseded');
+            await Promise.resolve();
+            const current = fetchInstanceDetails('world:room~friends(owner)~region(ca)', true);
+            await Promise.resolve();
+            expect(webApiService.execute).toHaveBeenCalledTimes(2);
+            expect(webApiService.execute.mock.calls[1][0]).not.toHaveProperty('force');
+            expect(fetchInstanceDetails('world:room')).toBe(current);
+            if (outcome === 'network failure') failOld(new Error('Late network failure'));
+            else finishOld({ status: outcome === 'success' ? 200 : 403, data: '{"id":"stale"}' });
+            await rejected;
+            expect(instanceMocks.applyInstance).not.toHaveBeenCalled();
+            expect(toast.error).not.toHaveBeenCalled();
+            expect(fetchInstanceDetails('world:room')).toBe(current);
+            const sharedTransport = request('instances/world:room~friends(owner)~region(ca)');
+            expect(webApiService.execute).toHaveBeenCalledTimes(2);
+            finishCurrent({ status: 200, data: '{"id":"fresh"}' });
+            await expect(current).resolves.toEqual({ id: 'fresh' });
+            await sharedTransport;
+            expect(instanceMocks.applyInstance).toHaveBeenCalledExactlyOnceWith({ id: 'fresh' });
+        }
+    );
+
+    test('force bypasses a cached 403 without changing non-forced cache behavior', async () => {
+        webApiService.execute.mockResolvedValueOnce({ status: 403, data: '{}' });
+        await expect(fetchInstanceDetails('world:room')).rejects.toMatchObject({ status: 403 });
+        await expect(fetchInstanceDetails('world:room')).rejects.toMatchObject({ status: 403 });
+        expect(webApiService.execute).toHaveBeenCalledTimes(1);
+        webApiService.execute.mockResolvedValueOnce({ status: 200, data: '{"id":"recovered"}' });
+        await expect(fetchInstanceDetails('world:room', true)).resolves.toEqual({ id: 'recovered' });
+        expect(webApiService.execute).toHaveBeenCalledTimes(2);
+    });
+
+    test('a stale forbidden response after refresh completion cannot repopulate the failure cache', async () => {
+        let finishOld;
+        webApiService.execute
+            .mockImplementationOnce(
+                () =>
+                    new Promise((resolve) => {
+                        finishOld = resolve;
+                    })
+            )
+            .mockResolvedValueOnce({ status: 200, data: '{"id":"fresh"}' });
+        const old = fetchInstanceDetails('world:room~region(ca)');
+        const rejected = expect(old).rejects.toThrow('superseded');
+        await Promise.resolve();
+        await expect(fetchInstanceDetails('world:room', true)).resolves.toEqual({ id: 'fresh' });
+        finishOld({ status: 403, data: '{}' });
+        await rejected;
+        webApiService.execute.mockResolvedValueOnce({ status: 200, data: '{"id":"still-available"}' });
+        await expect(fetchInstanceDetails('world:room~friends(owner)')).resolves.toEqual({ id: 'still-available' });
+        expect(webApiService.execute).toHaveBeenCalledTimes(3);
+        expect(instanceMocks.applyInstance.mock.calls).toEqual([[{ id: 'fresh' }], [{ id: 'still-available' }]]);
     });
 });
