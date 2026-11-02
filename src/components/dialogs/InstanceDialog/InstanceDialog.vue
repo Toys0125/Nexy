@@ -1,5 +1,5 @@
 <script setup>
-    import { computed, ref, watch } from 'vue';
+    import { computed, onUnmounted, ref, watch } from 'vue';
     import { storeToRefs } from 'pinia';
     import { worldRequest } from '@/api';
     import { useFriendStore, useInstanceStore, useLaunchStore, useUiStore, useUserStore } from '@/stores';
@@ -21,7 +21,9 @@
     const world = ref(null);
     const loading = ref(false);
     const error = ref(false);
+    const DETAIL_LOAD_TIMEOUT = 10000;
     let requestId = 0;
+    let loadingTimer;
     const friends = computed(() =>
         [...friendStore.friends.entries()]
             .map(([id, friend]) => userStore.cachedUsers.get(id) || { ...friend, id })
@@ -30,36 +32,49 @@
             )
     );
 
-    /** Load instance and world details, ignoring results superseded by a newer selection or refresh. */
+    /** Load details independently with one UI deadline, ignoring superseded or unmounted requests. */
     async function load(force = false) {
         const id = ++requestId;
+        clearTimeout(loadingTimer);
         const location = instanceDialog.value.location;
         const parsed = parseLocation(location);
         instance.value = getCachedInstance(location) || null;
         world.value = instance.value?.world?.id ? instance.value.world : null;
         loading.value = true;
         error.value = false;
+        loadingTimer = setTimeout(() => {
+            if (id !== requestId) return;
+            loading.value = false;
+            error.value = true;
+        }, DETAIL_LOAD_TIMEOUT);
         try {
-            const [instanceResult, worldResult] = await Promise.allSettled([
-                fetchInstanceDetails(location, force),
-                worldRequest.getWorld({ worldId: parsed.worldId })
+            const results = await Promise.allSettled([
+                fetchInstanceDetails(location, force).then((result) => {
+                    if (id !== requestId) return;
+                    instance.value = result;
+                    uiStore.setDialogCrumbLabel(
+                        'instance',
+                        location,
+                        instance.value?.displayName || `#${parsed.instanceName}`
+                    );
+                }),
+                worldRequest.getWorld({ worldId: parsed.worldId }).then((result) => {
+                    if (id === requestId) world.value = result.ref;
+                })
             ]);
             if (id !== requestId) return;
-            if (instanceResult.status === 'fulfilled') {
-                instance.value = instanceResult.value;
-                uiStore.setDialogCrumbLabel(
-                    'instance',
-                    location,
-                    instance.value?.displayName || `#${parsed.instanceName}`
-                );
-            } else {
-                error.value = true;
-            }
-            if (worldResult.status === 'fulfilled') world.value = worldResult.value.ref;
+            error.value = results.some((result) => result.status === 'rejected');
         } finally {
-            if (id === requestId) loading.value = false;
+            if (id === requestId) {
+                clearTimeout(loadingTimer);
+                loading.value = false;
+            }
         }
     }
+    onUnmounted(() => {
+        ++requestId;
+        clearTimeout(loadingTimer);
+    });
     watch(
         () => instanceDialog.value.location,
         () => load(),
