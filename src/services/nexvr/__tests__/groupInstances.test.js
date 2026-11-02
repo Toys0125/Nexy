@@ -75,7 +75,7 @@ import { useGroupStore } from '../../../stores/group';
 import { useInstanceStore } from '../../../stores/instance';
 import { i18n } from '../../../plugins/i18n';
 import { handleShimRequest } from '../shim';
-import { toVrcInstance } from '../mappers';
+import { toNexVRInstance } from '../mappers';
 
 class Socket {
     static OPEN = 1;
@@ -179,7 +179,7 @@ test('protobuf snapshots populate real sidebar and dialog stores and replace rem
 });
 
 test('live snapshots preserve fetched owner and lifetime details while updating counts', () => {
-    const detail = toVrcInstance({
+    const detail = toNexVRInstance({
         _id: 'i1',
         world: '6a335eb4fa3baa6c11dae00d',
         group: 'g1',
@@ -216,7 +216,7 @@ test.each([false, true])(
         await nextTick();
         if (snapshotFirst) snapshot('g1', [instance('i1', { type: 5, playerCount: 2, contentMode: 1 })]);
         const initialSnapshot = groups.groupInstances[0]?.instance;
-        const detail = toVrcInstance({
+        const detail = toNexVRInstance({
             _id: 'i1',
             world: '6a335eb4fa3baa6c11dae00d',
             group: 'g1',
