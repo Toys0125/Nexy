@@ -28,3 +28,21 @@ export function sameInstanceLocation(a, b) {
     if (!a || !b || !a.includes(':') || !b.includes(':')) return false;
     return a.split('~')[0] === b.split('~')[0];
 }
+
+/** Prefer the newest fetched record over partial snapshots of the same stable instance. */
+export function findCachedInstance(cachedInstances, location) {
+    let best = cachedInstances.get(location);
+    for (const instance of cachedInstances.values()) {
+        if (!sameInstanceLocation(instance.id, location)) continue;
+        const complete = instance.$nexvr?.detailsFetched === true;
+        const bestComplete = best?.$nexvr?.detailsFetched === true;
+        if (
+            !best ||
+            (complete && !bestComplete) ||
+            (complete === bestComplete && (Date.parse(instance.$fetchedAt) || 0) > (Date.parse(best.$fetchedAt) || 0))
+        ) {
+            best = instance;
+        }
+    }
+    return best;
+}

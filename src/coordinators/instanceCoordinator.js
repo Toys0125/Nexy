@@ -1,6 +1,6 @@
 import { instanceRequest } from '../api';
 import { parseLocation } from '../shared/utils/locationParser';
-import { sameInstanceLocation } from '../shared/utils/instanceDetails';
+import { findCachedInstance } from '../shared/utils/instanceDetails';
 import { useInstanceStore, useUiStore } from '../stores';
 import { assertRequestSession, getRequestSession } from '../services/requestSession';
 
@@ -11,20 +11,7 @@ const failureRetryDelay = 60000;
 /** Prefer the newest fetched record over partial snapshots of the same stable instance. */
 export function getCachedInstance(location) {
     const { cachedInstances } = useInstanceStore();
-    let best = cachedInstances.get(location);
-    for (const instance of cachedInstances.values()) {
-        if (!sameInstanceLocation(instance.id, location)) continue;
-        const complete = instance.$nexvr?.detailsFetched === true;
-        const bestComplete = best?.$nexvr?.detailsFetched === true;
-        if (
-            !best ||
-            (complete && !bestComplete) ||
-            (complete === bestComplete && (Date.parse(instance.$fetchedAt) || 0) > (Date.parse(best.$fetchedAt) || 0))
-        ) {
-            best = instance;
-        }
-    }
-    return best;
+    return findCachedInstance(cachedInstances, location);
 }
 
 /** Reuse fresh details and briefly retain failures; explicit refresh bypasses both caches. */
