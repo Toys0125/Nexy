@@ -136,6 +136,7 @@ export const useUiStore = defineStore('Ui', () => {
         handleBreadcrumbClick(dialogCrumbs.value.length - 1);
     }
 
+    /** Restore the selected dialog and trim forward navigation from shared breadcrumbs. */
     function handleBreadcrumbClick(index) {
         const item = dialogCrumbs.value[index];
         if (!item) {

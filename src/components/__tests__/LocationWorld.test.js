@@ -82,6 +82,7 @@ async function flush() {
     await Promise.resolve();
 }
 
+/** Mount a location row with overridable presence data and lightweight surrounding UI. */
 function mountComponent(props = {}) {
     return mount(LocationWorld, {
         props: {
@@ -158,7 +159,7 @@ describe('LocationWorld.vue', () => {
         expect(wrapper.text()).not.toContain('SFW');
     });
 
-    it('reuses complete owner and content metadata across row remounts without refetching', () => {
+    it('checks freshness when complete owner and content metadata is remounted', () => {
         mocks.cachedInstances.set('wrld_1:inst_1', {
             creatorId: 'usr_creator',
             $fetchedAt: '2020-01-01T00:00:00Z',
@@ -168,7 +169,7 @@ describe('LocationWorld.vue', () => {
         first.unmount();
         const second = mountComponent();
         expect(second.text()).toContain('Owner');
-        expect(mocks.fetchInstanceDetails).not.toHaveBeenCalled();
+        expect(mocks.fetchInstanceDetails).toHaveBeenCalledTimes(2);
     });
 
     it('still fetches when the cached owner is known but the content mode is missing', async () => {

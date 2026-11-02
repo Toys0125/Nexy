@@ -183,8 +183,6 @@
         () => props.locationobject?.tag,
         async (tag) => {
             if (!tag) return;
-            const cached = getCachedInstance(tag);
-            if (cached?.$nexvr?.creatorName && cached.$nexvr.contentMode) return;
             try {
                 await fetchInstanceDetails(tag);
                 if (props.locationobject?.tag === tag) parse();

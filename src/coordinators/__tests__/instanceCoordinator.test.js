@@ -35,6 +35,53 @@ describe('instance details coordinator', () => {
         expect(getCachedInstance('world:room~region(ca)')).toBe(instance);
         expect(getCachedInstance('world:other~region(ca)')).toBeUndefined();
     });
+
+    it('prefers fetched details over an exact-key incomplete snapshot', async () => {
+        const presence = 'world:room~region(ca)';
+        const complete = {
+            id: 'world:room~friends(owner)~region(ca)',
+            $fetchedAt: new Date().toISOString(),
+            $nexvr: { detailsFetched: true, creatorName: 'Owner', contentMode: 'nsfw_plus' }
+        };
+        mocks.cachedInstances.set(presence, {
+            id: presence,
+            $fetchedAt: new Date().toISOString(),
+            $nexvr: { detailsFetched: false }
+        });
+        mocks.cachedInstances.set(complete.id, complete);
+        expect(getCachedInstance(presence)).toBe(complete);
+        expect(await fetchInstanceDetails(presence)).toBe(complete);
+        expect(mocks.getInstance).not.toHaveBeenCalled();
+    });
+
+    it('selects the freshest complete record when several location variants coexist', () => {
+        const old = {
+            id: 'world:room',
+            $fetchedAt: new Date(Date.now() - 30000).toISOString(),
+            $nexvr: { detailsFetched: true }
+        };
+        const newest = {
+            id: 'world:room~region(ca)',
+            $fetchedAt: new Date().toISOString(),
+            $nexvr: { detailsFetched: true, contentMode: 'nsfw_plus' }
+        };
+        mocks.cachedInstances.set(old.id, old);
+        mocks.cachedInstances.set(newest.id, newest);
+        expect(getCachedInstance(old.id)).toBe(newest);
+    });
+
+    it('refreshes stale content metadata even when the cached owner and mode are present', async () => {
+        const stale = {
+            id: 'world:room',
+            $fetchedAt: new Date(Date.now() - 60001).toISOString(),
+            $nexvr: { detailsFetched: true, creatorName: 'Owner', contentMode: 'sfw' }
+        };
+        const updated = { ...stale, $nexvr: { ...stale.$nexvr, contentMode: 'nsfw_plus' } };
+        mocks.cachedInstances.set(stale.id, stale);
+        mocks.getInstance.mockResolvedValue({ ref: updated });
+        expect(await fetchInstanceDetails(stale.id)).toBe(updated);
+        expect(mocks.getInstance).toHaveBeenCalledTimes(1);
+    });
     it('deduplicates requests for the same instance across location variants', async () => {
         let resolve;
         mocks.getInstance.mockReturnValue(

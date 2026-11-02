@@ -75,10 +75,12 @@ export const useInstanceStore = defineStore('Instance', () => {
 
     const instanceDialog = ref({ visible: false, location: '', shortName: '' });
 
+    /** Show or dismiss the instance details view without discarding its selection. */
     function setInstanceDialogVisible(visible) {
         instanceDialog.value.visible = visible;
     }
 
+    /** Select and open an instance while retaining any short-name access token. */
     function setInstanceDialogLocation(location, shortName = '') {
         instanceDialog.value = { visible: true, location, shortName };
     }

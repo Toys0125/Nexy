@@ -70,6 +70,7 @@
             instance.value = getCachedInstance(location) || instance.value;
         }
     });
+    /** Open the existing launch flow using the resolved location and optional short name. */
     function join() {
         launchStore.showLaunchDialog(
             instance.value?.location || instanceDialog.value.location,

@@ -8,13 +8,23 @@ const pendingInstances = new Map();
 const failedInstances = new Map();
 const failureRetryDelay = 60000;
 
-/** Find an instance by stable identity when presence omits its access tags. */
+/** Prefer the newest fetched record over partial snapshots of the same stable instance. */
 export function getCachedInstance(location) {
     const { cachedInstances } = useInstanceStore();
-    return (
-        cachedInstances.get(location) ||
-        [...cachedInstances.values()].find((instance) => sameInstanceLocation(instance.id, location))
-    );
+    let best = cachedInstances.get(location);
+    for (const instance of cachedInstances.values()) {
+        if (!sameInstanceLocation(instance.id, location)) continue;
+        const complete = instance.$nexvr?.detailsFetched === true;
+        const bestComplete = best?.$nexvr?.detailsFetched === true;
+        if (
+            !best ||
+            (complete && !bestComplete) ||
+            (complete === bestComplete && (Date.parse(instance.$fetchedAt) || 0) > (Date.parse(best.$fetchedAt) || 0))
+        ) {
+            best = instance;
+        }
+    }
+    return best;
 }
 
 /** Reuse fresh details and briefly retain failures; explicit refresh bypasses both caches. */

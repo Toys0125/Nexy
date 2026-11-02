@@ -16,9 +16,10 @@ const instance = {
     userCount: 0,
     capacity: 32,
     active: true,
-    $nexvr: { contentMode: 'nsfw_plus', creatorName: 'Iris', ephemeral: true, region: 'ca' }
+    $nexvr: { detailsFetched: true, contentMode: 'nsfw_plus', creatorName: 'Iris', ephemeral: true, region: 'ca' }
 };
 
+/** Mount visible dialog controls with real translations and configurable instance data. */
 function render(props = {}) {
     const i18n = createI18n({ legacy: false, locale: 'en', messages: { en } });
     // Stub only the dialog accessibility primitives; render all visible controls.
@@ -67,6 +68,26 @@ describe('InstanceDialogContent', () => {
         expect(wrapper.text()).toContain('ERP');
         expect(wrapper.text()).toContain('0 / 32');
         expect(wrapper.text()).toContain('Temporary');
+    });
+
+    it.each([false, undefined])(
+        'keeps lifetime and closing schedule unknown without fetched details (%s)',
+        (detailsFetched) => {
+            const wrapper = render({
+                instance: { ...instance, $nexvr: { contentMode: 'sfw', ephemeral: false, detailsFetched } }
+            });
+            const values = wrapper.findAll('dd');
+            expect(values[3].text()).toBe('Unknown');
+            expect(values[5].text()).toBe('Unknown');
+            expect(wrapper.text()).not.toContain('Persistent');
+        }
+    );
+
+    it('shows persistent lifetime and an unscheduled close only after details are fetched', () => {
+        const wrapper = render({ instance: { ...instance, $nexvr: { detailsFetched: true, ephemeral: false } } });
+        const values = wrapper.findAll('dd');
+        expect(values[3].text()).toBe('Persistent');
+        expect(values[5].text()).toBe('Not scheduled');
     });
 
     it('opens the creator profile and forwards all detail actions', async () => {

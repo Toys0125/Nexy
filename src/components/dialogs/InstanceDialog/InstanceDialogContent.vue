@@ -76,9 +76,10 @@
         },
         {
             label: t('dialog.instance.lifetime'),
-            value: props.instance?.$nexvr
-                ? t(props.instance.$nexvr.ephemeral ? 'dialog.instance.temporary' : 'dialog.instance.persistent')
-                : unknown.value
+            value:
+                props.instance?.$nexvr?.detailsFetched === true
+                    ? t(props.instance.$nexvr.ephemeral ? 'dialog.instance.temporary' : 'dialog.instance.persistent')
+                    : unknown.value
         },
         { label: t('dialog.instance.created'), value: formatDate(props.instance?.$nexvr?.createdAt) },
         {
@@ -87,7 +88,9 @@
                 ? formatDate(props.instance.closedAt)
                 : props.instance?.$nexvr?.closesAt
                   ? formatDate(props.instance.$nexvr.closesAt)
-                  : t('dialog.instance.not_scheduled')
+                  : props.instance?.$nexvr?.detailsFetched === true
+                    ? t('dialog.instance.not_scheduled')
+                    : unknown.value
         }
     ]);
 </script>
