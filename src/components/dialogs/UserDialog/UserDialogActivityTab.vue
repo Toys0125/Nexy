@@ -569,6 +569,11 @@
             if (isSelf.value) {
                 currentRangeDays.value = rangeDays;
                 const cache = await activityStore.getCache(userId, true);
+                // A stale request must not start a top-worlds load, which would
+                // supersede the newer request's one and leave its spinner on
+                if (requestId !== userActivity.value.activeRequestId || userDialog.value.id !== userId) {
+                    return;
+                }
                 cachedSessions.value = cache.sessions || [];
             }
 

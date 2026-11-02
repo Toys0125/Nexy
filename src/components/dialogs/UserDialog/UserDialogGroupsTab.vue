@@ -480,10 +480,10 @@
             if (requestId !== userDialog.value.groupsRequestId) {
                 return;
             }
-            handleGroupList(args);
             if (userId !== userDialog.value.id) {
                 return;
             }
+            handleGroupList(args);
             if (userId === currentUser.value.id) {
                 // update current user groups
                 currentUserGroups.value.clear();
