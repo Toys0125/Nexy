@@ -29,8 +29,10 @@ import { clearTokens, getAccessToken, refreshTokens, setTokens } from './session
 import { AppDebug } from '../appConfig';
 import { keepRawResponse } from './rawResponses';
 import { realtime } from './realtime';
+import { getRequestSession } from '../requestSession';
 
 const SNAPSHOT_TIMEOUT = 8000;
+const DISPLAY_NAME_TIMEOUT = 2000;
 const NOT_AVAILABLE = 'Not available on NexVR';
 
 class ShimError extends Error {
@@ -56,7 +58,8 @@ let challenge = null;
 /** @type {Map<string, any>} realtime notification by id, for accept/hide */
 const notificationsById = new Map();
 /** @type {Map<string, Promise<string>>} */
-const displayNameCache = new Map();
+let displayNameCache = new Map();
+let displayNameContext = '';
 /** @type {Map<string, string[]>} tags from full profiles, kept across presence-only refreshes */
 const profileTags = new Map();
 
@@ -163,6 +166,9 @@ function fetchUser(userId) {
 }
 
 /**
+ * Resolve an optional display name within a finite budget and the current login/API context.
+ * Missing or slow profiles fall back to an empty name so callers can display the user ID.
+ *
  * @param {string} userId
  * @returns {Promise<string>}
  */
@@ -174,15 +180,39 @@ function displayNameOf(userId) {
     if (friend) {
         return Promise.resolve(friend.displayName);
     }
-    let pending = displayNameCache.get(userId);
+    const session = getRequestSession();
+    const endpoint = AppDebug.endpointDomain;
+    const context = `${session}:${endpoint}`;
+    if (displayNameContext !== context) {
+        displayNameContext = context;
+        displayNameCache = new Map();
+    }
+    const cache = displayNameCache;
+    let pending = cache.get(userId);
     if (!pending) {
-        pending = nexvr(`/users/${encodeURIComponent(userId)}`)
-            .then((user) => user.displayName || user.username || '')
+        let timer;
+        pending = Promise.race([
+            nexvr(`/users/${encodeURIComponent(userId)}`).then((user) => user.displayName || user.username || ''),
+            new Promise((resolve) => {
+                timer = setTimeout(() => resolve(''), DISPLAY_NAME_TIMEOUT);
+            })
+        ])
+            .then((name) => {
+                if (
+                    cache !== displayNameCache ||
+                    session !== getRequestSession() ||
+                    endpoint !== AppDebug.endpointDomain
+                )
+                    return '';
+                if (!name && cache.get(userId) === pending) cache.delete(userId);
+                return name;
+            })
             .catch(() => {
-                displayNameCache.delete(userId);
+                if (cache.get(userId) === pending) cache.delete(userId);
                 return '';
-            });
-        displayNameCache.set(userId, pending);
+            })
+            .finally(() => clearTimeout(timer));
+        cache.set(userId, pending);
     }
     return pending;
 }
@@ -968,6 +998,8 @@ export async function handleShimRequest(options, executeNative) {
 export async function endSession() {
     challenge = null;
     notificationsById.clear();
+    displayNameCache = new Map();
+    displayNameContext = '';
     realtime.reset();
     await clearTokens();
 }
