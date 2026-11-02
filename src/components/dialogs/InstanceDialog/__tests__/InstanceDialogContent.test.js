@@ -134,6 +134,21 @@ describe('InstanceDialogContent', () => {
         expect(wrapper.text()).not.toContain('SFW');
     });
 
+    it('keeps the launch flow available when uncached instance details fail to load', async () => {
+        const wrapper = render({ instance: null, world: null, error: true });
+        const join = wrapper.findAll('button').find((button) => button.text() === 'Join instance');
+        expect(join.attributes('disabled')).toBeUndefined();
+        await join.trigger('click');
+        expect(wrapper.emitted('join')).toHaveLength(1);
+        expect(wrapper.find('[role="alert"]').exists()).toBe(true);
+    });
+
+    it('keeps Join disabled while uncached instance details are loading', () => {
+        const wrapper = render({ instance: null, loading: true });
+        const join = wrapper.findAll('button').find((button) => button.text() === 'Join instance');
+        expect(join.attributes('disabled')).toBeDefined();
+    });
+
     it('only displays supplied friends and opens their profiles', async () => {
         const wrapper = render({ friends: [{ id: 'friend-id', displayName: 'Friend' }] });
         expect(wrapper.text()).toContain('Friends here (1)');

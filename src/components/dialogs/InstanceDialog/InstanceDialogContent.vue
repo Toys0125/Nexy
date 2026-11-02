@@ -149,10 +149,7 @@
                         </Button>
                     </div>
                 </div>
-                <Button
-                    class="w-full"
-                    :disabled="!instance || closed || instance.full || loading"
-                    @click="$emit('join')">
+                <Button class="w-full" :disabled="closed || instance?.full || loading" @click="$emit('join')">
                     <LogIn class="size-4" />{{
                         t(
                             closed
