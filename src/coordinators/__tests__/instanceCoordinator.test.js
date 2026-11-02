@@ -91,6 +91,7 @@ describe('instance details coordinator', () => {
         );
         const first = fetchInstanceDetails('world:room~region(ca)');
         const second = fetchInstanceDetails('world:room~friends(owner)~region(ca)');
+        await Promise.resolve();
         expect(mocks.getInstance).toHaveBeenCalledTimes(1);
         resolve({ ref: { id: 'world:room' } });
         expect(await first).toEqual({ id: 'world:room' });
@@ -151,9 +152,11 @@ describe('instance details coordinator', () => {
             );
         const old = fetchInstanceDetails('world:room');
         const rejected = expect(old).rejects.toThrow('previous login session');
+        await Promise.resolve();
         watchState.isLoggedIn = false;
         watchState.isLoggedIn = true;
         const current = fetchInstanceDetails('world:room', true);
+        await Promise.resolve();
         expect(mocks.getInstance).toHaveBeenCalledTimes(2);
         finishOld({ ref: { id: 'old-account' } });
         await rejected;

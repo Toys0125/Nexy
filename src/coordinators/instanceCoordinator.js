@@ -14,13 +14,13 @@ export function getCachedInstance(location) {
     return findCachedInstance(cachedInstances, location);
 }
 
-/** Reuse fresh details and briefly retain failures; explicit refresh bypasses both caches. */
+/** Reuse fresh details and failures; explicit refresh replaces pending work and bypasses caches. */
 export function fetchInstanceDetails(location, force = false) {
     const parsed = parseLocation(location);
     if (!parsed.worldId || !parsed.instanceId || !parsed.isRealInstance) return Promise.resolve(null);
     const session = getRequestSession();
     const key = `${session}:${location.split('~')[0]}`;
-    if (pendingInstances.has(key)) return pendingInstances.get(key);
+    if (!force && pendingInstances.has(key)) return pendingInstances.get(key);
     const failed = failedInstances.get(key);
     if (!force && failed && Date.now() - failed.at < failureRetryDelay) {
         return Promise.reject(failed.error);
@@ -35,20 +35,30 @@ export function fetchInstanceDetails(location, force = false) {
     ) {
         return Promise.resolve(cached);
     }
-    const pending = instanceRequest
-        .getInstance({ worldId: parsed.worldId, instanceId: parsed.instanceId })
+    const pending = Promise.resolve()
+        .then(() => {
+            assertRequestSession(session);
+            if (pendingInstances.get(key) !== pending)
+                throw new Error('Instance details request superseded by a newer refresh');
+            return instanceRequest.getInstance({ worldId: parsed.worldId, instanceId: parsed.instanceId }, force);
+        })
         .then(({ ref }) => {
             assertRequestSession(session);
+            if (pendingInstances.get(key) !== pending)
+                throw new Error('Instance details request superseded by a newer refresh');
             failedInstances.delete(key);
             return ref;
         })
         .catch((error) => {
-            if (session === getRequestSession()) failedInstances.set(key, { at: Date.now(), error });
+            if (session === getRequestSession() && pendingInstances.get(key) === pending)
+                failedInstances.set(key, { at: Date.now(), error });
             // Bound retention when a large friends list exposes unavailable instances.
             if (failedInstances.size > 200) failedInstances.delete(failedInstances.keys().next().value);
             throw error;
         })
-        .finally(() => pendingInstances.delete(key));
+        .finally(() => {
+            if (pendingInstances.get(key) === pending) pendingInstances.delete(key);
+        });
     pendingInstances.set(key, pending);
     return pending;
 }
