@@ -19,6 +19,7 @@ import { request } from '../request';
 import webApiService from '../webapi';
 import { watchState } from '../watchState';
 import instanceRequest from '../../api/instance';
+import { toast } from 'vue-sonner';
 
 beforeEach(() => {
     watchState.isLoggedIn = false;
@@ -27,6 +28,27 @@ beforeEach(() => {
 });
 
 describe('instance request account isolation', () => {
+    test('rejects stale transport failures before showing a toast, while retaining current-session errors', async () => {
+        let fail;
+        webApiService.execute.mockImplementationOnce(
+            () =>
+                new Promise((_resolve, reject) => {
+                    fail = reject;
+                })
+        );
+        const old = request('instances/world:private-instance-id');
+        const rejected = expect(old).rejects.toThrow('previous login session');
+        watchState.isLoggedIn = false;
+        watchState.isLoggedIn = true;
+        fail(new Error('Old account transport failure'));
+        await rejected;
+        expect(toast.error).not.toHaveBeenCalled();
+
+        const cause = new TypeError('Current account transport failure');
+        webApiService.execute.mockRejectedValueOnce(cause);
+        await expect(request('instances/world:private-instance-id')).rejects.toMatchObject({ cause, status: 0 });
+        expect(toast.error).toHaveBeenCalledTimes(1);
+    });
     test('a new login does not reuse old work and late results never reach the instance cache', async () => {
         let finishOld, finishCurrent;
         webApiService.execute

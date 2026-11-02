@@ -119,6 +119,7 @@ export function request(endpoint, options) {
     req = webApiService
         .execute(init)
         .catch((err) => {
+            if (instanceSession !== null) assertRequestSession(instanceSession);
             $throw(0, err, endpoint);
         })
         .then((response) => {
