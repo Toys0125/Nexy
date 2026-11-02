@@ -81,14 +81,38 @@ test('a timely owner name is preserved and reused within the same login', async 
     expect(vi.getTimerCount()).toBe(0);
 });
 
-test('a timed-out profile can be retried without a late result replacing the recovered name', async () => {
-    let finishOld;
+test('timed-out lookups share one native request until it succeeds', async () => {
+    let finish;
+    const profile = vi.fn(
+        () =>
+            new Promise((resolve) => {
+                finish = resolve;
+            })
+    );
+    const native = nativeWithOwner(profile);
+    const first = lookup(native);
+    await vi.advanceTimersByTimeAsync(2000);
+    expect((await first).$nexvr.creatorName).toBe('');
+    const retries = Promise.all([lookup(native), lookup(native)]);
+    await vi.advanceTimersByTimeAsync(2000);
+    expect((await retries).map((result) => result.$nexvr.creatorName)).toEqual(['', '']);
+    expect(profile).toHaveBeenCalledTimes(1);
+    expect(vi.getTimerCount()).toBe(0);
+    finish(response({ displayName: 'Late Owner' }));
+    await vi.advanceTimersByTimeAsync(0);
+    expect((await lookup(native)).$nexvr.creatorName).toBe('Late Owner');
+    expect(profile).toHaveBeenCalledTimes(1);
+    expect(vi.getTimerCount()).toBe(0);
+});
+
+test('a timed-out native request is retryable after it eventually fails', async () => {
+    let fail;
     const profile = vi
         .fn()
         .mockImplementationOnce(
             () =>
-                new Promise((resolve) => {
-                    finishOld = resolve;
+                new Promise((resolve, reject) => {
+                    fail = reject;
                 })
         )
         .mockResolvedValueOnce(response({ displayName: 'Recovered Owner' }));
@@ -96,8 +120,7 @@ test('a timed-out profile can be retried without a late result replacing the rec
     const first = lookup(native);
     await vi.advanceTimersByTimeAsync(2000);
     expect((await first).$nexvr.creatorName).toBe('');
-    expect((await lookup(native)).$nexvr.creatorName).toBe('Recovered Owner');
-    finishOld(response({ displayName: 'Late Owner' }));
+    fail(new Error('Late failure'));
     await vi.advanceTimersByTimeAsync(0);
     expect((await lookup(native)).$nexvr.creatorName).toBe('Recovered Owner');
     expect(profile).toHaveBeenCalledTimes(2);

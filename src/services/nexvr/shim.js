@@ -168,6 +168,7 @@ function fetchUser(userId) {
 /**
  * Resolve an optional display name within a finite budget and the current login/API context.
  * Missing or slow profiles fall back to an empty name so callers can display the user ID.
+ * Keep the native lookup cached until it settles, so a caller timeout cannot spawn duplicates.
  *
  * @param {string} userId
  * @returns {Promise<string>}
@@ -190,13 +191,8 @@ function displayNameOf(userId) {
     const cache = displayNameCache;
     let pending = cache.get(userId);
     if (!pending) {
-        let timer;
-        pending = Promise.race([
-            nexvr(`/users/${encodeURIComponent(userId)}`).then((user) => user.displayName || user.username || ''),
-            new Promise((resolve) => {
-                timer = setTimeout(() => resolve(''), DISPLAY_NAME_TIMEOUT);
-            })
-        ])
+        pending = nexvr(`/users/${encodeURIComponent(userId)}`)
+            .then((user) => user.displayName || user.username || '')
             .then((name) => {
                 if (
                     cache !== displayNameCache ||
@@ -210,11 +206,16 @@ function displayNameOf(userId) {
             .catch(() => {
                 if (cache.get(userId) === pending) cache.delete(userId);
                 return '';
-            })
-            .finally(() => clearTimeout(timer));
+            });
         cache.set(userId, pending);
     }
-    return pending;
+    let timer;
+    return Promise.race([
+        pending,
+        new Promise((resolve) => {
+            timer = setTimeout(() => resolve(''), DISPLAY_NAME_TIMEOUT);
+        })
+    ]).finally(() => clearTimeout(timer));
 }
 
 /**
