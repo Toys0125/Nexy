@@ -3,6 +3,9 @@ import { createI18n } from 'vue-i18n';
 import en from '@/localization/en.json';
 import InstanceDialogContent from '../InstanceDialogContent.vue';
 
+const dateSettings = vi.hoisted(() => ({ dtIsoFormat: true, dtHour12: false, currentCulture: 'en-US' }));
+vi.mock('@/stores', () => ({ useAppearanceSettingsStore: () => dateSettings }));
+
 const location = 'world:instance~region(ca)';
 const instance = {
     location,
@@ -32,6 +35,31 @@ function render(props = {}) {
 }
 
 describe('InstanceDialogContent', () => {
+    beforeEach(() => {
+        dateSettings.dtIsoFormat = true;
+        dateSettings.dtHour12 = false;
+    });
+
+    it('uses the app date and hour-format preferences', () => {
+        const createdAt = new Date(2026, 10, 1, 13, 18, 0).toISOString();
+        const props = { instance: { ...instance, $nexvr: { ...instance.$nexvr, createdAt } } };
+        expect(render(props).text()).toContain('2026-11-01 13:18:00');
+        dateSettings.dtIsoFormat = false;
+        dateSettings.dtHour12 = true;
+        const local = render(props);
+        expect(local.text()).toContain('11/01/2026');
+        expect(local.text()).toContain('PM');
+        expect(local.text()).not.toContain('2026-11-01 13:18:00');
+    });
+
+    it('keeps unknown values for missing or invalid dates', () => {
+        const wrapper = render({
+            instance: { ...instance, $nexvr: { ...instance.$nexvr, createdAt: null, closesAt: 'invalid' } }
+        });
+        const values = wrapper.findAll('dd');
+        expect(values[4].text()).toBe('Unknown');
+        expect(values[5].text()).toBe('Unknown');
+    });
     it('shows the creator separately from the world author and group owner', () => {
         const wrapper = render();
         expect(wrapper.text()).toContain('Iris');

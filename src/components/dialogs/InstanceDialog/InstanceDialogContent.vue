@@ -11,6 +11,7 @@
     import { getInstanceAccessKey } from '@/shared/utils/instanceDetails';
     import { parseLocation, translateAccessType } from '@/shared/utils/locationParser';
     import { accessTypeLocaleKeyMap } from '@/shared/constants/accessType';
+    import { formatDateFilter } from '@/coordinators/dateCoordinator';
 
     /**
      * @typedef {{
@@ -34,7 +35,7 @@
         error: Boolean
     });
     defineEmits(['refresh', 'close', 'join', 'world', 'owner', 'user', 'copy']);
-    const { t, locale } = useI18n();
+    const { t } = useI18n();
     const imageError = ref(false);
     watch(
         () => props.world?.thumbnailImageUrl,
@@ -57,10 +58,11 @@
     const unknown = computed(() => t('dialog.instance.unknown'));
     const closed = computed(() => Boolean(props.instance?.closedAt || props.instance?.active === false));
     const count = computed(() => props.instance?.userCount ?? props.instance?.n_users);
+    /** Follow the app's date preferences, retaining an unknown label for absent or invalid dates. */
     function formatDate(value) {
         if (!value) return unknown.value;
         const date = new Date(value);
-        return Number.isNaN(date.getTime()) ? unknown.value : date.toLocaleString(locale.value);
+        return Number.isNaN(date.getTime()) ? unknown.value : formatDateFilter(value, 'long');
     }
     const details = computed(() => [
         { label: t('dialog.instance.access'), value: access.value || unknown.value },

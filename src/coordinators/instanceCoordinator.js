@@ -4,7 +4,10 @@ import { sameInstanceLocation } from '../shared/utils/instanceDetails';
 import { useInstanceStore, useUiStore } from '../stores';
 
 const pendingInstances = new Map();
+const failedInstances = new Map();
+const failureRetryDelay = 60000;
 
+/** Find an instance by stable identity when presence omits its access tags. */
 export function getCachedInstance(location) {
     const { cachedInstances } = useInstanceStore();
     return (
@@ -13,11 +16,17 @@ export function getCachedInstance(location) {
     );
 }
 
+/** Reuse fresh details and briefly retain failures; explicit refresh bypasses both caches. */
 export function fetchInstanceDetails(location, force = false) {
     const parsed = parseLocation(location);
     if (!parsed.worldId || !parsed.instanceId || !parsed.isRealInstance) return Promise.resolve(null);
     const key = location.split('~')[0];
     if (pendingInstances.has(key)) return pendingInstances.get(key);
+    const failed = failedInstances.get(key);
+    if (!force && failed && Date.now() - failed.at < failureRetryDelay) {
+        return Promise.reject(failed.error);
+    }
+    failedInstances.delete(key);
     const cached = getCachedInstance(location);
     if (
         !force &&
@@ -29,12 +38,22 @@ export function fetchInstanceDetails(location, force = false) {
     }
     const pending = instanceRequest
         .getInstance({ worldId: parsed.worldId, instanceId: parsed.instanceId })
-        .then(({ ref }) => ref)
+        .then(({ ref }) => {
+            failedInstances.delete(key);
+            return ref;
+        })
+        .catch((error) => {
+            failedInstances.set(key, { at: Date.now(), error });
+            // Bound retention when a large friends list exposes unavailable instances.
+            if (failedInstances.size > 200) failedInstances.delete(failedInstances.keys().next().value);
+            throw error;
+        })
         .finally(() => pendingInstances.delete(key));
     pendingInstances.set(key, pending);
     return pending;
 }
 
+/** Open a real instance through the shared dialog and breadcrumb navigation. */
 export function showInstanceDialog(location, shortName = '') {
     const parsed = parseLocation(location);
     if (!parsed.worldId || !parsed.instanceId || !parsed.isRealInstance) return;
@@ -51,7 +70,9 @@ export function showInstanceDialog(location, shortName = '') {
 }
 
 /**
- * @param {object} instance
+ * Refresh the player count for a real instance location.
+ *
+ * @param {string} instance
  */
 function refreshInstancePlayerCount(instance) {
     const L = parseLocation(instance);

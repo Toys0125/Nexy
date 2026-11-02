@@ -105,6 +105,7 @@
     const groupName = ref('');
     const closedAt = ref('');
 
+    /** Resolve row labels, ownership and group information from presence and cached details. */
     function parse() {
         const locObj = props.locationobject;
         if (!locObj) return;
@@ -160,6 +161,8 @@
     }
 
     /**
+     * Translate a parsed access type, preserving the group qualifier.
+     *
      * @param accessTypeNameRaw
      */
     function translateAccessType(accessTypeNameRaw) {
@@ -180,6 +183,8 @@
         () => props.locationobject?.tag,
         async (tag) => {
             if (!tag) return;
+            const cached = getCachedInstance(tag);
+            if (cached?.$nexvr?.creatorName && cached.$nexvr.contentMode) return;
             try {
                 await fetchInstanceDetails(tag);
                 if (props.locationobject?.tag === tag) parse();
@@ -200,10 +205,12 @@
         { immediate: true }
     );
 
+    /** Show details while retaining the instance's optional short-name access token. */
     function openInstance() {
         showInstanceDialog(location.value, shortName.value);
     }
 
+    /** Open the group identified by fetched metadata or the original presence location. */
     function openLocationGroupDialog() {
         if (!location.value) return;
         const L = parseLocation(instanceInfo.value?.location || location.value);

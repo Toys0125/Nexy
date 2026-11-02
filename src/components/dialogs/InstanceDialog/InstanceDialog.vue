@@ -30,6 +30,7 @@
             )
     );
 
+    /** Load instance and world details, ignoring results superseded by a newer selection or refresh. */
     async function load(force = false) {
         const id = ++requestId;
         const location = instanceDialog.value.location;

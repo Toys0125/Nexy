@@ -5,6 +5,7 @@ const mocks = vi.hoisted(() => ({
     cachedInstances: new Map(),
     lastInstanceApplied: { value: '' },
     showLaunchDialog: vi.fn(),
+    fetchInstanceDetails: vi.fn(() => Promise.resolve(null)),
     showInstanceDialog: vi.fn(),
     showUserDialog: vi.fn(),
     showGroupDialog: vi.fn(),
@@ -18,7 +19,7 @@ const mocks = vi.hoisted(() => ({
 
 vi.mock('../../coordinators/instanceCoordinator', () => ({
     getCachedInstance: (location) => mocks.cachedInstances.get(location),
-    fetchInstanceDetails: vi.fn(() => Promise.resolve(null)),
+    fetchInstanceDetails: mocks.fetchInstanceDetails,
     showInstanceDialog: (...args) => mocks.showInstanceDialog(...args)
 }));
 
@@ -115,6 +116,7 @@ describe('LocationWorld.vue', () => {
         mocks.cachedInstances = new Map();
         mocks.lastInstanceApplied.value = '';
         mocks.showLaunchDialog.mockClear();
+        mocks.fetchInstanceDetails.mockClear();
         mocks.showInstanceDialog.mockClear();
         mocks.showUserDialog.mockClear();
         mocks.showGroupDialog.mockClear();
@@ -154,6 +156,26 @@ describe('LocationWorld.vue', () => {
         const wrapper = mountComponent();
         expect(wrapper.text()).toContain('dialog.instance.content_unknown');
         expect(wrapper.text()).not.toContain('SFW');
+    });
+
+    it('reuses complete owner and content metadata across row remounts without refetching', () => {
+        mocks.cachedInstances.set('wrld_1:inst_1', {
+            creatorId: 'usr_creator',
+            $fetchedAt: '2020-01-01T00:00:00Z',
+            $nexvr: { contentMode: 'sfw', creatorName: 'Owner' }
+        });
+        const first = mountComponent();
+        first.unmount();
+        const second = mountComponent();
+        expect(second.text()).toContain('Owner');
+        expect(mocks.fetchInstanceDetails).not.toHaveBeenCalled();
+    });
+
+    it('still fetches when the cached owner is known but the content mode is missing', async () => {
+        mocks.cachedInstances.set('wrld_1:inst_1', { $nexvr: { creatorName: 'Owner' } });
+        mountComponent();
+        await flush();
+        expect(mocks.fetchInstanceDetails).toHaveBeenCalledWith('wrld_1:inst_1');
     });
 
     it('opens instance details with the keyboard', async () => {

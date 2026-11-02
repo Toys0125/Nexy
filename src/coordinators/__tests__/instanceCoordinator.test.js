@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mocks = vi.hoisted(() => ({
     cachedInstances: new Map(),
@@ -17,10 +17,15 @@ vi.mock('../../stores', () => ({
 import { fetchInstanceDetails, getCachedInstance, showInstanceDialog } from '../instanceCoordinator';
 
 describe('instance details coordinator', () => {
+    let testTime = Date.now();
     beforeEach(() => {
+        vi.useFakeTimers({ toFake: ['Date'] });
+        testTime += 60001;
+        vi.setSystemTime(testTime);
         mocks.cachedInstances.clear();
         vi.clearAllMocks();
     });
+    afterEach(() => vi.useRealTimers());
     it('finds cached metadata when presence omits the access tags', () => {
         const instance = { id: 'world:room~friends(owner)~region(ca)' };
         mocks.cachedInstances.set(instance.id, instance);
@@ -50,12 +55,23 @@ describe('instance details coordinator', () => {
         await fetchInstanceDetails('world:room', true);
         expect(mocks.getInstance).toHaveBeenCalledTimes(1);
     });
-    it('allows retrying a failed request', async () => {
+    it('allows explicitly retrying a failed request immediately', async () => {
         mocks.getInstance
             .mockRejectedValueOnce(new Error('Unavailable'))
             .mockResolvedValueOnce({ ref: { id: 'world:room' } });
         await expect(fetchInstanceDetails('world:room')).rejects.toThrow('Unavailable');
+        await expect(fetchInstanceDetails('world:room', true)).resolves.toEqual({ id: 'world:room' });
+    });
+    it('retains failures across remounts and location variants until the retry delay expires', async () => {
+        mocks.getInstance
+            .mockRejectedValueOnce(new Error('Unavailable'))
+            .mockResolvedValueOnce({ ref: { id: 'world:room' } });
+        await expect(fetchInstanceDetails('world:room~region(ca)')).rejects.toThrow('Unavailable');
+        await expect(fetchInstanceDetails('world:room~friends(owner)~region(ca)')).rejects.toThrow('Unavailable');
+        expect(mocks.getInstance).toHaveBeenCalledTimes(1);
+        vi.setSystemTime(Date.now() + 60000);
         await expect(fetchInstanceDetails('world:room')).resolves.toEqual({ id: 'world:room' });
+        expect(mocks.getInstance).toHaveBeenCalledTimes(2);
     });
     it('fetches complete details even when a realtime snapshot was just cached', async () => {
         mocks.cachedInstances.set('world:room', {
