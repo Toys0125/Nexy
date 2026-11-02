@@ -73,6 +73,16 @@ export const useInstanceStore = defineStore('Instance', () => {
 
     const lastInstanceApplied = ref('');
 
+    const instanceDialog = ref({ visible: false, location: '', shortName: '' });
+
+    function setInstanceDialogVisible(visible) {
+        instanceDialog.value.visible = visible;
+    }
+
+    function setInstanceDialogLocation(location, shortName = '') {
+        instanceDialog.value = { visible: true, location, shortName };
+    }
+
     const currentInstanceWorld = ref({
         ref: {},
         instance: {},
@@ -153,6 +163,7 @@ export const useInstanceStore = defineStore('Instance', () => {
             currentInstanceUsersData.value = [];
             instanceJoinHistory.clear();
             hidePreviousInstancesDialogs();
+            setInstanceDialogVisible(false);
             cachedInstances.clear();
             queuedInstances.clear();
             if (isLoggedIn) {
@@ -1277,6 +1288,9 @@ export const useInstanceStore = defineStore('Instance', () => {
 
         cachedInstances,
         lastInstanceApplied,
+        instanceDialog,
+        setInstanceDialogVisible,
+        setInstanceDialogLocation,
         currentInstanceWorld,
         currentInstanceLocation,
         queuedInstances,

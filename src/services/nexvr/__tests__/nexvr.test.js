@@ -222,4 +222,40 @@ describe('content', () => {
         expect(instance.worldId).toBe(WORLD);
         expect(instance.n_users).toBe(3);
     });
+
+    test('public instances retain their creator and content mode separately from access', () => {
+        const instance = toVrcInstance({
+            _id: INSTANCE,
+            world: WORLD,
+            type: 'public',
+            creator: 'owner-id',
+            creatorName: 'Owner',
+            contentMode: 'nsfw_plus',
+            region: 'ca',
+            createdAt: '2026-11-01T12:00:00Z',
+            ephemeral: true
+        });
+        expect(parseLocation(instance.id).userId).toBeNull();
+        expect(instance.creatorId).toBe('owner-id');
+        expect(instance.$nexvr).toMatchObject({
+            type: 'public',
+            creatorName: 'Owner',
+            contentMode: 'nsfw_plus',
+            region: 'ca',
+            createdAt: '2026-11-01T12:00:00Z',
+            ephemeral: true
+        });
+    });
+
+    test('group instances retain both their group and their creator', () => {
+        const instance = toVrcInstance({
+            _id: INSTANCE,
+            world: WORLD,
+            type: 'group-public',
+            creator: 'owner-id',
+            group: 'group-id'
+        });
+        expect(instance.ownerId).toBe('group-id');
+        expect(instance.creatorId).toBe('owner-id');
+    });
 });

@@ -700,7 +700,8 @@ const routes = [
         /^instances\/([^/]+)$/,
         async (m) => {
             const id = instanceIdFromLocation(decodeURIComponent(m[1]));
-            return toVrcInstance(await nexvr(`/instances/${encodeURIComponent(id)}`));
+            const instance = await nexvr(`/instances/${encodeURIComponent(id)}`);
+            return toVrcInstance({ ...instance, creatorName: await displayNameOf(instance.creator) });
         }
     ],
     // following/featured span every group; NexVR only lists one owner's events.

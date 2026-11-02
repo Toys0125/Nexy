@@ -1,0 +1,76 @@
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+
+const mocks = vi.hoisted(() => ({
+    cachedInstances: new Map(),
+    getInstance: vi.fn(),
+    openDialog: vi.fn(),
+    setInstanceDialogLocation: vi.fn()
+}));
+vi.mock('../../api', () => ({ instanceRequest: { getInstance: mocks.getInstance } }));
+vi.mock('../../stores', () => ({
+    useInstanceStore: () => ({
+        cachedInstances: mocks.cachedInstances,
+        setInstanceDialogLocation: mocks.setInstanceDialogLocation
+    }),
+    useUiStore: () => ({ openDialog: mocks.openDialog })
+}));
+import { fetchInstanceDetails, getCachedInstance, showInstanceDialog } from '../instanceCoordinator';
+
+describe('instance details coordinator', () => {
+    beforeEach(() => {
+        mocks.cachedInstances.clear();
+        vi.clearAllMocks();
+    });
+    it('finds cached metadata when presence omits the access tags', () => {
+        const instance = { id: 'world:room~friends(owner)~region(ca)' };
+        mocks.cachedInstances.set(instance.id, instance);
+        expect(getCachedInstance('world:room~region(ca)')).toBe(instance);
+        expect(getCachedInstance('world:other~region(ca)')).toBeUndefined();
+    });
+    it('deduplicates requests for the same instance across location variants', async () => {
+        let resolve;
+        mocks.getInstance.mockReturnValue(
+            new Promise((done) => {
+                resolve = done;
+            })
+        );
+        const first = fetchInstanceDetails('world:room~region(ca)');
+        const second = fetchInstanceDetails('world:room~friends(owner)~region(ca)');
+        expect(mocks.getInstance).toHaveBeenCalledTimes(1);
+        resolve({ ref: { id: 'world:room' } });
+        expect(await first).toEqual({ id: 'world:room' });
+        expect(await second).toEqual({ id: 'world:room' });
+    });
+    it('reuses fresh metadata but refreshes it on request', async () => {
+        const instance = { id: 'world:room', $fetchedAt: new Date().toISOString() };
+        mocks.cachedInstances.set(instance.id, instance);
+        expect(await fetchInstanceDetails('world:room')).toBe(instance);
+        expect(mocks.getInstance).not.toHaveBeenCalled();
+        mocks.getInstance.mockResolvedValue({ ref: instance });
+        await fetchInstanceDetails('world:room', true);
+        expect(mocks.getInstance).toHaveBeenCalledTimes(1);
+    });
+    it('allows retrying a failed request', async () => {
+        mocks.getInstance
+            .mockRejectedValueOnce(new Error('Unavailable'))
+            .mockResolvedValueOnce({ ref: { id: 'world:room' } });
+        await expect(fetchInstanceDetails('world:room')).rejects.toThrow('Unavailable');
+        await expect(fetchInstanceDetails('world:room')).resolves.toEqual({ id: 'world:room' });
+    });
+    it.each(['offline', 'private', 'traveling', 'local:room', 'world'])(
+        'does not fetch or open a non-instance location: %s',
+        async (location) => {
+            expect(await fetchInstanceDetails(location)).toBeNull();
+            showInstanceDialog(location);
+            expect(mocks.getInstance).not.toHaveBeenCalled();
+            expect(mocks.openDialog).not.toHaveBeenCalled();
+        }
+    );
+    it('opens through the main dialog navigation with the short name', () => {
+        showInstanceDialog('world:room~region(ca)', 'short');
+        expect(mocks.openDialog).toHaveBeenCalledWith(
+            expect.objectContaining({ type: 'instance', id: 'world:room~region(ca)', shortName: 'short' })
+        );
+        expect(mocks.setInstanceDialogLocation).toHaveBeenCalledWith('world:room~region(ca)', 'short');
+    });
+});

@@ -525,6 +525,7 @@ export function toVrcInstance(instance) {
         region: normalizeRegion(instance.region),
         photonRegion: normalizeRegion(instance.region),
         ownerId: instance.group || instance.creator || '',
+        creatorId: instance.creator || '',
         n_users: instance.playerCount || 0,
         userCount: instance.playerCount || 0,
         capacity: instance.maxPlayers || 0,
@@ -541,7 +542,11 @@ export function toVrcInstance(instance) {
         ageGate: instance.contentMode === 'nsfw' || instance.contentMode === 'nsfw_plus',
         world: world ? toVrcWorld(world) : undefined,
         $nexvr: {
+            type: instance.type,
+            creatorName: instance.creatorName || '',
             contentMode: instance.contentMode,
+            region: instance.region || '',
+            createdAt: instance.createdAt || null,
             ephemeral: Boolean(instance.ephemeral),
             closesAt: instance.closesAt || null
         }

@@ -150,6 +150,11 @@ export const useUiStore = defineStore('Ui', () => {
             showWorldDialog(item.tag, item.shortName);
             return;
         }
+        if (item.type === 'instance') {
+            openDialog(item);
+            instanceStore.setInstanceDialogLocation(item.tag || item.id, item.shortName);
+            return;
+        }
         if (item.type === 'avatar') {
             showAvatarDialog(item.id);
             return;
@@ -205,6 +210,7 @@ export const useUiStore = defineStore('Ui', () => {
         clearGroupMemberModerationDialog();
         groupStore.setGroupRolesDialogVisible(false);
         instanceStore.hidePreviousInstancesDialogs();
+        instanceStore.setInstanceDialogVisible(false);
         clearDialogCrumbs();
     }
 
@@ -234,6 +240,7 @@ export const useUiStore = defineStore('Ui', () => {
             groupStore.groupDialog.visible ||
             groupStore.groupMemberModeration.visible ||
             groupStore.groupRolesDialog.visible ||
+            instanceStore.instanceDialog.visible ||
             (instanceStore.previousInstancesInfoDialog.visible && !isPrevInfo) ||
             (instanceStore.previousInstancesListDialog.visible && !isPrevList);
 
@@ -242,6 +249,9 @@ export const useUiStore = defineStore('Ui', () => {
         }
         if (type !== 'world') {
             worldStore.setWorldDialogVisible(false);
+        }
+        if (type !== 'instance') {
+            instanceStore.setInstanceDialogVisible(false);
         }
         if (type !== 'avatar') {
             avatarStore.setAvatarDialogVisible(false);

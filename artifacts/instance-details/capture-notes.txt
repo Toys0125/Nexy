@@ -1,0 +1,2 @@
+Rendered from the implemented Vue components with illustrative fixture data. No live account or private instance data was used.
+Desktop and narrow screenshots captured. Owner, world, join, copy and instance-row entry actions verified.
