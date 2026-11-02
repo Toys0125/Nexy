@@ -16,7 +16,7 @@ import { FriendPresenceSchema, PresenceStatus } from '../realtimeSchema';
 import { getRawPresence, getRawResponse, keepRawResponse, presentSections } from '../rawResponses';
 import { handleShimRequest } from '../shim';
 import { realtime } from '../realtime';
-import { maskEmail, toVrcCurrentUser, toVrcUser } from '../mappers';
+import { maskEmail, toNexVRCurrentUser, toNexVRUser } from '../mappers';
 
 const native = async ({ url, method }) => {
     const path = new URL(url).pathname.replace(/^\/api/, '');
@@ -85,7 +85,7 @@ describe('raw NexVR responses for the JSON tabs', () => {
 });
 
 test('a friend fetched by profile carries when the friendship began', () => {
-    const user = toVrcUser(
+    const user = toNexVRUser(
         { id: 'f1', username: 'f1' },
         { userId: 'f1', status: PresenceStatus.ONLINE, friendsSince: '2026-02-03T00:00:00Z' }
     );
@@ -97,7 +97,7 @@ test('the signed-in account only ever exposes a masked email', () => {
     expect(maskEmail('a@localhost')).toBe('a****@l****');
     expect(maskEmail('')).toBe('');
     expect(maskEmail('not-an-email')).toBe('');
-    const me = toVrcCurrentUser({ id: 'me', username: 'me', primaryEmail: 'someone@example.com' }, new Map());
+    const me = toNexVRCurrentUser({ id: 'me', username: 'me', primaryEmail: 'someone@example.com' }, new Map());
     expect(me.obfuscatedEmail).toBe('s****@e****.com');
     expect(JSON.stringify(me)).not.toContain('someone@');
 });
