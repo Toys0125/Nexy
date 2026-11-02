@@ -15,10 +15,13 @@ vi.mock('../../stores', () => ({
     useUiStore: () => ({ openDialog: mocks.openDialog })
 }));
 import { fetchInstanceDetails, getCachedInstance, showInstanceDialog } from '../instanceCoordinator';
+import { watchState } from '../../services/watchState';
 
 describe('instance details coordinator', () => {
     let testTime = Date.now();
     beforeEach(() => {
+        watchState.isLoggedIn = false;
+        watchState.isLoggedIn = true;
         vi.useFakeTimers({ toFake: ['Date'] });
         testTime += 60001;
         vi.setSystemTime(testTime);
@@ -82,6 +85,45 @@ describe('instance details coordinator', () => {
         mocks.getInstance.mockResolvedValue({ ref: { id: 'world:room', creatorId: 'owner' } });
         expect(await fetchInstanceDetails('world:room')).toMatchObject({ creatorId: 'owner' });
         expect(mocks.getInstance).toHaveBeenCalledTimes(1);
+    });
+
+    it('keeps pending results and forced refreshes isolated across login sessions', async () => {
+        let finishOld, finishCurrent;
+        mocks.getInstance
+            .mockImplementationOnce(
+                () =>
+                    new Promise((resolve) => {
+                        finishOld = resolve;
+                    })
+            )
+            .mockImplementationOnce(
+                () =>
+                    new Promise((resolve) => {
+                        finishCurrent = resolve;
+                    })
+            );
+        const old = fetchInstanceDetails('world:room');
+        const rejected = expect(old).rejects.toThrow('previous login session');
+        watchState.isLoggedIn = false;
+        watchState.isLoggedIn = true;
+        const current = fetchInstanceDetails('world:room', true);
+        expect(mocks.getInstance).toHaveBeenCalledTimes(2);
+        finishOld({ ref: { id: 'old-account' } });
+        await rejected;
+        expect(fetchInstanceDetails('world:room')).toBe(current);
+        finishCurrent({ ref: { id: 'current-account' } });
+        await expect(current).resolves.toEqual({ id: 'current-account' });
+    });
+
+    it('does not carry a failed request into the next login session', async () => {
+        mocks.getInstance
+            .mockRejectedValueOnce(new Error('Forbidden'))
+            .mockResolvedValueOnce({ ref: { id: 'allowed' } });
+        await expect(fetchInstanceDetails('world:room')).rejects.toThrow('Forbidden');
+        watchState.isLoggedIn = false;
+        watchState.isLoggedIn = true;
+        await expect(fetchInstanceDetails('world:room')).resolves.toEqual({ id: 'allowed' });
+        expect(mocks.getInstance).toHaveBeenCalledTimes(2);
     });
     it.each(['offline', 'private', 'traveling', 'local:room', 'world'])(
         'does not fetch or open a non-instance location: %s',

@@ -2,6 +2,7 @@ import { instanceRequest } from '../api';
 import { parseLocation } from '../shared/utils/locationParser';
 import { sameInstanceLocation } from '../shared/utils/instanceDetails';
 import { useInstanceStore, useUiStore } from '../stores';
+import { assertRequestSession, getRequestSession } from '../services/requestSession';
 
 const pendingInstances = new Map();
 const failedInstances = new Map();
@@ -20,7 +21,8 @@ export function getCachedInstance(location) {
 export function fetchInstanceDetails(location, force = false) {
     const parsed = parseLocation(location);
     if (!parsed.worldId || !parsed.instanceId || !parsed.isRealInstance) return Promise.resolve(null);
-    const key = location.split('~')[0];
+    const session = getRequestSession();
+    const key = `${session}:${location.split('~')[0]}`;
     if (pendingInstances.has(key)) return pendingInstances.get(key);
     const failed = failedInstances.get(key);
     if (!force && failed && Date.now() - failed.at < failureRetryDelay) {
@@ -39,11 +41,12 @@ export function fetchInstanceDetails(location, force = false) {
     const pending = instanceRequest
         .getInstance({ worldId: parsed.worldId, instanceId: parsed.instanceId })
         .then(({ ref }) => {
+            assertRequestSession(session);
             failedInstances.delete(key);
             return ref;
         })
         .catch((error) => {
-            failedInstances.set(key, { at: Date.now(), error });
+            if (session === getRequestSession()) failedInstances.set(key, { at: Date.now(), error });
             // Bound retention when a large friends list exposes unavailable instances.
             if (failedInstances.size > 200) failedInstances.delete(failedInstances.keys().next().value);
             throw error;
