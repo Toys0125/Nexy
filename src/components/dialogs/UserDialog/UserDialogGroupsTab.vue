@@ -526,6 +526,10 @@
                 userDialog.value.groupSorting = userDialogGroupSortingOptions.alphabetical;
             }
             await sortCurrentUserGroups();
+        } catch (err) {
+            // Callers do not await this, so a failure must not escape as an
+            // unhandled rejection; the refresh button retries the request
+            console.error('getUserGroups', err);
         } finally {
             if (requestId === userDialog.value.groupsRequestId) {
                 userDialog.value.isGroupsLoading = false;
