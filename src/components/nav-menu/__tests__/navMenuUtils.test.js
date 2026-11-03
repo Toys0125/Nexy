@@ -1,5 +1,6 @@
 import { describe, expect, test } from 'vitest';
 
+import { NEXVR_HIDDEN_NAV_KEYS } from '../../../shared/constants/nexvr';
 import {
     getFirstNavRoute,
     isEntryNotified,
@@ -22,6 +23,10 @@ const testDefinitions = [
 const testDefinitionMap = new Map(testDefinitions.map((d) => [d.key, d]));
 const mockT = (key) => `translated:${key}`;
 const mockGenerateFolderId = () => 'generated-folder-id';
+
+test('NexVR does not hide Direct Access from the navigation', () => {
+    expect(NEXVR_HIDDEN_NAV_KEYS.has('direct-access')).toBe(false);
+});
 
 // ─── normalizeHiddenKeys ─────────────────────────────────────────────
 

@@ -119,6 +119,20 @@ export const useSearchStore = defineStore('Search', () => {
         if (directAccessWorld(input)) {
             return true;
         }
+        if (input.startsWith('https://nexvr.net/')) {
+            const url = new URL(input);
+            const pathParts = url.pathname.split('/').filter(Boolean);
+            if (
+                pathParts.length === 3 &&
+                pathParts[0] === 'social' &&
+                pathParts[1] === 'profile' &&
+                /^[a-f0-9]{24}$/i.test(pathParts[2])
+            ) {
+                showUserDialog(pathParts[2]);
+                return true;
+            }
+            return false;
+        }
         if (input.startsWith('https://vrchat.')) {
             const url = new URL(input);
             const urlPath = url.pathname;

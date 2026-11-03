@@ -205,6 +205,30 @@ describe('useSearchStore', () => {
             expect(mockShowGroupDialog).toHaveBeenCalledWith('grp_abc123');
         });
 
+        test('parses a NexVR social profile URL', () => {
+            const url = 'https://nexvr.net/social/profile/6a54382813df04bba917772a';
+            expect(store.directAccessParse(url)).toBe(true);
+            expect(mockShowUserDialog).toHaveBeenCalledWith('6a54382813df04bba917772a');
+        });
+
+        test('accepts NexVR profile URLs with a trailing slash, query, or fragment', () => {
+            const url = 'https://nexvr.net/social/profile/6a54382813df04bba917772a/?tab=info#top';
+            expect(store.directAccessParse(url)).toBe(true);
+            expect(mockShowUserDialog).toHaveBeenCalledWith('6a54382813df04bba917772a');
+        });
+
+        test('rejects invalid NexVR profile URLs', () => {
+            const invalidUrls = [
+                'https://nexvr.net/social/profile/invalid-id',
+                'https://nexvr.net/social/profile/6a54382813df04bba917772a/edit',
+                'https://nexvr.net.evil.test/social/profile/6a54382813df04bba917772a'
+            ];
+            for (const url of invalidUrls) {
+                expect(store.directAccessParse(url)).toBe(false);
+            }
+            expect(mockShowUserDialog).not.toHaveBeenCalled();
+        });
+
         test('parses vrchat.com user URL', () => {
             store.directAccessParse('https://vrchat.com/home/user/usr_abc123');
             expect(mockShowUserDialog).toHaveBeenCalledWith('usr_abc123');
