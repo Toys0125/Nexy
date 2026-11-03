@@ -1,11 +1,13 @@
-import { beforeEach, describe, expect, test, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 import { createI18n } from 'vue-i18n';
 import { createTestingPinia } from '@pinia/testing';
 import { mount } from '@vue/test-utils';
-import { ref } from 'vue';
+import { nextTick, ref } from 'vue';
 
 import StatusBar from '../StatusBar.vue';
 import en from '../../localization/en.json';
+import { wsMessageRate } from '../../services/websocket';
+import { createWebSocketMessageRate } from '../../services/websocketMetrics';
 
 // --- Mocks ---
 
@@ -30,6 +32,7 @@ vi.mock('../../services/config', () => ({
 
 vi.mock('../../services/websocket', () => ({
     wsState: { connected: false, messageCount: 0, bytesReceived: 0 },
+    wsMessageRate: { getHistory: vi.fn(() => new Array(60).fill(0)) },
     initWebsocket: vi.fn(),
     closeWebSocket: vi.fn(),
     reconnectWebSocket: vi.fn()
@@ -92,6 +95,7 @@ vi.mock('vue-router', async (importOriginal) => {
         }))
     };
 });
+
 vi.mock('../../plugins/interopApi', () => ({
     initInteropApi: vi.fn()
 }));
@@ -274,5 +278,58 @@ describe('StatusBar.vue - Servers indicator', () => {
 
         expect(wrapper.text()).toContain('Last Session');
         expect(wrapper.text()).toContain('Offline Since');
+    });
+});
+
+describe('StatusBar.vue - WebSocket rate', () => {
+    let rate;
+    let wrapper;
+
+    beforeEach(() => {
+        vi.useFakeTimers();
+        vi.setSystemTime(new Date('2026-11-03T12:00:00Z'));
+        rate = createWebSocketMessageRate();
+        wsMessageRate.getHistory.mockImplementation(() => rate.getHistory());
+        vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue(null);
+    });
+
+    afterEach(() => {
+        wrapper?.unmount();
+        wrapper = null;
+        vi.useRealTimers();
+        vi.restoreAllMocks();
+        wsMessageRate.getHistory.mockImplementation(() => new Array(60).fill(0));
+    });
+
+    test('samples receipt history immediately on mount and on the next timer tick', async () => {
+        rate.record();
+        wrapper = mountStatusBar();
+        expect(wrapper.text()).toContain('1 avg/min');
+
+        rate.record();
+        await vi.advanceTimersByTimeAsync(1000);
+        expect(wrapper.text()).toContain('2 avg/min');
+    });
+
+    test('expires stale traffic on restore and cleans up the visibility listener', async () => {
+        rate.record();
+        wrapper = mountStatusBar();
+        expect(wrapper.text()).toContain('1 avg/min');
+
+        // Advance wall time without running the throttled interval.
+        vi.setSystemTime(Date.now() + 120_000);
+        rate.record();
+        rate.record();
+        vi.spyOn(document, 'visibilityState', 'get').mockReturnValue('visible');
+        document.dispatchEvent(new Event('visibilitychange'));
+        await nextTick();
+        expect(wrapper.text()).toContain('2 avg/min');
+
+        wrapper.unmount();
+        wrapper = null;
+        wsMessageRate.getHistory.mockClear();
+        document.dispatchEvent(new Event('visibilitychange'));
+        await vi.advanceTimersByTimeAsync(1000);
+        expect(wsMessageRate.getHistory).not.toHaveBeenCalled();
     });
 });
