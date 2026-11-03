@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, test, vi } from 'vitest';
 import { createTestingPinia } from '@pinia/testing';
-import { mount } from '@vue/test-utils';
+import { flushPromises, mount } from '@vue/test-utils';
 
 // ─── Mocks ───────────────────────────────────────────────────────────
 
@@ -77,6 +77,14 @@ vi.mock('../../../../services/jsonStorage', () => ({ default: vi.fn() }));
 vi.mock('../../../../services/watchState', () => ({
     watchState: { isLoggedIn: false }
 }));
+// The real module reads debounce from shared/utils while that index is still
+// loading through a circular import, so the suite fails before any test runs
+vi.mock('../../../../services/websocket', () => ({
+    initWebsocket: vi.fn(),
+    closeWebSocket: vi.fn(),
+    reconnectWebSocket: vi.fn(),
+    wsState: {}
+}));
 vi.mock('../../../../services/request', () => ({
     request: vi.fn().mockResolvedValue({ json: {} }),
     processBulk: vi.fn(),
@@ -92,8 +100,17 @@ vi.mock('../../../../coordinators/worldCoordinator', async (importOriginal) => {
     return { ...actual, showWorldDialog: vi.fn() };
 });
 
+vi.mock('../../../../api', async (importOriginal) => {
+    const actual = await importOriginal();
+    return {
+        ...actual,
+        queryRequest: { ...actual.queryRequest, fetch: vi.fn() }
+    };
+});
+
 import UserDialogWorldsTab from '../UserDialogWorldsTab.vue';
 import { useUserStore } from '../../../../stores';
+import { queryRequest } from '../../../../api';
 import { userDialogWorldSortingOptions, userDialogWorldOrderOptions } from '../../../../shared/constants';
 
 // ─── Helpers ─────────────────────────────────────────────────────────
@@ -209,6 +226,134 @@ describe('UserDialogWorldsTab.vue', () => {
             const wrapper = mountComponent({ isWorldsLoading: false });
             const button = wrapper.find('button');
             expect(button.attributes('disabled')).toBeUndefined();
+        });
+    });
+
+    describe('refreshUserDialogWorlds requests', () => {
+        function deferred() {
+            let resolve;
+            let reject;
+            const promise = new Promise((res, rej) => {
+                resolve = res;
+                reject = rej;
+            });
+            return { promise, resolve, reject };
+        }
+
+        /**
+         * Each fetch returns the next pending request, so a test settles them
+         * in whatever order it wants to exercise
+         */
+        function queueWorldRequests(count) {
+            const requests = Array.from({ length: count }, deferred);
+            let index = 0;
+            queryRequest.fetch.mockImplementation(() => requests[index++].promise);
+            return requests;
+        }
+
+        function worldsResponse(...names) {
+            return { json: names.map((name) => ({ id: `wrld_${name}`, name })) };
+        }
+
+        function worldNames(userStore) {
+            return userStore.userDialog.worlds.map((world) => world.name);
+        }
+
+        test('ignores an older user’s worlds that return after the newer user loaded', async () => {
+            const [requestA, requestB] = queueWorldRequests(2);
+            const wrapper = mountComponent({ id: 'usr_a', worlds: [] });
+            const userStore = useUserStore();
+
+            wrapper.vm.refreshUserDialogWorlds();
+            userStore.userDialog.id = 'usr_b';
+            // A pending request for A must not block the one for B
+            wrapper.vm.refreshUserDialogWorlds();
+            expect(queryRequest.fetch).toHaveBeenCalledTimes(2);
+
+            requestB.resolve(worldsResponse('Beta'));
+            await flushPromises();
+            requestA.resolve(worldsResponse('Alpha'));
+            await flushPromises();
+
+            expect(worldNames(userStore)).toEqual(['Beta']);
+            expect(userStore.userDialog.isWorldsLoading).toBe(false);
+        });
+
+        test('keeps only the latest response when switching A → B → A', async () => {
+            const [firstA, requestB, secondA] = queueWorldRequests(3);
+            const wrapper = mountComponent({ id: 'usr_a', worlds: [] });
+            const userStore = useUserStore();
+
+            wrapper.vm.refreshUserDialogWorlds();
+            userStore.userDialog.id = 'usr_b';
+            wrapper.vm.refreshUserDialogWorlds();
+            userStore.userDialog.id = 'usr_a';
+            wrapper.vm.refreshUserDialogWorlds();
+            expect(queryRequest.fetch).toHaveBeenCalledTimes(3);
+
+            secondA.resolve(worldsResponse('Fresh'));
+            await flushPromises();
+            // The first A response passes the user check now the dialog is back
+            // on A, so only the request id can reject it
+            firstA.resolve(worldsResponse('Stale'));
+            requestB.resolve(worldsResponse('Beta'));
+            await flushPromises();
+
+            expect(worldNames(userStore)).toEqual(['Fresh']);
+            expect(userStore.userDialog.isWorldsLoading).toBe(false);
+        });
+
+        test('a stale request settling first leaves the newer request loading', async () => {
+            const [requestA, requestB] = queueWorldRequests(2);
+            const wrapper = mountComponent({ id: 'usr_a', worlds: [] });
+            const userStore = useUserStore();
+
+            wrapper.vm.refreshUserDialogWorlds();
+            userStore.userDialog.id = 'usr_b';
+            wrapper.vm.refreshUserDialogWorlds();
+
+            requestA.resolve(worldsResponse('Alpha'));
+            await flushPromises();
+            expect(userStore.userDialog.isWorldsLoading).toBe(true);
+            expect(worldNames(userStore)).toEqual([]);
+
+            requestB.resolve(worldsResponse('Beta'));
+            await flushPromises();
+            expect(userStore.userDialog.isWorldsLoading).toBe(false);
+            expect(worldNames(userStore)).toEqual(['Beta']);
+        });
+
+        test('does not start a second request for the user already loading', async () => {
+            const [request] = queueWorldRequests(1);
+            const wrapper = mountComponent({ id: 'usr_a', worlds: [] });
+
+            wrapper.vm.refreshUserDialogWorlds();
+            wrapper.vm.refreshUserDialogWorlds();
+            expect(queryRequest.fetch).toHaveBeenCalledTimes(1);
+
+            request.resolve(worldsResponse('Alpha'));
+            await flushPromises();
+            expect(worldNames(useUserStore())).toEqual(['Alpha']);
+        });
+
+        test('clears loading after a rejected request and loads again on retry', async () => {
+            const [failed, retry] = queueWorldRequests(2);
+            const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
+            const wrapper = mountComponent({ id: 'usr_a', worlds: [] });
+            const userStore = useUserStore();
+
+            wrapper.vm.refreshUserDialogWorlds();
+            failed.reject(new Error('network down'));
+            await flushPromises();
+            expect(userStore.userDialog.isWorldsLoading).toBe(false);
+            expect(consoleError).toHaveBeenCalledWith('refreshUserDialogWorlds failed', expect.any(Error));
+
+            wrapper.vm.refreshUserDialogWorlds();
+            retry.resolve(worldsResponse('Alpha'));
+            await flushPromises();
+            expect(worldNames(userStore)).toEqual(['Alpha']);
+            expect(userStore.userDialog.isWorldsLoading).toBe(false);
+            consoleError.mockRestore();
         });
     });
 });
