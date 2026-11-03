@@ -7,7 +7,7 @@ import {
     ServerMessageSchema
 } from './realtimeSchema';
 import { AppDebug } from '../appConfig';
-import { toVrcRealtimeInstance } from './mappers';
+import { toNexVRRealtimeInstance } from './mappers';
 
 const AUTH_TIMEOUT = 10000;
 const REQUEST_TIMEOUT = 10000;
@@ -264,7 +264,7 @@ class RealtimeClient {
     /** @param {string[]} [groupIds] */
     getGroupInstances(groupIds = this.watchedGroups) {
         return groupIds.flatMap((groupId) =>
-            (this.groupInstances.get(groupId) ?? []).map((instance) => toVrcRealtimeInstance(instance, groupId))
+            (this.groupInstances.get(groupId) ?? []).map((instance) => toNexVRRealtimeInstance(instance, groupId))
         );
     }
 

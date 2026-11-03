@@ -14,7 +14,7 @@ import { onGroupLeft, applyGroup, handleGroupMember } from '../coordinators/grou
 import { handleFriendAdd, handleFriendDelete } from '../coordinators/friendRelationshipCoordinator';
 import { debounce, parseLocation } from '../shared/utils';
 import { AppDebug } from './appConfig';
-import { presenceState, presenceToUser, toVrcNotification } from './nexvr/mappers';
+import { presenceState, presenceToUser, toNexVRNotification } from './nexvr/mappers';
 import { realtime } from './nexvr/realtime';
 import { startGameSession } from './nexvr/gameSession';
 import { startGroupInstances } from './nexvr/groupInstances';
@@ -248,7 +248,7 @@ function handleRealtimeNotifications(list) {
         if (knownNotificationIds.has(notification.id)) {
             continue;
         }
-        const json = toVrcNotification(notification);
+        const json = toNexVRNotification(notification);
         if (!json.senderUsername) {
             json.senderUsername =
                 realtime.friends.get(json.senderUserId)?.displayName ??

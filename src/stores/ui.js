@@ -136,6 +136,7 @@ export const useUiStore = defineStore('Ui', () => {
         handleBreadcrumbClick(dialogCrumbs.value.length - 1);
     }
 
+    /** Restore the selected dialog and trim forward navigation from shared breadcrumbs. */
     function handleBreadcrumbClick(index) {
         const item = dialogCrumbs.value[index];
         if (!item) {
@@ -148,6 +149,11 @@ export const useUiStore = defineStore('Ui', () => {
         }
         if (item.type === 'world') {
             showWorldDialog(item.tag, item.shortName);
+            return;
+        }
+        if (item.type === 'instance') {
+            openDialog(item);
+            instanceStore.setInstanceDialogLocation(item.tag || item.id, item.shortName);
             return;
         }
         if (item.type === 'avatar') {
@@ -205,6 +211,7 @@ export const useUiStore = defineStore('Ui', () => {
         clearGroupMemberModerationDialog();
         groupStore.setGroupRolesDialogVisible(false);
         instanceStore.hidePreviousInstancesDialogs();
+        instanceStore.setInstanceDialogVisible(false);
         clearDialogCrumbs();
     }
 
@@ -234,6 +241,7 @@ export const useUiStore = defineStore('Ui', () => {
             groupStore.groupDialog.visible ||
             groupStore.groupMemberModeration.visible ||
             groupStore.groupRolesDialog.visible ||
+            instanceStore.instanceDialog.visible ||
             (instanceStore.previousInstancesInfoDialog.visible && !isPrevInfo) ||
             (instanceStore.previousInstancesListDialog.visible && !isPrevList);
 
@@ -242,6 +250,9 @@ export const useUiStore = defineStore('Ui', () => {
         }
         if (type !== 'world') {
             worldStore.setWorldDialogVisible(false);
+        }
+        if (type !== 'instance') {
+            instanceStore.setInstanceDialogVisible(false);
         }
         if (type !== 'avatar') {
             avatarStore.setAvatarDialogVisible(false);

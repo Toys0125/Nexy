@@ -10,27 +10,29 @@ import {
     presenceState,
     presenceToUser,
     toNexvrEventBody,
-    toVrcCalendarEvent,
-    toVrcCurrentUser,
-    toVrcGroup,
-    toVrcGroupMember,
-    toVrcGroupPost,
-    toVrcGroupRules,
-    toVrcInstance,
-    toVrcMembershipStatus,
-    toVrcMyMember,
-    toVrcNotification,
-    toVrcPlayerModeration,
-    toVrcPublicProfile,
-    toVrcUser,
-    toVrcWorld
+    toNexVRCalendarEvent,
+    toNexVRCurrentUser,
+    toNexVRGroup,
+    toNexVRGroupMember,
+    toNexVRGroupPost,
+    toNexVRGroupRules,
+    toNexVRInstance,
+    toNexVRMembershipStatus,
+    toNexVRMyMember,
+    toNexVRNotification,
+    toNexVRPlayerModeration,
+    toNexVRPublicProfile,
+    toNexVRUser,
+    toNexVRWorld
 } from './mappers';
 import { clearTokens, getAccessToken, refreshTokens, setTokens } from './session';
 import { AppDebug } from '../appConfig';
 import { keepRawResponse } from './rawResponses';
 import { realtime } from './realtime';
+import { getRequestSession } from '../requestSession';
 
 const SNAPSHOT_TIMEOUT = 8000;
+const DISPLAY_NAME_TIMEOUT = 2000;
 const NOT_AVAILABLE = 'Not available on NexVR';
 
 class ShimError extends Error {
@@ -56,7 +58,8 @@ let challenge = null;
 /** @type {Map<string, any>} realtime notification by id, for accept/hide */
 const notificationsById = new Map();
 /** @type {Map<string, Promise<string>>} */
-const displayNameCache = new Map();
+let displayNameCache = new Map();
+let displayNameContext = '';
 /** @type {Map<string, string[]>} tags from full profiles, kept across presence-only refreshes */
 const profileTags = new Map();
 
@@ -163,6 +166,10 @@ function fetchUser(userId) {
 }
 
 /**
+ * Resolve an optional display name within a finite budget and the current login/API context.
+ * Missing or slow profiles fall back to an empty name so callers can display the user ID.
+ * Keep the native lookup cached until it settles, so a caller timeout cannot spawn duplicates.
+ *
  * @param {string} userId
  * @returns {Promise<string>}
  */
@@ -174,17 +181,41 @@ function displayNameOf(userId) {
     if (friend) {
         return Promise.resolve(friend.displayName);
     }
-    let pending = displayNameCache.get(userId);
+    const session = getRequestSession();
+    const endpoint = AppDebug.endpointDomain;
+    const context = `${session}:${endpoint}`;
+    if (displayNameContext !== context) {
+        displayNameContext = context;
+        displayNameCache = new Map();
+    }
+    const cache = displayNameCache;
+    let pending = cache.get(userId);
     if (!pending) {
         pending = nexvr(`/users/${encodeURIComponent(userId)}`)
             .then((user) => user.displayName || user.username || '')
+            .then((name) => {
+                if (
+                    cache !== displayNameCache ||
+                    session !== getRequestSession() ||
+                    endpoint !== AppDebug.endpointDomain
+                )
+                    return '';
+                if (!name && cache.get(userId) === pending) cache.delete(userId);
+                return name;
+            })
             .catch(() => {
-                displayNameCache.delete(userId);
+                if (cache.get(userId) === pending) cache.delete(userId);
                 return '';
             });
-        displayNameCache.set(userId, pending);
+        cache.set(userId, pending);
     }
-    return pending;
+    let timer;
+    return Promise.race([
+        pending,
+        new Promise((resolve) => {
+            timer = setTimeout(() => resolve(''), DISPLAY_NAME_TIMEOUT);
+        })
+    ]).finally(() => clearTimeout(timer));
 }
 
 /**
@@ -232,7 +263,7 @@ async function currentUser() {
         throw err;
     }
     await ensureRealtime(me.id);
-    return toVrcCurrentUser(me, realtime.friends, realtime.hasSnapshot);
+    return toNexVRCurrentUser(me, realtime.friends, realtime.hasSnapshot);
 }
 
 /**
@@ -330,7 +361,7 @@ async function notificationsList(query) {
     const result = [];
     for (const notification of list) {
         notificationsById.set(notification.id, notification);
-        const mapped = toVrcNotification(notification);
+        const mapped = toNexVRNotification(notification);
         if (!mapped.senderUsername) {
             mapped.senderUsername = await displayNameOf(mapped.senderUserId);
         }
@@ -345,7 +376,7 @@ async function notificationsList(query) {
  */
 async function answerNotification(id, accept) {
     const notification = notificationsById.get(id) ?? realtime.notifications.find((n) => n.id === id);
-    const mapped = notification && toVrcNotification(notification);
+    const mapped = notification && toNexVRNotification(notification);
     if (mapped?.type === 'friendRequest') {
         await nexvr(`/friends/${encodeURIComponent(mapped.senderUserId)}/${accept ? 'accept' : 'decline'}`, {
             method: 'POST'
@@ -387,7 +418,7 @@ function groupMembers(groupId) {
     const members = nexvr(`/groups/${encodeURIComponent(groupId)}/members`)
         // pending requests and outstanding invites aren't members yet
         .then((list) =>
-            list.filter((member) => member.status === 'active').map((member) => toVrcGroupMember(groupId, member))
+            list.filter((member) => member.status === 'active').map((member) => toNexVRGroupMember(groupId, member))
         )
         .catch((err) => {
             memberLists.delete(groupId);
@@ -437,17 +468,17 @@ async function groupDetails(groupId) {
         const presence = realtime.friends.get(member.userId);
         return presence && presenceState(presence).state !== 'offline';
     }).length;
-    const vrcGroup = toVrcGroup(group);
-    const myMember = toVrcMyMember(groupId, realtime.userId, membership, listed);
+    const vrcGroup = toNexVRGroup(group);
+    const myMember = toNexVRMyMember(groupId, realtime.userId, membership, listed);
     return {
         ...vrcGroup,
         // the list can be fresher than the stored count; never show fewer than are listed
         memberCount: Math.max(vrcGroup.memberCount, members.length),
         onlineMemberCount,
-        membershipStatus: toVrcMembershipStatus(membership?.status),
+        membershipStatus: toNexVRMembershipStatus(membership?.status),
         // VRChat leaves myMember out for non-members; applyGroup writes into it, so null would crash
         ...(myMember && { myMember }),
-        rules: toVrcGroupRules(rules)
+        rules: toNexVRGroupRules(rules)
     };
 }
 
@@ -488,7 +519,7 @@ function toNexvrGroupBody(body) {
  * @returns {Promise<object>} VRChat CalendarEvent
  */
 async function calendarEvent(eventId) {
-    return toVrcCalendarEvent(await nexvr(`/calendar/events/${encodeURIComponent(eventId)}`));
+    return toNexVRCalendarEvent(await nexvr(`/calendar/events/${encodeURIComponent(eventId)}`));
 }
 
 /**
@@ -513,7 +544,7 @@ async function worldSearch(query) {
             creator: user || undefined
         }
     });
-    return Promise.all(searchPage(worlds, query).map(async (w) => toVrcWorld(w, await displayNameOf(w.owner))));
+    return Promise.all(searchPage(worlds, query).map(async (w) => toNexVRWorld(w, await displayNameOf(w.owner))));
 }
 
 /**
@@ -578,7 +609,7 @@ const routes = [
         /^auth\/user\/playermoderations$/,
         async () => {
             const list = await nexvr('/moderation/');
-            return list.map(toVrcPlayerModeration);
+            return list.map(toNexVRPlayerModeration);
         }
     ],
     ['GET', /^auth\/user\/avatarmoderations$/, () => []],
@@ -603,7 +634,7 @@ const routes = [
             }
             // NexVR rejects a limit over 50 and has no offset, so fetch the cap and page here
             const users = await nexvr('/users/search', { query: { q: search, limit: 50 } });
-            return searchPage(users, q).map((u) => rememberTags(toVrcUser(u, realtime.friends.get(u.id))));
+            return searchPage(users, q).map((u) => rememberTags(toNexVRUser(u, realtime.friends.get(u.id))));
         }
     ],
     [
@@ -611,7 +642,7 @@ const routes = [
         /^users\/([^/]+)$/,
         async (m) => {
             const user = await fetchUser(m[1]);
-            return rememberTags(toVrcUser(user, realtime.friends.get(user.id)));
+            return rememberTags(toNexVRUser(user, realtime.friends.get(user.id)));
         }
     ],
     [
@@ -635,7 +666,7 @@ const routes = [
                 patch.displayName = body.displayName;
             }
             const me = await nexvr('/users/me', { method: 'PATCH', body: patch });
-            return toVrcCurrentUser(me, realtime.friends, realtime.hasSnapshot);
+            return toNexVRCurrentUser(me, realtime.friends, realtime.hasSnapshot);
         }
     ],
     [
@@ -643,7 +674,7 @@ const routes = [
         /^users\/([^/]+)\/groups$/,
         async (m) => {
             const groups = await nexvr(`/groups/user/${encodeURIComponent(m[1])}`);
-            return groups.map(toVrcGroup);
+            return groups.map(toNexVRGroup);
         }
     ],
     ['GET', /^users\/([^/]+)\/groups\/represented$/, () => ({})],
@@ -668,7 +699,7 @@ const routes = [
             return { instances: realtime.getGroupInstances([m[2]]) };
         }
     ],
-    ['GET', /^profile\/([^/]+)$/, async (m) => toVrcPublicProfile(await fetchUser(m[1]))],
+    ['GET', /^profile\/([^/]+)$/, async (m) => toNexVRPublicProfile(await fetchUser(m[1]))],
     ['GET', /^user\/([^/]+)\/friendStatus$/, (m) => friendStatus(m[1])],
     [
         'POST',
@@ -692,7 +723,7 @@ const routes = [
         /^worlds\/([^/]+)$/,
         async (m) => {
             const world = await nexvr(`/worlds/${encodeURIComponent(m[1])}`);
-            return toVrcWorld(world, await displayNameOf(world.owner));
+            return toNexVRWorld(world, await displayNameOf(world.owner));
         }
     ],
     [
@@ -700,7 +731,8 @@ const routes = [
         /^instances\/([^/]+)$/,
         async (m) => {
             const id = instanceIdFromLocation(decodeURIComponent(m[1]));
-            return toVrcInstance(await nexvr(`/instances/${encodeURIComponent(id)}`));
+            const instance = await nexvr(`/instances/${encodeURIComponent(id)}`);
+            return toNexVRInstance({ ...instance, creatorName: await displayNameOf(instance.creator) });
         }
     ],
     // following/featured span every group; NexVR only lists one owner's events.
@@ -713,7 +745,7 @@ const routes = [
             const events = await nexvr('/calendar/events', {
                 query: { ownerType: 'group', owner: m[1], limit: 200 }
             });
-            const results = events.map(toVrcCalendarEvent);
+            const results = events.map(toNexVRCalendarEvent);
             return { results, totalCount: results.length, hasNext: false };
         }
     ],
@@ -721,7 +753,7 @@ const routes = [
         'POST',
         /^calendar\/([^/]+)\/event$/,
         async (m, q, body) =>
-            toVrcCalendarEvent(
+            toNexVRCalendarEvent(
                 await nexvr('/calendar/events', {
                     method: 'POST',
                     body: { ownerType: 'group', owner: m[1], ...toNexvrEventBody(body) }
@@ -743,7 +775,7 @@ const routes = [
                     delete patch.visibility;
                 }
             }
-            return toVrcCalendarEvent(await nexvr(`/calendar/events/${id}`, { method: 'PATCH', body: patch }));
+            return toNexVRCalendarEvent(await nexvr(`/calendar/events/${id}`, { method: 'PATCH', body: patch }));
         }
     ],
     [
@@ -773,7 +805,7 @@ const routes = [
     [
         'POST',
         /^groups$/,
-        async (m, q, body) => toVrcGroup(await nexvr('/groups/', { method: 'POST', body: toNexvrGroupBody(body) }))
+        async (m, q, body) => toNexVRGroup(await nexvr('/groups/', { method: 'POST', body: toNexvrGroupBody(body) }))
     ],
     [
         'GET',
@@ -783,14 +815,14 @@ const routes = [
             const groups = await nexvr('/groups/', {
                 query: { search: q.get('query') || undefined, limit: 100, includeMine: 'true' }
             });
-            return searchPage(groups, q).map(toVrcGroup);
+            return searchPage(groups, q).map(toNexVRGroup);
         }
     ],
     [
         'PUT',
         /^groups\/([^/]+)$/,
         async (m, q, body) =>
-            toVrcGroup(
+            toNexVRGroup(
                 await nexvr(`/groups/${encodeURIComponent(m[1])}`, { method: 'PATCH', body: toNexvrGroupBody(body) })
             )
     ],
@@ -814,7 +846,7 @@ const routes = [
             const listed = (await groupMembers(groupId)).find((member) => member.userId === userId);
             if (userId === realtime.userId) {
                 const membership = await groupMembership(groupId);
-                const mine = toVrcMyMember(groupId, userId, membership, listed);
+                const mine = toNexVRMyMember(groupId, userId, membership, listed);
                 if (mine) {
                     return { ...listed, ...mine };
                 }
@@ -830,7 +862,7 @@ const routes = [
         'GET',
         /^groups\/([^/]+)\/posts$/,
         async (m, q) => {
-            const posts = (await nexvr(`/groups/${encodeURIComponent(m[1])}/announcements`)).map(toVrcGroupPost);
+            const posts = (await nexvr(`/groups/${encodeURIComponent(m[1])}/announcements`)).map(toNexVRGroupPost);
             const offset = Number(q.get('offset') || 0);
             return { posts: posts.slice(offset, offset + Number(q.get('n') || 100)), total: posts.length };
         }
@@ -844,7 +876,7 @@ const routes = [
             if (body.title) {
                 announcement.title = body.title;
             }
-            return toVrcGroupPost(
+            return toNexVRGroupPost(
                 await nexvr(`/groups/${encodeURIComponent(m[1])}/announcements`, {
                     method: 'POST',
                     body: announcement
@@ -967,6 +999,8 @@ export async function handleShimRequest(options, executeNative) {
 export async function endSession() {
     challenge = null;
     notificationsById.clear();
+    displayNameCache = new Map();
+    displayNameContext = '';
     realtime.reset();
     await clearTokens();
 }

@@ -6,11 +6,13 @@ import { AppDebug, isApiLogSuppressed, logWebRequest } from './appConfig.js';
 import { i18n } from '../plugins/i18n';
 import { statusCodes } from '../shared/constants/api.js';
 import { watchState } from './watchState';
+import { assertRequestSession, getRequestSession } from './requestSession';
 
 import webApiService from './webapi.js';
 
 const pendingGetRequests = new Map();
 export let failedGetRequests = new Map();
+let instanceFailureSession = getRequestSession();
 
 const t = i18n.global.t;
 
@@ -85,33 +87,67 @@ export function request(endpoint, options) {
         throw `API request blocked while logged out: ${endpoint}`;
     }
     let req;
-    const init = buildRequestInit(endpoint, options);
+    const { force = false, ...requestOptions } = options || {};
+    const init = buildRequestInit(endpoint, requestOptions);
+    const instanceSession = init.method === 'GET' && endpoint.startsWith('instances/') ? getRequestSession() : null;
+    const instanceAttempt = { current: true };
+    /** Reject superseded instance responses and errors before their shared-cache or UI side effects. */
+    function assertCurrentInstance() {
+        if (instanceSession === null) return;
+        assertRequestSession(instanceSession);
+        if (!instanceAttempt.current) throw new Error('Instance request superseded by a newer refresh');
+    }
+    // Access-tag variants identify the same instance; refresh must supersede every variant.
+    const instanceDetail = instanceSession !== null && /^instances\/[^/]+:[^/]+$/.test(endpoint);
+    const failureKey = instanceDetail ? endpoint.split('~')[0] : endpoint;
+    let cacheUrl = init.url;
+    if (instanceDetail) {
+        const url = new URL(init.url);
+        url.pathname = url.pathname.split('~')[0];
+        cacheUrl = url.toString();
+    }
+    const requestKey = instanceSession === null ? cacheUrl : `${instanceSession}:${cacheUrl}`;
+    if (instanceSession !== null && instanceSession !== instanceFailureSession) {
+        for (const failedEndpoint of failedGetRequests.keys()) {
+            if (failedEndpoint.startsWith('instances/')) failedGetRequests.delete(failedEndpoint);
+        }
+        instanceFailureSession = instanceSession;
+    }
     if (init.method === 'GET') {
+        if (force && instanceSession !== null) {
+            failedGetRequests.delete(failureKey);
+            const previous = pendingGetRequests.get(requestKey);
+            if (previous) previous.instanceAttempt.current = false;
+            pendingGetRequests.delete(requestKey);
+        }
         // don't retry recent 404/403
-        if (failedGetRequests.has(endpoint)) {
-            const lastRun = failedGetRequests.get(endpoint);
+        if (failedGetRequests.has(failureKey)) {
+            const lastRun = failedGetRequests.get(failureKey);
             if (lastRun >= Date.now() - 900000) {
                 // 15mins
                 $throw(-1, t('api.error.message.403_404_bailing_request'), endpoint);
             }
-            failedGetRequests.delete(endpoint);
+            failedGetRequests.delete(failureKey);
         }
         // merge requests
-        req = pendingGetRequests.get(init.url);
+        req = pendingGetRequests.get(requestKey);
         if (typeof req !== 'undefined') {
             if (req.time >= Date.now() - 10000) {
                 // 10s
                 return req.req;
             }
-            pendingGetRequests.delete(init.url);
+            if (instanceSession !== null) req.instanceAttempt.current = false;
+            pendingGetRequests.delete(requestKey);
         }
     }
     req = webApiService
         .execute(init)
         .catch((err) => {
+            assertCurrentInstance();
             $throw(0, err, endpoint);
         })
         .then((response) => {
+            assertCurrentInstance();
             if (!watchState.isLoggedIn && endpoint.startsWith('/auth') && endpoint !== 'config') {
                 throw `API request blocked while logged out: ${endpoint}`;
             }
@@ -169,6 +205,7 @@ export function request(endpoint, options) {
             return parsed;
         })
         .then(({ data, status }) => {
+            assertCurrentInstance();
             if (status === 200) {
                 if (!data) {
                     return data;
@@ -195,7 +232,7 @@ export function request(endpoint, options) {
                 return null;
             }
             if (init.method === 'GET' && (status === 404 || status === 403) && !endpoint.startsWith('auth/user')) {
-                failedGetRequests.set(endpoint, Date.now());
+                failedGetRequests.set(failureKey, Date.now());
             }
             if (
                 init.method === 'GET' &&
@@ -219,13 +256,14 @@ export function request(endpoint, options) {
         // Return the cleanup chain too: finally() creates a new promise which
         // would otherwise reject unhandled even when the caller catches req.
         req = req.finally(() => {
-            if (pendingGetRequests.get(init.url)?.req === req) {
-                pendingGetRequests.delete(init.url);
+            if (pendingGetRequests.get(requestKey)?.req === req) {
+                pendingGetRequests.delete(requestKey);
             }
         });
-        pendingGetRequests.set(init.url, {
+        pendingGetRequests.set(requestKey, {
             req,
-            time: Date.now()
+            time: Date.now(),
+            instanceAttempt
         });
     }
     return req;

@@ -75,6 +75,7 @@ import { useGroupStore } from '../../../stores/group';
 import { useInstanceStore } from '../../../stores/instance';
 import { i18n } from '../../../plugins/i18n';
 import { handleShimRequest } from '../shim';
+import { toNexVRInstance } from '../mappers';
 
 class Socket {
     static OPEN = 1;
@@ -176,6 +177,92 @@ test('protobuf snapshots populate real sidebar and dialog stores and replace rem
     expect(groups.groupInstances).toEqual([]);
     expect(groups.groupDialog.instances).toEqual([]);
 });
+
+test('live snapshots preserve fetched owner and lifetime details while updating counts', () => {
+    const detail = toNexVRInstance({
+        _id: 'i1',
+        world: '6a335eb4fa3baa6c11dae00d',
+        group: 'g1',
+        type: 'group-plus',
+        region: 'eu-central',
+        creator: 'owner-id',
+        creatorName: 'Owner',
+        createdAt: '2026-11-01T12:00:00Z',
+        closesAt: '2026-11-02T12:00:00Z',
+        ephemeral: true,
+        contentMode: 'sfw',
+        playerCount: 1,
+        maxPlayers: 10
+    });
+    instances.applyInstance(detail);
+    snapshot('g1', [instance('i1', { playerCount: 5, contentMode: 3 })]);
+    const updated = instances.cachedInstances.get(detail.id);
+    expect(updated).toMatchObject({ creatorId: 'owner-id', userCount: 5 });
+    expect(updated.$nexvr).toMatchObject({
+        detailsFetched: true,
+        creatorName: 'Owner',
+        contentMode: 'nsfw_plus',
+        ephemeral: true,
+        createdAt: '2026-11-01T12:00:00Z',
+        closesAt: '2026-11-02T12:00:00Z'
+    });
+});
+
+test.each([false, true])(
+    'different access-tag variants share live dialog and row data (snapshot first: %s)',
+    async (snapshotFirst) => {
+        groups.groupDialog.id = 'g1';
+        groups.groupDialog.visible = true;
+        await nextTick();
+        if (snapshotFirst) snapshot('g1', [instance('i1', { type: 5, playerCount: 2, contentMode: 1 })]);
+        const initialSnapshot = groups.groupInstances[0]?.instance;
+        const detail = toNexVRInstance({
+            _id: 'i1',
+            world: '6a335eb4fa3baa6c11dae00d',
+            group: 'g1',
+            type: 'group-plus',
+            region: 'eu-central',
+            creator: 'owner-id',
+            creatorName: 'Owner',
+            createdAt: '2026-11-01T12:00:00Z',
+            closesAt: '2026-11-02T12:00:00Z',
+            ephemeral: true,
+            contentMode: 'sfw',
+            playerCount: 1,
+            maxPlayers: 10
+        });
+        const selected = instances.applyInstance(detail);
+        if (snapshotFirst) expect(selected).toBe(initialSnapshot);
+        const dialog = mount({
+            setup: () => ({ selected }),
+            template:
+                '<p>{{ selected.userCount }} {{ selected.$nexvr.contentMode }} {{ selected.$nexvr.creatorName }}</p>'
+        });
+        expect(dialog.text()).toBe('1 sfw Owner');
+
+        snapshot('g1', [instance('i1', { type: 5, playerCount: 5, contentMode: 3 })]);
+        await nextTick();
+        const live = groups.groupInstances[0].instance;
+        expect(live.id).not.toBe(detail.id);
+        expect(instances.cachedInstances.get(detail.id)).toBe(selected);
+        expect(instances.cachedInstances.get(live.id)).toBe(selected);
+        expect(live).toBe(selected);
+        expect(groups.groupDialog.instances[0].ref).toBe(selected);
+        expect(dialog.text()).toBe('5 nsfw_plus Owner');
+        expect(selected.$nexvr).toMatchObject({
+            detailsFetched: true,
+            ephemeral: true,
+            createdAt: detail.$nexvr.createdAt,
+            closesAt: detail.$nexvr.closesAt
+        });
+
+        // Repeated snapshots with the same ID must update an already-open view too.
+        snapshot('g1', [instance('i1', { type: 5, playerCount: 7, contentMode: 2 })]);
+        await nextTick();
+        expect(dialog.text()).toBe('7 nsfw Owner');
+        dialog.unmount();
+    }
+);
 
 test('membership and dialog subscriptions preserve friends, notifications and moderation', async () => {
     realtime.watchInstances(['i-current']);
