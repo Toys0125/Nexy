@@ -44,7 +44,7 @@ const responses = {
             joinedAt: '2026-01-01T00:00:00Z'
         },
         {
-            user: user('me', 'Iris'),
+            user: user('me', 'Nexy'),
             roles: [{ roleId: 'r-mod' }],
             membershipVisibility: 'friends-only',
             status: 'active',
@@ -146,7 +146,7 @@ describe('NexVR group routes', () => {
     test('the caller member entry merges their membership; others come from the list', async () => {
         const mine = (await get('groups/g1/members/me')).json;
         expect(mine.membershipStatus).toBe('member');
-        expect(mine.user.displayName).toBe('Iris');
+        expect(mine.user.displayName).toBe('Nexy');
 
         expect((await get('groups/g1/members/a')).json.user.displayName).toBe('Alpha');
         expect((await get('groups/g1/members/nobody')).status).toBe(404);
