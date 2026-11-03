@@ -5,6 +5,9 @@ const mocks = vi.hoisted(() => ({
     cachedInstances: new Map(),
     lastInstanceApplied: { value: '' },
     showLaunchDialog: vi.fn(),
+    fetchInstanceDetails: vi.fn(() => Promise.resolve(null)),
+    showInstanceDialog: vi.fn(),
+    showUserDialog: vi.fn(),
     showGroupDialog: vi.fn(),
     getGroupName: vi.fn(() => Promise.resolve('Fetched Group')),
     parseLocation: vi.fn(() => ({
@@ -12,6 +15,16 @@ const mocks = vi.hoisted(() => ({
         tag: 'wrld_1:inst_1',
         groupId: 'grp_1'
     }))
+}));
+
+vi.mock('../../coordinators/instanceCoordinator', () => ({
+    getCachedInstance: (location) => mocks.cachedInstances.get(location),
+    fetchInstanceDetails: mocks.fetchInstanceDetails,
+    showInstanceDialog: (...args) => mocks.showInstanceDialog(...args)
+}));
+
+vi.mock('../../coordinators/userCoordinator', () => ({
+    showUserDialog: (...args) => mocks.showUserDialog(...args)
 }));
 
 vi.mock('pinia', async (importOriginal) => {
@@ -69,6 +82,7 @@ async function flush() {
     await Promise.resolve();
 }
 
+/** Mount a location row with overridable presence data and lightweight surrounding UI. */
 function mountComponent(props = {}) {
     return mount(LocationWorld, {
         props: {
@@ -103,6 +117,9 @@ describe('LocationWorld.vue', () => {
         mocks.cachedInstances = new Map();
         mocks.lastInstanceApplied.value = '';
         mocks.showLaunchDialog.mockClear();
+        mocks.fetchInstanceDetails.mockClear();
+        mocks.showInstanceDialog.mockClear();
+        mocks.showUserDialog.mockClear();
         mocks.showGroupDialog.mockClear();
         mocks.getGroupName.mockClear();
         mocks.parseLocation.mockClear();
@@ -113,14 +130,59 @@ describe('LocationWorld.vue', () => {
         }));
     });
 
-    it('marks unlocked for owner and opens launch dialog on click', async () => {
+    it('marks unlocked for owner and opens instance details on click', async () => {
         const wrapper = mountComponent();
 
         expect(wrapper.find('[data-testid="unlock"]').exists()).toBe(true);
 
         await wrapper.findAll('.cursor-pointer')[0].trigger('click');
 
-        expect(mocks.showLaunchDialog).toHaveBeenCalledWith('wrld_1:inst_1', 'short-1');
+        expect(mocks.showInstanceDialog).toHaveBeenCalledWith('wrld_1:inst_1', 'short-1');
+    });
+
+    it('shows content mode and the resolved public instance owner', async () => {
+        mocks.cachedInstances.set('wrld_1:inst_1', {
+            creatorId: 'usr_creator',
+            type: 'public',
+            $nexvr: { contentMode: 'nsfw_plus', creatorName: 'Instance Owner' }
+        });
+        const wrapper = mountComponent();
+        expect(wrapper.text()).toContain('ERP');
+        expect(wrapper.text()).toContain('Instance Owner');
+        await wrapper.find('button').trigger('click');
+        expect(mocks.showUserDialog).toHaveBeenCalledWith('usr_creator');
+    });
+
+    it('does not label missing content information SFW', () => {
+        const wrapper = mountComponent();
+        expect(wrapper.text()).toContain('dialog.instance.content_unknown');
+        expect(wrapper.text()).not.toContain('SFW');
+    });
+
+    it('checks freshness when complete owner and content metadata is remounted', () => {
+        mocks.cachedInstances.set('wrld_1:inst_1', {
+            creatorId: 'usr_creator',
+            $fetchedAt: '2020-01-01T00:00:00Z',
+            $nexvr: { contentMode: 'sfw', creatorName: 'Owner' }
+        });
+        const first = mountComponent();
+        first.unmount();
+        const second = mountComponent();
+        expect(second.text()).toContain('Owner');
+        expect(mocks.fetchInstanceDetails).toHaveBeenCalledTimes(2);
+    });
+
+    it('still fetches when the cached owner is known but the content mode is missing', async () => {
+        mocks.cachedInstances.set('wrld_1:inst_1', { $nexvr: { creatorName: 'Owner' } });
+        mountComponent();
+        await flush();
+        expect(mocks.fetchInstanceDetails).toHaveBeenCalledWith('wrld_1:inst_1');
+    });
+
+    it('opens instance details with the keyboard', async () => {
+        const wrapper = mountComponent();
+        await wrapper.find('[role="button"]').trigger('keydown', { key: 'Enter' });
+        expect(mocks.showInstanceDialog).toHaveBeenCalledWith('wrld_1:inst_1', 'short-1');
     });
 
     it('shows group hint and opens group dialog', async () => {

@@ -27,6 +27,7 @@ import { instanceRequest, queryRequest, userRequest, worldRequest } from '../api
 import { accessTypeLocaleKeyMap, instanceContentSettings } from '../shared/constants';
 import { database } from '../services/database';
 import { resolveRef } from '../shared/utils/resolveRef';
+import { findCachedInstance } from '../shared/utils/instanceDetails';
 import { useAppearanceSettingsStore } from './settings/appearance';
 import { useFriendStore } from './friend';
 import { useGroupStore } from './group';
@@ -72,6 +73,18 @@ export const useInstanceStore = defineStore('Instance', () => {
     }
 
     const lastInstanceApplied = ref('');
+
+    const instanceDialog = ref({ visible: false, location: '', shortName: '' });
+
+    /** Show or dismiss the instance details view without discarding its selection. */
+    function setInstanceDialogVisible(visible) {
+        instanceDialog.value.visible = visible;
+    }
+
+    /** Select and open an instance while retaining any short-name access token. */
+    function setInstanceDialogLocation(location, shortName = '') {
+        instanceDialog.value = { visible: true, location, shortName };
+    }
 
     const currentInstanceWorld = ref({
         ref: {},
@@ -153,6 +166,7 @@ export const useInstanceStore = defineStore('Instance', () => {
             currentInstanceUsersData.value = [];
             instanceJoinHistory.clear();
             hidePreviousInstancesDialogs();
+            setInstanceDialogVisible(false);
             cachedInstances.clear();
             queuedInstances.clear();
             if (isLoggedIn) {
@@ -455,16 +469,28 @@ export const useInstanceStore = defineStore('Instance', () => {
         if (!json.$fetchedAt) {
             json.$fetchedAt = new Date().toJSON();
         }
-        let ref = cachedInstances.get(json.id);
+        let ref = findCachedInstance(cachedInstances, json.id);
+        if (json.$nexvr?.detailsFetched === false && ref?.$nexvr?.detailsFetched) {
+            // Group snapshots carry live counts and access, but omit REST-only details.
+            const { creatorName, createdAt, closesAt, ephemeral } = ref.$nexvr;
+            json = {
+                ...json,
+                creatorId: json.creatorId || ref.creatorId,
+                $nexvr: { ...json.$nexvr, creatorName, createdAt, closesAt, ephemeral, detailsFetched: true }
+            };
+        }
         if (json.world?.id && !json.world.name && ref?.world?.id === json.world.id) {
             json.world = ref.world;
         }
         if (typeof ref === 'undefined') {
-            ref = createDefaultInstanceRef(json);
-            cachedInstances.set(ref.id, ref);
-            cleanInstanceCache();
+            ref = reactive(createDefaultInstanceRef(json));
         } else {
             Object.assign(ref, json);
+        }
+        if (!cachedInstances.has(json.id) || cachedInstances.get(json.id) !== ref) {
+            // Access-tag variants must share the same live object held by rows and dialogs.
+            cachedInstances.set(json.id, ref);
+            cleanInstanceCache();
         }
         ref.$location = parseLocation(ref.location);
         if (ref.world?.id) {
@@ -1277,6 +1303,9 @@ export const useInstanceStore = defineStore('Instance', () => {
 
         cachedInstances,
         lastInstanceApplied,
+        instanceDialog,
+        setInstanceDialogVisible,
+        setInstanceDialogLocation,
         currentInstanceWorld,
         currentInstanceLocation,
         queuedInstances,

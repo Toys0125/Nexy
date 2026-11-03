@@ -36,6 +36,7 @@
     import PreviousInstancesListDialog from './PreviousInstancesDialog/PreviousInstancesListDialog.vue';
     import UserDialog from './UserDialog/UserDialog.vue';
     import WorldDialog from './WorldDialog/WorldDialog.vue';
+    import InstanceDialog from './InstanceDialog/InstanceDialog.vue';
     import GroupMemberModerationDialog from './GroupDialog/GroupMemberModerationDialog.vue';
     import GroupRolesDialog from './GroupDialog/GroupRolesDialog.vue';
     import { getReadableProfileThemeColor } from '@/shared/utils/user';
@@ -80,6 +81,9 @@
             if (worldStore.worldDialog.visible) {
                 return 'world';
             }
+            if (instanceStore.instanceDialog.visible) {
+                return 'instance';
+            }
             if (avatarStore.avatarDialog.visible) {
                 return 'avatar';
             }
@@ -102,6 +106,8 @@
                 return UserDialog;
             case 'world':
                 return WorldDialog;
+            case 'instance':
+                return InstanceDialog;
             case 'avatar':
                 return AvatarDialog;
             case 'group':
@@ -151,6 +157,7 @@
             case 'group':
             case 'world':
             case 'avatar':
+            case 'instance':
                 return 'x-dialog translate-y-0 sm:max-w-270 overflow-hidden flex flex-col';
             case 'group-member-moderation':
             case 'group-roles':

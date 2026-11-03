@@ -216,7 +216,7 @@ function baseUser(user) {
  * @param {any} user NexVR public user profile
  * @returns {object} VRChat PublicProfile (the bio and large picture of a user dialog)
  */
-export function toVrcPublicProfile(user) {
+export function toNexVRPublicProfile(user) {
     return {
         id: user.id,
         displayName: user.displayName || user.username,
@@ -301,7 +301,7 @@ export function presenceToUser(presence, cachedTags = []) {
  * @param {any} [presence] FriendPresence, when the user is a friend
  * @returns {object} VRChat User
  */
-export function toVrcUser(user, presence) {
+export function toNexVRUser(user, presence) {
     const ref = {
         ...baseUser(user),
         isFriend: Boolean(presence),
@@ -328,7 +328,7 @@ export function toVrcUser(user, presence) {
  *   empty map means no friends rather than none received yet
  * @returns {object} VRChat CurrentUser
  */
-export function toVrcCurrentUser(me, friends, friendsComplete = true) {
+export function toNexVRCurrentUser(me, friends, friendsComplete = true) {
     const onlineFriends = [];
     const activeFriends = [];
     const offlineFriends = [];
@@ -404,7 +404,7 @@ export function toVrcCurrentUser(me, friends, friendsComplete = true) {
  * @param {string} [authorName]
  * @returns {object} VRChat World
  */
-export function toVrcWorld(world, authorName = '') {
+export function toNexVRWorld(world, authorName = '') {
     const versions = world.versions || [];
     const latest = versions.find((v) => v.versionNumber === world.currentVersion) || versions[versions.length - 1];
     const stats = world.stats || {};
@@ -486,25 +486,29 @@ const REALTIME_CONTENT_MODES = ['', 'sfw', 'nsfw', 'nsfw_plus', 'sfw_plus'];
  * @param {any} instance NexVR realtime WorldInstance
  * @param {string} groupId Subscription key
  */
-export function toVrcRealtimeInstance(instance, groupId) {
+export function toNexVRRealtimeInstance(instance, groupId) {
     return {
-        ...toVrcInstance({
-            ...instance,
-            _id: instance.id,
-            world: instance.worldId,
-            group: groupId,
-            type: REALTIME_INSTANCE_TYPES[instance.type],
-            contentMode: REALTIME_CONTENT_MODES[instance.contentMode]
-        }),
+        ...toNexVRInstance(
+            {
+                ...instance,
+                _id: instance.id,
+                world: instance.worldId,
+                group: groupId,
+                type: REALTIME_INSTANCE_TYPES[instance.type],
+                contentMode: REALTIME_CONTENT_MODES[instance.contentMode]
+            },
+            { detailsFetched: false }
+        ),
         world: { id: instance.worldId, name: '' }
     };
 }
 
 /**
  * @param {any} instance NexVR instance
+ * @param {{ detailsFetched?: boolean }} [options]
  * @returns {object} VRChat Instance
  */
-export function toVrcInstance(instance) {
+export function toNexVRInstance(instance, { detailsFetched = true } = {}) {
     const world = typeof instance.world === 'object' && instance.world ? instance.world : null;
     const worldId = world ? world._id : instance.world;
     const location = makeLocation(worldId, instance._id, {
@@ -525,6 +529,7 @@ export function toVrcInstance(instance) {
         region: normalizeRegion(instance.region),
         photonRegion: normalizeRegion(instance.region),
         ownerId: instance.group || instance.creator || '',
+        creatorId: instance.creator || '',
         n_users: instance.playerCount || 0,
         userCount: instance.playerCount || 0,
         capacity: instance.maxPlayers || 0,
@@ -539,9 +544,14 @@ export function toVrcInstance(instance) {
         queueSize: 0,
         strict: false,
         ageGate: instance.contentMode === 'nsfw' || instance.contentMode === 'nsfw_plus',
-        world: world ? toVrcWorld(world) : undefined,
+        world: world ? toNexVRWorld(world) : undefined,
         $nexvr: {
+            detailsFetched,
+            type: instance.type,
+            creatorName: instance.creatorName || '',
             contentMode: instance.contentMode,
+            region: instance.region || '',
+            createdAt: instance.createdAt || null,
             ephemeral: Boolean(instance.ephemeral),
             closesAt: instance.closesAt || null
         }
@@ -558,7 +568,7 @@ const JOIN_STATES = {
  * @param {any} group NexVR group
  * @returns {object} VRChat Group
  */
-export function toVrcGroup(group) {
+export function toNexVRGroup(group) {
     return {
         id: group.id,
         groupId: group.id,
@@ -619,7 +629,7 @@ const MEMBER_VISIBILITY = {
  * @param {string | null | undefined} status NexVR membership status
  * @returns {string} VRChat membershipStatus ('inactive' when not a member)
  */
-export function toVrcMembershipStatus(status) {
+export function toNexVRMembershipStatus(status) {
     return MEMBERSHIP_STATUS[status] ?? 'inactive';
 }
 
@@ -628,7 +638,7 @@ export function toVrcMembershipStatus(status) {
  * @param {any} member NexVR group member (from /groups/:id/members)
  * @returns {object} VRChat GroupMember
  */
-export function toVrcGroupMember(groupId, member) {
+export function toNexVRGroupMember(groupId, member) {
     const image = member.user.profileImageUrl || '';
     return {
         id: `${groupId}:${member.user.id}`,
@@ -642,7 +652,7 @@ export function toVrcGroupMember(groupId, member) {
             currentAvatarThumbnailImageUrl: image
         },
         roleIds: (member.roles || []).map((role) => role.roleId),
-        membershipStatus: toVrcMembershipStatus(member.status),
+        membershipStatus: toNexVRMembershipStatus(member.status),
         visibility: MEMBER_VISIBILITY[member.membershipVisibility] ?? 'visible',
         joinedAt: member.joinedAt || null,
         isRepresenting: false,
@@ -664,7 +674,7 @@ const PERMISSION_MAP = {
  * @param {string[]} permissions NexVR permissions
  * @returns {string[]} The NexVR names plus their VRChat equivalents
  */
-export function toVrcGroupPermissions(permissions = []) {
+export function toNexVRGroupPermissions(permissions = []) {
     return [...new Set([...permissions, ...permissions.flatMap((permission) => PERMISSION_MAP[permission] ?? [])])];
 }
 
@@ -677,7 +687,7 @@ export function toVrcGroupPermissions(permissions = []) {
  * @param {any} [listed] The caller's entry from the member list, for the join date
  * @returns {object | null}
  */
-export function toVrcMyMember(groupId, userId, membership, listed) {
+export function toNexVRMyMember(groupId, userId, membership, listed) {
     if (!membership?.status) {
         return null;
     }
@@ -686,11 +696,11 @@ export function toVrcMyMember(groupId, userId, membership, listed) {
         groupId,
         userId,
         roleIds: membership.roles || [],
-        membershipStatus: toVrcMembershipStatus(membership.status),
+        membershipStatus: toNexVRMembershipStatus(membership.status),
         visibility: MEMBER_VISIBILITY[membership.membershipVisibility] ?? 'visible',
         isSubscribedToAnnouncements: !membership.muted,
         // the owner holds every permission implicitly, so it may be missing from the list
-        permissions: toVrcGroupPermissions(
+        permissions: toNexVRGroupPermissions(
             membership.isOwner ? [...(membership.permissions || []), 'manage-group'] : membership.permissions
         ),
         isSubscribedToEventAnnouncements: !membership.muted,
@@ -706,7 +716,7 @@ export function toVrcMyMember(groupId, userId, membership, listed) {
  * @param {any} rules NexVR /groups/:id/rules
  * @returns {string}
  */
-export function toVrcGroupRules(rules) {
+export function toNexVRGroupRules(rules) {
     const flags = (rules?.flags || []).map((flag) => {
         const text = flag.replace(/_/g, ' ');
         return `• ${text.charAt(0).toUpperCase()}${text.slice(1)}`;
@@ -718,7 +728,7 @@ export function toVrcGroupRules(rules) {
  * @param {any} announcement NexVR group announcement
  * @returns {object} VRChat GroupPost
  */
-export function toVrcGroupPost(announcement) {
+export function toNexVRGroupPost(announcement) {
     return {
         id: announcement.id,
         groupId: announcement.groupId,
@@ -758,7 +768,7 @@ const NOTIFICATION_TYPES = {
  * @param {any} notification Notification from the realtime socket
  * @returns {object} VRChat Notification (v1)
  */
-export function toVrcNotification(notification) {
+export function toNexVRNotification(notification) {
     const data = { ...(notification.data || {}) };
     const details = { ...data };
     const worldId = data.worldId || data.world;
@@ -786,7 +796,7 @@ export function toVrcNotification(notification) {
  * @param {any} moderation NexVR moderation entry
  * @returns {object} VRChat PlayerModeration
  */
-export function toVrcPlayerModeration(moderation) {
+export function toNexVRPlayerModeration(moderation) {
     const types = {
         block: 'block',
         mute: 'mute',
@@ -814,7 +824,7 @@ const EVENT_ACCESS = {
  * @param {any} event NexVR calendar event
  * @returns {object} VRChat CalendarEvent
  */
-export function toVrcCalendarEvent(event) {
+export function toNexVRCalendarEvent(event) {
     const rsvps = event.rsvpSummary || {};
     return {
         id: event.id,

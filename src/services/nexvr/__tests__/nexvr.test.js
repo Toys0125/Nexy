@@ -7,9 +7,9 @@ import {
     normalizeRegion,
     presenceState,
     presenceToUser,
-    toVrcCurrentUser,
-    toVrcInstance,
-    toVrcWorld
+    toNexVRCurrentUser,
+    toNexVRInstance,
+    toNexVRWorld
 } from '../mappers';
 import { parseLocation } from '../../../shared/utils/locationParser';
 import { computeTrustLevel } from '../../../shared/utils/userTransforms';
@@ -158,7 +158,7 @@ describe('presence', () => {
             ['b', { userId: 'b', status: PresenceStatus.ONLINE }],
             ['c', { userId: 'c', status: PresenceStatus.OFFLINE }]
         ]);
-        const me = toVrcCurrentUser(
+        const me = toNexVRCurrentUser(
             { id: 'me', username: 'me', displayName: 'Me', userPreferenceStatus: 'do-not-disturb', socialRank: 'B' },
             friends
         );
@@ -182,14 +182,14 @@ describe('presence', () => {
             ['old', { userId: 'old', status: PresenceStatus.OFFLINE, friendsSince: '2026-01-01T00:00:00Z' }],
             ['mid', { userId: 'mid', status: PresenceStatus.ASK_ME, friendsSince: '2026-05-01T00:00:00Z' }]
         ]);
-        const me = toVrcCurrentUser({ id: 'me', username: 'me', displayName: 'Me' }, friends);
+        const me = toNexVRCurrentUser({ id: 'me', username: 'me', displayName: 'Me' }, friends);
         expect(me.friends).toEqual(['old', 'mid', 'new']);
     });
 });
 
 describe('content', () => {
     test('worlds map ids, images and player counts', () => {
-        const world = toVrcWorld(
+        const world = toNexVRWorld(
             {
                 _id: WORLD,
                 name: 'Club',
@@ -208,7 +208,7 @@ describe('content', () => {
     });
 
     test('instances get a VRChat-style location id', () => {
-        const instance = toVrcInstance({
+        const instance = toNexVRInstance({
             _id: INSTANCE,
             world: WORLD,
             type: 'private',
@@ -221,5 +221,41 @@ describe('content', () => {
         expect(parseLocation(instance.id).accessType).toBe('invite');
         expect(instance.worldId).toBe(WORLD);
         expect(instance.n_users).toBe(3);
+    });
+
+    test('public instances retain their creator and content mode separately from access', () => {
+        const instance = toNexVRInstance({
+            _id: INSTANCE,
+            world: WORLD,
+            type: 'public',
+            creator: 'owner-id',
+            creatorName: 'Owner',
+            contentMode: 'nsfw_plus',
+            region: 'ca',
+            createdAt: '2026-11-01T12:00:00Z',
+            ephemeral: true
+        });
+        expect(parseLocation(instance.id).userId).toBeNull();
+        expect(instance.creatorId).toBe('owner-id');
+        expect(instance.$nexvr).toMatchObject({
+            type: 'public',
+            creatorName: 'Owner',
+            contentMode: 'nsfw_plus',
+            region: 'ca',
+            createdAt: '2026-11-01T12:00:00Z',
+            ephemeral: true
+        });
+    });
+
+    test('group instances retain both their group and their creator', () => {
+        const instance = toNexVRInstance({
+            _id: INSTANCE,
+            world: WORLD,
+            type: 'group-public',
+            creator: 'owner-id',
+            group: 'group-id'
+        });
+        expect(instance.ownerId).toBe('group-id');
+        expect(instance.creatorId).toBe('owner-id');
     });
 });
