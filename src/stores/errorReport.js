@@ -40,7 +40,9 @@ function normalizeError(error) {
         return { message: error, stack: '' };
     }
     try {
-        return { message: JSON.stringify(error), stack: '' };
+        // undefined (e.g. Promise.reject() with no reason) doesn't serialize
+        const json = JSON.stringify(error);
+        return { message: typeof json === 'string' ? json : String(error), stack: '' };
     } catch {
         return { message: String(error), stack: '' };
     }
@@ -53,7 +55,8 @@ function normalizeError(error) {
  * @returns {string}
  */
 function scrubUserPaths(text) {
-    return text.replace(/([\\/](?:Users|home)[\\/])[^\\/\s]+/gi, '$1<user>');
+    // Usernames can contain spaces, so redact up to the next separator
+    return text.replace(/([\\/](?:Users|home)[\\/])[^\\/\n]+/gi, '$1<user>');
 }
 
 export const useErrorReportStore = defineStore('ErrorReport', () => {
@@ -70,15 +73,29 @@ export const useErrorReportStore = defineStore('ErrorReport', () => {
     /** Errors the user already dismissed this session */
     const dismissedSignatures = new Set();
 
-    const configLoaded = configRepository.getBool('Nexy_errorReportPopup', true).then((value) => {
-        errorReportPopup.value = value;
-    });
+    let configReady = false;
+    const configLoaded = configRepository
+        .getBool('Nexy_errorReportPopup', true)
+        .then((value) => {
+            errorReportPopup.value = value;
+        })
+        .catch((e) => {
+            console.error('Failed to load error report popup setting:', e);
+        })
+        .finally(() => {
+            configReady = true;
+        });
 
     /**
      * @param {unknown} error
      * @param {string} source
      */
     function reportError(error, source) {
+        if (!configReady) {
+            // Startup errors wait for the saved setting so a disabled popup stays disabled
+            configLoaded.then(() => reportError(error, source));
+            return;
+        }
         if (!errorReportPopup.value) return;
 
         const normalized = normalizeError(error);
@@ -128,7 +145,7 @@ export const useErrorReportStore = defineStore('ErrorReport', () => {
     }
 
     /**
-     * Prefilled GitHub issue, stack trimmed so the URL stays openable.
+     * Prefilled GitHub issue, stack then message trimmed so the URL stays openable.
      *
      * @returns {string}
      */
@@ -137,14 +154,14 @@ export const useErrorReportStore = defineStore('ErrorReport', () => {
         const firstLine = D.message.split('\n', 1)[0];
         const title = `[Bug] ${firstLine.length > 100 ? `${firstLine.slice(0, 97)}...` : firstLine}`;
 
-        const buildUrl = (stack) => {
+        const buildUrl = (message, stack) => {
             const body = [
                 '**Describe the bug**',
                 'What were you doing when this happened?',
                 '',
                 '**Error**',
                 '```',
-                D.message,
+                message,
                 stack,
                 '```',
                 '',
@@ -157,12 +174,27 @@ export const useErrorReportStore = defineStore('ErrorReport', () => {
         };
 
         let stackLines = D.stack.split('\n');
-        let url = buildUrl(D.stack);
+        let stack = D.stack;
+        let url = buildUrl(D.message, stack);
         while (url.length > MAX_ISSUE_URL_LENGTH && stackLines.length > 0) {
             stackLines = stackLines.slice(0, -1);
-            url = buildUrl([...stackLines, '    ...'].join('\n'));
+            stack = [...stackLines, '    ...'].join('\n');
+            url = buildUrl(D.message, stack);
         }
-        return url;
+        if (url.length <= MAX_ISSUE_URL_LENGTH) return url;
+
+        // Still too long, binary search the longest message prefix that fits
+        let low = 0;
+        let high = D.message.length;
+        while (low < high) {
+            const mid = Math.ceil((low + high) / 2);
+            if (buildUrl(`${D.message.slice(0, mid)}...`, stack).length <= MAX_ISSUE_URL_LENGTH) {
+                low = mid;
+            } else {
+                high = mid - 1;
+            }
+        }
+        return buildUrl(`${D.message.slice(0, low)}...`, stack);
     }
 
     async function setErrorReportPopup() {
