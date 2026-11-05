@@ -12,6 +12,11 @@ on:
         required: false
         type: boolean
         default: false
+      skip-macos:
+        description: Skip the macOS packages (when no macOS runners are available)
+        required: false
+        type: boolean
+        default: false
 
 concurrency:
   group: nightly
@@ -85,7 +90,57 @@ jobs:
       ref: ${{ needs.prepare.outputs.sha }}
       version: ${{ needs.prepare.outputs.version }}
       require-windows-signing: false
+      build-macos: ${{ !inputs.skip-macos }}
     secrets: inherit
+
+  macos_watchdog:
+    name: Watch macOS runner queue
+    needs: prepare
+    if: needs.prepare.outputs.skip != 'true' && !inputs.skip-macos
+    runs-on: ubuntu-24.04
+    timeout-minutes: 120
+    # Never fail the nightly on its own account.
+    continue-on-error: true
+    permissions:
+      actions: write
+    steps:
+      - name: Restart without macOS if build_macos waits too long for a runner
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          RUN_ID: ${{ github.run_id }}
+          REF: ${{ github.ref_name }}
+          QUEUE_LIMIT_MINUTES: 15
+        run: |
+          # timeout-minutes does not cover time spent queued for a runner, and macOS runners
+          # can stay unavailable for hours. Rather than hold up the whole nightly, start it
+          # again without macOS and cancel this run.
+          queued_since=""
+          while true; do
+            status="$(gh api "repos/$GH_REPO/actions/runs/$RUN_ID/jobs?per_page=100" \
+              --jq '[.jobs[] | select(.name | endswith("build_macos"))] | first | .status // ""')"
+            case "$status" in
+              completed)
+                echo "build_macos finished."
+                exit 0
+                ;;
+              queued)
+                now="$(date +%s)"
+                queued_since="${queued_since:-$now}"
+                if (( now - queued_since >= QUEUE_LIMIT_MINUTES * 60 )); then
+                  echo "::warning::build_macos waited ${QUEUE_LIMIT_MINUTES} minutes for a macOS runner; restarting the nightly without macOS."
+                  # The new run waits on the nightly concurrency group until this one is cancelled.
+                  gh workflow run nightly.yml --ref "$REF" -f skip-macos=true -f force=true
+                  gh run cancel "$RUN_ID"
+                  exit 0
+                fi
+                ;;
+              *)
+                queued_since=""
+                ;;
+            esac
+            sleep 60
+          done
 
   publish:
     name: Publish nightly prerelease
@@ -108,14 +163,17 @@ jobs:
           merge-multiple: true
 
       - name: Download macOS DMGs
+        if: ${{ !inputs.skip-macos }}
         uses: actions/download-artifact@v8
         with:
           pattern: Electron-MacDmg-*
           path: release-assets
           merge-multiple: true
 
-      - name: Verify six release packages
+      - name: Verify release packages
         shell: bash
+        env:
+          SKIP_MACOS: ${{ inputs.skip-macos || false }}
         run: |
           shopt -s nullglob
           expected=(
@@ -123,9 +181,10 @@ jobs:
             'Nexy_*_x64.zip'
             'Nexy_*_x64.AppImage'
             'Nexy_*_arm64.AppImage'
-            'Nexy_*_x64.dmg'
-            'Nexy_*_arm64.dmg'
           )
+          if [ "${SKIP_MACOS:-false}" != "true" ]; then
+            expected+=('Nexy_*_x64.dmg' 'Nexy_*_arm64.dmg')
+          fi
           for pattern in "${expected[@]}"; do
             matches=(release-assets/$pattern)
             if (( ${#matches[@]} != 1 )); then
@@ -135,7 +194,7 @@ jobs:
           done
           assets=(release-assets/*)
           if (( ${#assets[@]} != ${#expected[@]} )); then
-            echo "Expected six release assets; found ${#assets[@]}" >&2
+            echo "Expected ${#expected[@]} release assets; found ${#assets[@]}" >&2
             exit 1
           fi
 
