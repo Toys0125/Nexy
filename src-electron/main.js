@@ -23,6 +23,7 @@ const { createRendererSecurity } = require('./renderer-security');
 const { pathToFileURL } = require('node:url');
 const rendererIpc = createRendererSecurity(ipcMain);
 const { applyGpuPreferences } = require('./gpu-preferences');
+const { getDevVersion } = require('./dev-version');
 
 function dotnetSetup() {
     const bundledDotNetPath = path.join(process.resourcesPath, 'dotnet-runtime');
@@ -750,7 +751,9 @@ function getHomePath() {
 
 function getVersion() {
     try {
-        const versionFile = fs.readFileSync(path.join(rootDir, 'Version'), 'utf8').trim();
+        const versionFile =
+            (!app.isPackaged && getDevVersion(rootDir)) ||
+            fs.readFileSync(path.join(rootDir, 'Version'), 'utf8').trim();
 
         // nightly builds are stamped "v2026.11.01-nightly" and show as-is;
         // a trailing git hash "-22bcd96" is the older nightly form
