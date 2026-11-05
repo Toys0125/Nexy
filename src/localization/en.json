@@ -1205,6 +1205,10 @@
                         "header": "Self Invite Action",
                         "description": "Use self invite instead of opening the instance in NexVR."
                     },
+                    "error_report_popup": {
+                        "header": "Error Report Popup",
+                        "description": "Show a popup with a GitHub issue link when Nexy hits an unexpected error."
+                    },
                     "anonymous_error_reporting": {
                         "header": "Anonymous Error Reporting (Nightly Only)",
                         "description": "Help improve Nexy by sending anonymous crash and error reports. No personal or NexVR data is collected.",
@@ -2858,6 +2862,17 @@
             "keyword_blacklist": "Keyword Blacklist",
             "user_blacklist": "User Blacklist",
             "add_item": "Add Item"
+        },
+        "error_report": {
+            "header": "Something went wrong",
+            "description": "Nexy ran into an unexpected error. Reporting it on GitHub helps get it fixed. The issue opens in your browser so you can review it before submitting.",
+            "source": "Source",
+            "version": "Version",
+            "extra_errors": "+{count} more errors since this one",
+            "copy": "Copy Details",
+            "copied": "Error details copied to clipboard",
+            "dismiss": "Dismiss",
+            "report_on_github": "Report on GitHub"
         },
         "vrcx_updater": {
             "header": "Nexy Updater",
