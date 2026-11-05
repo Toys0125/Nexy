@@ -420,6 +420,7 @@
                 show-icon />
         </SettingsGroup>
 
+        <!-- TODO: re-enable once Nexy has its own error reporting backend
         <template v-if="branch === 'Nightly'">
             <SettingsGroup :title="t('view.settings.advanced_groups.nightly.header')">
                 <SettingsItem
@@ -430,6 +431,7 @@
                 </SettingsItem>
             </SettingsGroup>
         </template>
+        -->
 
         <RegistryBackupDialog />
         <PhotonSettings v-if="showVrchatOnlySettings && photonLoggingEnabled" />

@@ -214,11 +214,12 @@ export const useAdvancedSettingsStore = defineStore('AdvancedSettings', () => {
 
         handleSetAppLauncherSettings();
 
-        setTimeout(() => {
-            if (VRCXUpdaterStore.branch === 'Nightly' && sentryErrorReportingConfig === '') {
-                checkSentryConsent();
-            }
-        }, 2000);
+        // TODO: re-enable once Nexy has its own error reporting backend
+        // setTimeout(() => {
+        //     if (VRCXUpdaterStore.branch === 'Nightly' && sentryErrorReportingConfig === '') {
+        //         checkSentryConsent();
+        //     }
+        // }, 2000);
     }
 
     initAdvancedSettings();
