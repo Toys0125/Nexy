@@ -120,7 +120,8 @@ jobs:
           runtime-identifier: linux-arm64
 
   build_dotnet_macos:
-    runs-on: macos-latest
+    # Managed cross-build only; keeps it out of the macOS runner queue.
+    runs-on: ubuntu-latest
     needs: set_version
     steps:
       - uses: actions/checkout@v6
