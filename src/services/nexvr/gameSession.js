@@ -111,6 +111,7 @@ function ownLocation() {
     return state.state === 'online' && state.location !== 'private' ? state.location : '';
 }
 
+/** Restores or starts the caller's instance session before recording its occupants. */
 async function sync() {
     const location = useGameStore().isGameRunning ? ownLocation() : '';
     if (location === currentLocation) {
@@ -118,6 +119,12 @@ async function sync() {
             await applyOccupants(friendsInInstance());
         }
         return;
+    }
+
+    const locationStore = useLocationStore();
+    if (location && !locationStore.lastLocation.location) {
+        // A failed restore must leave the session uncommitted so the next sync retries it.
+        await tryLoadPlayerList();
     }
 
     debug('instance changed', currentLocation, '→', location);
@@ -131,11 +138,6 @@ async function sync() {
         return;
     }
 
-    const locationStore = useLocationStore();
-    if (!locationStore.lastLocation.location) {
-        // Restore the previous session before deciding whether this is a new location.
-        await tryLoadPlayerList();
-    }
     if (locationStore.lastLocation.location === location) {
         // restored from the database after a restart: carry on with that list
         currentSessionStart = locationStore.lastLocation.date || Date.now();

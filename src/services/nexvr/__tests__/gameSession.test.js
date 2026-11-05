@@ -65,7 +65,10 @@ describe('NexVR game session', () => {
         location.lastLocation = { location: '', playerList: new Map() };
     });
 
-    afterEach(() => stop?.());
+    afterEach(() => {
+        stop?.();
+        vi.restoreAllMocks();
+    });
 
     test('logs the instance and the friends in it, then the occupant feed', async () => {
         realtime.friends = new Map([
@@ -209,5 +212,27 @@ describe('NexVR game session', () => {
         await flush();
         expect(restorePlayerList).toHaveBeenCalledOnce();
         expect(entries).toEqual([]);
+    });
+
+    test('retries a failed history read before logging the location and its occupants', async () => {
+        const error = new Error('history read failed');
+        const syncError = vi.spyOn(console, 'error').mockImplementation(() => {});
+        restorePlayerList.mockRejectedValueOnce(error);
+        realtime.friends = new Map([['me', presence('me', 'i1')]]);
+        stop = startGameSession();
+        await flush();
+        expect(syncError).toHaveBeenCalledWith('NexVR session sync failed:', error);
+        expect(entries).toEqual([]);
+
+        realtime.emit('instanceModeration', {
+            instanceId: 'i1',
+            moderation: { occupants: [{ userId: 'stranger', displayName: 'Stranger' }] }
+        });
+        await flush();
+        expect(entries).toEqual([]);
+
+        await setFriends([presence('me', 'i1'), presence('a', 'i1')]);
+        expect(restorePlayerList).toHaveBeenCalledTimes(2);
+        expect(summary()).toEqual(['location:w1:i1~region(ca)', 'player-joined:me', 'player-joined:a']);
     });
 });
