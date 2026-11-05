@@ -464,6 +464,7 @@
      * @param userId
      */
     async function getUserGroups(userId) {
+        const requestId = ++userDialog.value.groupsRequestId;
         exitEditModeCurrentUserGroups();
         userDialog.value.isGroupsLoading = true;
         userDialog.value.userGroups = {
@@ -472,55 +473,68 @@
             mutualGroups: [],
             remainingGroups: []
         };
-        const args = await groupRequest.getGroups({ userId });
-        handleGroupList(args);
-        if (userId !== userDialog.value.id) {
-            userDialog.value.isGroupsLoading = false;
-            return;
-        }
-        if (userId === currentUser.value.id) {
-            // update current user groups
-            currentUserGroups.value.clear();
-            args.json.forEach((group) => {
-                const ref = applyGroup(group);
-                if (!currentUserGroups.value.has(group.id)) {
-                    currentUserGroups.value.set(group.id, ref);
-                }
-            });
-
-            saveCurrentUserGroups();
-        }
-        userDialog.value.userGroups.groups = args.json;
-        for (let i = 0; i < args.json.length; ++i) {
-            const group = args.json[i];
-            if (!group?.id) {
-                console.error('getUserGroups, group ID is missing', group);
-                continue;
+        try {
+            const args = await groupRequest.getGroups({ userId });
+            // A newer request owns the lists now, even one for this same user, so
+            // a stale response must not touch them or the shared group caches
+            if (requestId !== userDialog.value.groupsRequestId) {
+                return;
             }
-            if (group.ownerId === userId) {
-                userDialog.value.userGroups.ownGroups.unshift(group);
+            if (userId !== userDialog.value.id) {
+                return;
             }
+            handleGroupList(args);
             if (userId === currentUser.value.id) {
-                // skip mutual groups for current user
-                if (group.ownerId !== userId) {
+                // update current user groups
+                currentUserGroups.value.clear();
+                args.json.forEach((group) => {
+                    const ref = applyGroup(group);
+                    if (!currentUserGroups.value.has(group.id)) {
+                        currentUserGroups.value.set(group.id, ref);
+                    }
+                });
+
+                saveCurrentUserGroups();
+            }
+            userDialog.value.userGroups.groups = args.json;
+            for (let i = 0; i < args.json.length; ++i) {
+                const group = args.json[i];
+                if (!group?.id) {
+                    console.error('getUserGroups, group ID is missing', group);
+                    continue;
+                }
+                if (group.ownerId === userId) {
+                    userDialog.value.userGroups.ownGroups.unshift(group);
+                }
+                if (userId === currentUser.value.id) {
+                    // skip mutual groups for current user
+                    if (group.ownerId !== userId) {
+                        userDialog.value.userGroups.remainingGroups.unshift(group);
+                    }
+                    continue;
+                }
+                if (group.mutualGroup) {
+                    userDialog.value.userGroups.mutualGroups.unshift(group);
+                }
+                if (!group.mutualGroup && group.ownerId !== userId) {
                     userDialog.value.userGroups.remainingGroups.unshift(group);
                 }
-                continue;
             }
-            if (group.mutualGroup) {
-                userDialog.value.userGroups.mutualGroups.unshift(group);
+            if (userId === currentUser.value.id) {
+                userDialog.value.groupSorting = userDialogGroupSortingOptions.inGame;
+            } else if (userDialog.value.groupSorting.value === userDialogGroupSortingOptions.inGame.value) {
+                userDialog.value.groupSorting = userDialogGroupSortingOptions.alphabetical;
             }
-            if (!group.mutualGroup && group.ownerId !== userId) {
-                userDialog.value.userGroups.remainingGroups.unshift(group);
+            await sortCurrentUserGroups();
+        } catch (err) {
+            // Callers do not await this, so a failure must not escape as an
+            // unhandled rejection; the refresh button retries the request
+            console.error('getUserGroups', err);
+        } finally {
+            if (requestId === userDialog.value.groupsRequestId) {
+                userDialog.value.isGroupsLoading = false;
             }
         }
-        if (userId === currentUser.value.id) {
-            userDialog.value.groupSorting = userDialogGroupSortingOptions.inGame;
-        } else if (userDialog.value.groupSorting.value === userDialogGroupSortingOptions.inGame.value) {
-            userDialog.value.groupSorting = userDialogGroupSortingOptions.alphabetical;
-        }
-        await sortCurrentUserGroups();
-        userDialog.value.isGroupsLoading = false;
     }
 
     /**
@@ -557,6 +571,11 @@
             case 'inGame':
                 sortMethod = sortGroupsByInGame;
                 await updateInGameGroupOrder();
+                // Another user's groups may have loaded and been sorted
+                // another way meanwhile; leave them to that sort
+                if (D.groupSorting.value !== 'inGame') {
+                    return;
+                }
                 break;
         }
 
