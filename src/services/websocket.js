@@ -23,6 +23,7 @@ import { request } from './request';
 import { runUpdateFriendFlow } from '../coordinators/friendPresenceCoordinator';
 import { runSetCurrentUserLocationFlow } from '../coordinators/locationCoordinator';
 import { watchState } from './watchState';
+import { createWebSocketMessageRate } from './websocketMetrics';
 
 import * as workerTimers from 'worker-timers';
 
@@ -41,13 +42,15 @@ const refreshOwnedItems = debounce(() => useUserStore().getAllProductPurchases()
 /**
  * Reactive WebSocket state for status bar telemetry.
  * - connected: whether the WS is currently open
- * - messageCount: total messages received (used for rate delta)
+ * - messageCount: total messages received
  */
 export const wsState = reactive({
     connected: false,
     messageCount: 0,
     bytesReceived: 0
 });
+
+export const wsMessageRate = createWebSocketMessageRate();
 
 export function initWebsocket() {
     if (!watchState.isFriendsLoaded || realtimeAttached) {
@@ -86,6 +89,7 @@ async function connectWebSocket(token) {
         realtime.on('friends', handleRealtimeFriends),
         realtime.on('notifications', handleRealtimeNotifications),
         realtime.on('message', (bytes) => {
+            wsMessageRate.record();
             wsState.messageCount++;
             wsState.bytesReceived += bytes;
         }),

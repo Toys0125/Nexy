@@ -359,11 +359,11 @@
     import { HoverCard, HoverCardContent, HoverCardTrigger } from '@/components/ui/hover-card';
     import { formatSeconds, timeToText } from '@/shared/utils';
     import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-    import { useIntervalFn, useNow } from '@vueuse/core';
+    import { useEventListener, useIntervalFn, useNow } from '@vueuse/core';
     import { TooltipWrapper } from '@/components/ui/tooltip';
     import { useI18n } from 'vue-i18n';
     import { openExternalLink } from '@/shared/utils/appActions';
-    import { wsState } from '@/services/websocket';
+    import { wsMessageRate, wsState } from '@/services/websocket';
 
     import dayjs from 'dayjs';
     import timezone from 'dayjs/plugin/timezone';
@@ -459,32 +459,25 @@
 
     // --- WebSocket message rate + sparkline ---
 
-    const GRAPH_POINTS = 60;
     const WS_CANVAS_WIDTH = 48;
     const WS_CANVAS_HEIGHT = 12;
-    const msgHistory = ref(new Array(GRAPH_POINTS).fill(0));
-    const msgsLastMinute = ref(0);
-    let lastMsgCount = wsState.messageCount;
+    const msgHistory = ref(wsMessageRate.getHistory());
 
     const wsCanvasRef = ref(null);
     const now = useNow({ scheduler: (cb) => useIntervalFn(cb, 1000) });
 
-    useIntervalFn(() => {
-        const delta = wsState.messageCount - lastMsgCount;
-        lastMsgCount = wsState.messageCount;
-
-        const arr = msgHistory.value;
-        arr.shift();
-        arr.push(delta);
-        msgHistory.value = arr;
-
-        // Sum of messages in the last 60 seconds
-        msgsLastMinute.value = arr.reduce((a, b) => a + b, 0);
-
+    function updateMessageRate() {
+        // Expire samples by receipt time even when this timer was throttled.
+        msgHistory.value = wsMessageRate.getHistory();
         drawSparkline();
-    }, 1000);
+    }
 
-    const msgsPerMinuteAvg = computed(() => Math.round(msgsLastMinute.value));
+    useIntervalFn(updateMessageRate, 1000);
+    useEventListener(document, 'visibilitychange', () => {
+        if (document.visibilityState === 'visible') updateMessageRate();
+    });
+
+    const msgsPerMinuteAvg = computed(() => msgHistory.value.reduce((sum, count) => sum + count, 0));
 
     function drawSparkline() {
         const canvas = wsCanvasRef.value;
