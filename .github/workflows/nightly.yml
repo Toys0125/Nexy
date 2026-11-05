@@ -53,7 +53,19 @@ jobs:
             echo "skip=false" >> "$GITHUB_OUTPUT"
           fi
 
-  # ... builds job stays the same ...
+    builds:
+    name: Build Nexy nightly packages
+    needs: prepare
+    if: needs.prepare.outputs.skip != 'true'
+    permissions:
+      contents: read
+      id-token: write
+    uses: ./.github/workflows/github_actions.yml
+    with:
+      ref: ${{ needs.prepare.outputs.sha }}
+      version: ${{ needs.prepare.outputs.version }}
+      require-windows-signing: false
+    secrets: inherit
 
   publish:
     name: Publish nightly prerelease
