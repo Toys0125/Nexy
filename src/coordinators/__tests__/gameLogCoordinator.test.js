@@ -1,10 +1,17 @@
 const mocks = vi.hoisted(() => ({
-    database: { getGamelogDatabase: vi.fn() },
+    database: { getGamelogDatabase: vi.fn(), addGamelogJoinLeaveToDatabase: vi.fn() },
     isGameRunning: vi.fn(),
     userRequest: { getUser: vi.fn(), getPublicProfile: vi.fn() },
     game: { isGameRunning: true },
-    user: { cachedUsers: new Map(), cachedProfiles: new Map(), applyUserDialogLocation: vi.fn() },
-    friend: { friends: new Map() },
+    user: {
+        currentUser: { id: 'self' },
+        cachedUsers: new Map(),
+        cachedProfiles: new Map(),
+        applyUserDialogLocation: vi.fn()
+    },
+    friend: { friends: new Map(), updateFriendLastSeen: vi.fn() },
+    gameLog: { state: { lastLocationAvatarList: new Map() } },
+    photon: { photonLobbyAvatars: new Map() },
     instance: {
         updateCurrentInstanceWorld: vi.fn(),
         getCurrentInstanceUserList: vi.fn(),
@@ -39,19 +46,19 @@ vi.mock('../../stores/settings/advanced', () => ({ useAdvancedSettingsStore: () 
 vi.mock('../../stores/friend', () => ({ useFriendStore: () => mocks.friend }));
 vi.mock('../../stores/gallery', () => ({ useGalleryStore: () => ({}) }));
 vi.mock('../../stores/game', () => ({ useGameStore: () => mocks.game }));
-vi.mock('../../stores/gameLog', () => ({ useGameLogStore: () => ({}) }));
+vi.mock('../../stores/gameLog', () => ({ useGameLogStore: () => mocks.gameLog }));
 vi.mock('../../stores/settings/general', () => ({ useGeneralSettingsStore: () => ({}) }));
 vi.mock('../../stores/instance', () => ({ useInstanceStore: () => mocks.instance }));
 vi.mock('../../stores/modal', () => ({ useModalStore: () => ({}) }));
 vi.mock('../../stores/notification', () => ({ useNotificationStore: () => ({}) }));
-vi.mock('../../stores/photon', () => ({ usePhotonStore: () => ({}) }));
+vi.mock('../../stores/photon', () => ({ usePhotonStore: () => mocks.photon }));
 vi.mock('../../stores/sharedFeed', () => ({ useSharedFeedStore: () => ({}) }));
 vi.mock('../../stores/user', () => ({ useUserStore: () => mocks.user }));
 vi.mock('../../stores/vr', () => ({ useVrStore: () => mocks.vr }));
 vi.mock('../../stores/vrcx', () => ({ useVrcxStore: () => ({}) }));
 vi.mock('../../services/config', () => ({ default: {} }));
 
-import { tryLoadPlayerList } from '../gameLogCoordinator';
+import { addGameLogEntry, tryLoadPlayerList } from '../gameLogCoordinator';
 import { reactive } from 'vue';
 import { createPinia, setActivePinia } from 'pinia';
 import { useLocationStore } from '../../stores/location';
@@ -78,6 +85,15 @@ beforeEach(() => {
 });
 
 afterEach(() => vi.unstubAllGlobals());
+
+test('tracks the current user without logging their own join or leave', async () => {
+    const dt = '2026-11-05T22:33:45.000Z';
+    await addGameLogEntry({ type: 'player-joined', userId: 'self', displayName: 'Me', dt }, 'world:instance');
+    expect(locationStore.lastLocation.playerList.has('self')).toBe(true);
+    await addGameLogEntry({ type: 'player-left', userId: 'self', displayName: 'Me', dt }, 'world:instance');
+    expect(locationStore.lastLocation.playerList.has('self')).toBe(false);
+    expect(mocks.database.addGamelogJoinLeaveToDatabase).not.toHaveBeenCalled();
+});
 
 test('startup does not restore a VRChat session imported by an older build', async () => {
     mocks.database.getGamelogDatabase.mockResolvedValue([

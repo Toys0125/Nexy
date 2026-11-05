@@ -150,6 +150,12 @@ describe('getGameLogCreatedAtTs', () => {
 });
 
 describe('compareGameLogRows', () => {
+    test('places the new location above previous players leaving at the same time', () => {
+        const location = { created_at: 1000, type: 'Location', rowId: 1 };
+        const left = { created_at: 1000, type: 'OnPlayerLeft', rowId: 100 };
+        expect(compareGameLogRows(location, left)).toBeLessThan(0);
+        expect(compareGameLogRows(left, location)).toBeGreaterThan(0);
+    });
     test('sorts by timestamp descending (newest first)', () => {
         const a = { created_at: 2000 };
         const b = { created_at: 1000 };
