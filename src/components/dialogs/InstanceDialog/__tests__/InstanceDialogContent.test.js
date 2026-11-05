@@ -16,7 +16,7 @@ const instance = {
     userCount: 0,
     capacity: 32,
     active: true,
-    $nexvr: { detailsFetched: true, contentMode: 'nsfw_plus', creatorName: 'Iris', ephemeral: true, region: 'ca' }
+    $nexvr: { detailsFetched: true, contentMode: 'nsfw_plus', creatorName: 'Nexy', ephemeral: true, region: 'ca' }
 };
 
 /** Mount visible dialog controls with real translations and configurable instance data. */
@@ -63,7 +63,7 @@ describe('InstanceDialogContent', () => {
     });
     it('shows the creator separately from the world author and group owner', () => {
         const wrapper = render();
-        expect(wrapper.text()).toContain('Iris');
+        expect(wrapper.text()).toContain('Nexy');
         expect(wrapper.text()).toContain('World Author');
         expect(wrapper.text()).toContain('ERP');
         expect(wrapper.text()).toContain('0 / 32');
@@ -97,7 +97,7 @@ describe('InstanceDialogContent', () => {
                 .findAll('button')
                 .find((button) => button.text().includes(text))
                 .trigger('click');
-        await click('Iris');
+        await click('Nexy');
         await click('View world');
         await click('Join instance');
         await click('Copy link');
