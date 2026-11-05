@@ -20,6 +20,7 @@ const avatarModerationReq = {
         });
     },
 
+    // Not available on NexVR: the shim answers 501
     sendAvatarModeration(
         params: CreateAvatarModerationRequest
     ): Promise<{ json: Json<AvatarModerationCreated>; params: CreateAvatarModerationRequest }> {
@@ -35,6 +36,7 @@ const avatarModerationReq = {
         });
     },
 
+    // Not available on NexVR: the shim answers 501
     deleteAvatarModeration(
         params: DeleteGlobalAvatarModeration['query']
     ): Promise<{ json: Json<OkStatus2>; params: DeleteGlobalAvatarModeration['query'] }> {

@@ -40,6 +40,7 @@ const worldReq = {
             return args;
         });
     },
+    // Not available on NexVR: the shim answers 501
     deleteWorld(params: { worldId: string }): Promise<{ json: Json<World>; params }> {
         return request(`worlds/${params.worldId}`, {
             method: 'DELETE'
@@ -52,6 +53,7 @@ const worldReq = {
         });
     },
 
+    // Not available on NexVR: the shim answers 501
     saveWorld(
         params: UpdateWorldRequest & { id: string }
     ): Promise<{ json: Json<World>; params: UpdateWorldRequest & { id: string } }> {
@@ -74,6 +76,7 @@ const worldReq = {
         });
     },
 
+    // Not available on NexVR: the shim answers 501
     publishWorld(params: { worldId: string }): Promise<{ json: unknown; params }> {
         return request(`worlds/${params.worldId}/publish`, {
             method: 'PUT',
@@ -94,6 +97,7 @@ const worldReq = {
         });
     },
 
+    // Not available on NexVR: the shim answers 501
     unpublishWorld(params: { worldId: string }): Promise<{ json: unknown; params }> {
         return request(`worlds/${params.worldId}/publish`, {
             method: 'DELETE',
@@ -114,6 +118,7 @@ const worldReq = {
         });
     },
 
+    // Not available on NexVR: the shim answers 501
     uploadWorldImage(imageData: string): Promise<{ json: Json<File>; params: { tag: string } }> {
         const params = {
             tag: 'worldimage'

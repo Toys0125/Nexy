@@ -15,6 +15,7 @@ const playerModerationReq = {
     },
 
     // old-way: POST auth/user/blocks {blocked:userId}
+    // Not available on NexVR: the shim answers 501
     sendPlayerModeration(
         params: ModerateUserRequest
     ): Promise<{ json: Json<PlayerModeration>; params: ModerateUserRequest }> {
@@ -31,6 +32,7 @@ const playerModerationReq = {
     },
 
     // old-way: PUT auth/user/unblocks {blocked:userId}
+    // Not available on NexVR: the shim answers 501
     deletePlayerModeration(params: ModerateUserRequest): Promise<{ json: Json<Success>; params: ModerateUserRequest }> {
         return request('auth/user/unplayermoderate', {
             method: 'PUT',
@@ -44,6 +46,7 @@ const playerModerationReq = {
         });
     },
 
+    // Not available on NexVR: the shim answers 501
     deletePlayerModerations(
         params: Pick<ModerateUserRequest, 'type'>
     ): Promise<{ json: Json<Success>; params: Pick<ModerateUserRequest, 'type'> }> {
