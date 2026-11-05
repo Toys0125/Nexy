@@ -214,6 +214,41 @@ describe('NexVR game session', () => {
         expect(entries).toEqual([]);
     });
 
+    test.each(['game stops', 'location changes'])('discards restored history when the %s', async (change) => {
+        let finishRestore;
+        restorePlayerList.mockImplementationOnce(
+            () =>
+                new Promise((resolve) => {
+                    finishRestore = resolve;
+                })
+        );
+        realtime.friends = new Map([['me', presence('me', 'i1')]]);
+        stop = startGameSession();
+        await flush();
+        expect(restorePlayerList).toHaveBeenCalledOnce();
+        expect(entries).toEqual([]);
+
+        if (change === 'game stops') {
+            game.isGameRunning = false;
+            await flush();
+        } else {
+            await setFriends([presence('me', 'i2')]);
+        }
+        finishRestore();
+        await flush();
+
+        if (change === 'game stops') {
+            expect(entries).toEqual([]);
+            expect(realtime.watchedInstances).toEqual([]);
+            game.isGameRunning = true;
+            await flush();
+            expect(summary()).toEqual(['location:w1:i1~region(ca)', 'player-joined:me']);
+        } else {
+            expect(summary()).toEqual(['location:w1:i2~region(ca)', 'player-joined:me']);
+            expect(realtime.watchedInstances).toEqual(['i2']);
+        }
+    });
+
     test('retries a failed history read before logging the location and its occupants', async () => {
         const error = new Error('history read failed');
         const syncError = vi.spyOn(console, 'error').mockImplementation(() => {});
