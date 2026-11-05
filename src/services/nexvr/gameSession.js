@@ -125,6 +125,9 @@ async function sync() {
     if (location && !locationStore.lastLocation.location) {
         // A failed restore must leave the session uncommitted so the next sync retries it.
         await tryLoadPlayerList();
+        if (!useGameStore().isGameRunning || ownLocation() !== location) {
+            return;
+        }
     }
 
     debug('instance changed', currentLocation, '→', location);
