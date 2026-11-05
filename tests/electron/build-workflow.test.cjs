@@ -81,10 +81,11 @@ test('release verifiers accept all six assets and reject missing, duplicate, or 
         for (const file of ['nightly.yml', 'release.yml']) {
             const config = yaml.load(workflow(file));
             const steps = (config.jobs.publish || config.jobs.attach).steps;
-            const script = steps.find((step) => step.name === 'Verify six release packages').run;
-            const run = () => {
+            const script = steps.find((step) => /^Verify (six )?release packages$/.test(step.name)).run;
+            const run = (env = {}) => {
                 const result = spawnSync(bash, ['--noprofile', '--norc', '-c', script], {
                     cwd: root,
+                    env: { ...process.env, ...env },
                     encoding: 'utf8',
                     windowsHide: true
                 });
@@ -104,12 +105,38 @@ test('release verifiers accept all six assets and reject missing, duplicate, or 
             fs.writeFileSync(unexpected, 'unexpected');
             assert.notEqual(run().status, 0, 'Unexpected seventh file passed');
             fs.unlinkSync(unexpected);
+            if (file === 'nightly.yml') {
+                assert.notEqual(run({ SKIP_MACOS: 'true' }).status, 0, 'DMGs passed with macOS skipped');
+                for (const name of names.slice(4)) fs.renameSync(path.join(assets, name), path.join(root, name));
+                const withoutMac = run({ SKIP_MACOS: 'true' });
+                assert.equal(withoutMac.status, 0, withoutMac.stderr);
+                assert.notEqual(run().status, 0, 'Missing DMGs passed without skipping macOS');
+                for (const name of names.slice(4)) fs.renameSync(path.join(root, name), path.join(assets, name));
+            }
         }
     } finally {
         for (const file of fs.readdirSync(assets)) fs.unlinkSync(path.join(assets, file));
         fs.rmdirSync(assets);
         fs.rmdirSync(root);
     }
+});
+
+test('nightly can skip macOS and restarts without it when macOS runners stay unavailable', () => {
+    const nightly = yaml.load(workflow('nightly.yml'));
+    const build = yaml.load(workflow('github_actions.yml'));
+    assert.equal(nightly.on.workflow_dispatch.inputs['skip-macos'].default, false);
+    assert.equal(nightly.jobs.builds.with['build-macos'], '${{ !inputs.skip-macos }}');
+    assert.equal(build.on.workflow_call.inputs['build-macos'].default, true);
+    for (const job of ['build_dotnet_macos', 'build_macos']) {
+        assert.equal(build.jobs[job].if, 'inputs.build-macos != false');
+    }
+    assert.equal(build.jobs.build_macos['timeout-minutes'], 15);
+    const download = nightly.jobs.publish.steps.find((step) => step.with?.pattern === 'Electron-MacDmg-*');
+    assert.match(download.if, /!inputs.skip-macos/);
+    const watchdog = nightly.jobs.macos_watchdog;
+    assert.equal(watchdog['continue-on-error'], true);
+    assert.equal(watchdog.permissions.actions, 'write');
+    assert.match(watchdog.steps[0].run, /gh workflow run nightly\.yml .*-f skip-macos=true/);
 });
 
 test('published Windows releases require signing and verification before upload', () => {
