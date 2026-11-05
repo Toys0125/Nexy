@@ -126,7 +126,10 @@ test('nightly can skip macOS and restarts without it when macOS runners stay una
     const build = yaml.load(workflow('github_actions.yml'));
     assert.equal(nightly.on.workflow_dispatch.inputs['skip-macos'].default, false);
     assert.equal(nightly.jobs.builds.with['build-macos'], '${{ !inputs.skip-macos }}');
-    assert.equal(build.on.workflow_call.inputs['build-macos'].default, true);
+    // A missing input compares equal to false, so direct dispatches must declare it too.
+    for (const trigger of ['workflow_call', 'workflow_dispatch']) {
+        assert.equal(build.on[trigger].inputs['build-macos'].default, true);
+    }
     for (const job of ['build_dotnet_macos', 'build_macos']) {
         assert.equal(build.jobs[job].if, 'inputs.build-macos != false');
     }
