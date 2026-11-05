@@ -703,7 +703,7 @@ const gameLog = {
                 }
                 gamelogDatabase.push(row);
             },
-            `SELECT ${baseColumns} FROM (${selects.join(' UNION ALL ')}) ORDER BY created_at DESC, id DESC LIMIT @limit`,
+            `SELECT ${baseColumns} FROM (${selects.join(' UNION ALL ')}) ORDER BY created_at DESC, CASE WHEN type = 'Location' THEN 0 WHEN type = 'OnPlayerLeft' THEN 1 ELSE 2 END, id DESC LIMIT @limit`,
             args
         );
         return gamelogDatabase;
@@ -906,7 +906,7 @@ const gameLog = {
                 }
                 gamelogDatabase.push(row);
             },
-            `SELECT ${baseColumns} FROM (${selects.join(' UNION ALL ')}) ORDER BY created_at DESC, id DESC LIMIT @limit`,
+            `SELECT ${baseColumns} FROM (${selects.join(' UNION ALL ')}) ORDER BY created_at DESC, CASE WHEN type = 'Location' THEN 0 WHEN type = 'OnPlayerLeft' THEN 1 ELSE 2 END, id DESC LIMIT @limit`,
             args
         );
         return gamelogDatabase;
@@ -1125,7 +1125,7 @@ const gameLog = {
                 }
                 gamelogDatabase.push(row);
             },
-            `SELECT ${baseColumns} FROM (${selects.join(' UNION ALL ')}) ORDER BY created_at DESC, id DESC LIMIT @limit`,
+            `SELECT ${baseColumns} FROM (${selects.join(' UNION ALL ')}) ORDER BY created_at DESC, CASE WHEN type = 'Location' THEN 0 WHEN type = 'OnPlayerLeft' THEN 1 ELSE 2 END, id DESC LIMIT @limit`,
             args
         );
         return gamelogDatabase;

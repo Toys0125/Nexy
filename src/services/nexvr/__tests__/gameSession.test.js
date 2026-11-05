@@ -1,11 +1,13 @@
 import { nextTick, reactive } from 'vue';
 
 const entries = [];
+const restorePlayerList = vi.fn();
 const game = reactive({ isGameRunning: true });
 const location = reactive({ lastLocation: { location: '', playerList: new Map() } });
 
 vi.mock('../../appConfig', () => ({ AppDebug: { debugGameLog: false, websocketDomain: '' } }));
 vi.mock('../../../coordinators/gameLogCoordinator', () => ({
+    tryLoadPlayerList: (...args) => restorePlayerList(...args),
     addGameLogEntry: vi.fn(async (entry) => {
         entries.push(entry);
     })
@@ -56,6 +58,7 @@ describe('NexVR game session', () => {
 
     beforeEach(() => {
         entries.length = 0;
+        restorePlayerList.mockReset();
         realtime.userId = 'me';
         realtime.watchedInstances = [];
         game.isGameRunning = true;
@@ -89,7 +92,7 @@ describe('NexVR game session', () => {
         });
         await flush();
         expect(summary().slice(3)).toEqual(['player-joined:x']);
-        expect(entries[3].dt).toBe('2026-10-31T00:00:00.000Z');
+        expect(Date.parse(entries[3].dt)).toBe(Date.parse(entries[0].dt) + 1);
 
         realtime.emit('instanceModeration', {
             instanceId: 'i1',
@@ -102,6 +105,38 @@ describe('NexVR game session', () => {
         });
         await flush();
         expect(summary().slice(4)).toEqual(['player-left:a']);
+    });
+
+    test('discards an old occupant frame queued behind an instance change', async () => {
+        realtime.friends = new Map([['me', presence('me', 'i1')]]);
+        stop = startGameSession();
+        await flush();
+        realtime.friends = new Map([['me', presence('me', 'i2')]]);
+        realtime.emit('friends', { snapshot: false, changed: [], removed: [] });
+        realtime.emit('instanceModeration', {
+            instanceId: 'i1',
+            moderation: { occupants: [{ userId: 'stale', displayName: 'Stale' }] }
+        });
+        await flush();
+        expect(entries.some((entry) => entry.userId === 'stale')).toBe(false);
+    });
+
+    test('keeps a reported join time after the local instance start', async () => {
+        realtime.friends = new Map([['me', presence('me', 'i1')]]);
+        stop = startGameSession();
+        await flush();
+        const joinedAt = new Date(Date.parse(entries[0].dt) + 5000).toISOString();
+        realtime.emit('instanceModeration', {
+            instanceId: 'i1',
+            moderation: {
+                occupants: [
+                    { userId: 'me', displayName: 'ME' },
+                    { userId: 'a', displayName: 'A', joinedAt }
+                ]
+            }
+        });
+        await flush();
+        expect(entries.find((entry) => entry.userId === 'a').dt).toBe(joinedAt);
     });
 
     test('without an occupant feed, friends coming and going are the player list', async () => {
@@ -159,5 +194,20 @@ describe('NexVR game session', () => {
         stop = startGameSession();
         await flush();
         expect(summary()).toEqual(['player-joined:a']);
+    });
+
+    test('waits for history restoration before deciding whether a location is new', async () => {
+        restorePlayerList.mockImplementation(async () => {
+            location.lastLocation = {
+                location: 'w1:i1~region(ca)',
+                date: Date.now() - 10000,
+                playerList: new Map([['me', { displayName: 'ME' }]])
+            };
+        });
+        realtime.friends = new Map([['me', presence('me', 'i1')]]);
+        stop = startGameSession();
+        await flush();
+        expect(restorePlayerList).toHaveBeenCalledOnce();
+        expect(entries).toEqual([]);
     });
 });
