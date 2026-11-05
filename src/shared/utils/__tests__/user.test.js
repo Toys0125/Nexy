@@ -417,9 +417,9 @@ describe('User Utils', () => {
         });
 
         test('returns their initial when user has no image fields', () => {
-            const user = { displayName: 'iris' };
+            const user = { displayName: 'nexy' };
             expect(userImage(user, false, '128', false, false)).toBe(defaultUserImage(user));
-            expect(decodeURIComponent(defaultUserImage(user))).toContain('>I</text>');
+            expect(decodeURIComponent(defaultUserImage(user))).toContain('>N</text>');
         });
     });
 
