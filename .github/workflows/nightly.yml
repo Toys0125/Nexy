@@ -1,3 +1,25 @@
+name: Nightly
+
+on:
+  schedule:
+    # runs twice a day, once at midnight UTC and second time at midday UTC
+    - cron: '0 00 * * *'
+    - cron: '0 12 * * *'
+  workflow_dispatch:
+    inputs:
+      force:
+        description: Build even if master has not changed since the last nightly
+        required: false
+        type: boolean
+        default: false
+
+concurrency:
+  group: nightly
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
 jobs:
   prepare:
     name: Prepare nightly
@@ -7,7 +29,7 @@ jobs:
       sha: ${{ steps.check.outputs.sha }}
       version: ${{ steps.check.outputs.version }}
       tag: ${{ steps.check.outputs.tag }}
-      previous_tag: ${{ steps.check.outputs.previous_tag }}   # ← new
+      previous_tag: ${{ steps.check.outputs.previous_tag }}
     steps:
       - name: Check for changes since last nightly
         id: check
@@ -19,10 +41,22 @@ jobs:
           SCHEDULE: ${{ github.event.schedule }}
           TZ: Europe/Helsinki
         run: |
-          # ... (schedule check stays the same) ...
+          # Only the schedule entry matching Helsinki's current UTC offset builds.
+          if [ "$EVENT" = "schedule" ]; then
+            offset="$(date +%z)"
+            expected_hour="\( (( (24 - 10# \){offset:1:2}) % 24 ))"
+            if [ "$SCHEDULE" != "0 ${expected_hour} * * *" ]; then
+              echo "Schedule '\( {SCHEDULE}' is not midnight in Helsinki (UTC \)(date +%:z)); skipping."
+              echo "skip=true" >> "$GITHUB_OUTPUT"
+              exit 0
+            fi
+          fi
 
           sha="$(gh api "repos/$GH_REPO/commits/master" --jq '.sha')"
 
+          # Base version dated in Helsinki time. If that exact tag already exists
+          # (forced re-run or second build the same day), append -2, -3, ... so the
+          # previous nightly is kept instead of being overwritten.
           base_version="v$(date +%Y.%m.%d)-nightly"
           version="$base_version"
           n=2
@@ -38,7 +72,7 @@ jobs:
 
           last_tag="$(gh release list --limit 100 --json tagName,isPrerelease,createdAt \
             --jq '[.[] | select(.isPrerelease and (.tagName | endswith("-nightly") or (.tagName | test("-nightly-[0-9]+$"))))] | sort_by(.createdAt) | last | .tagName // ""')"
-          echo "previous_tag=${last_tag}" >> "$GITHUB_OUTPUT"   # ← new
+          echo "previous_tag=${last_tag}" >> "$GITHUB_OUTPUT"
 
           last_sha=""
           if [ -n "$last_tag" ]; then
@@ -53,7 +87,7 @@ jobs:
             echo "skip=false" >> "$GITHUB_OUTPUT"
           fi
 
-    builds:
+  builds:
     name: Build Nexy nightly packages
     needs: prepare
     if: needs.prepare.outputs.skip != 'true'
@@ -74,7 +108,50 @@ jobs:
     permissions:
       contents: write
     steps:
-      # ... download + verify steps stay the same ...
+      - name: Extract Windows Electron installer and portable ZIP
+        uses: actions/download-artifact@v8
+        with:
+          name: Electron-Windows-x64
+          path: release-assets
+
+      - name: Download Linux AppImages
+        uses: actions/download-artifact@v8
+        with:
+          pattern: Electron-AppImage-*
+          path: release-assets
+          merge-multiple: true
+
+      - name: Download macOS DMGs
+        uses: actions/download-artifact@v8
+        with:
+          pattern: Electron-MacDmg-*
+          path: release-assets
+          merge-multiple: true
+
+      - name: Verify six release packages
+        shell: bash
+        run: |
+          shopt -s nullglob
+          expected=(
+            'Nexy_*_Setup_x64.exe'
+            'Nexy_*_x64.zip'
+            'Nexy_*_x64.AppImage'
+            'Nexy_*_arm64.AppImage'
+            'Nexy_*_x64.dmg'
+            'Nexy_*_arm64.dmg'
+          )
+          for pattern in "${expected[@]}"; do
+            matches=(release-assets/$pattern)
+            if (( ${#matches[@]} != 1 )); then
+              echo "Expected one release asset matching $pattern; found ${#matches[@]}" >&2
+              exit 1
+            fi
+          done
+          assets=(release-assets/*)
+          if (( ${#assets[@]} != ${#expected[@]} )); then
+            echo "Expected six release assets; found ${#assets[@]}" >&2
+            exit 1
+          fi
 
       - name: Create nightly prerelease
         env:
