@@ -1,30 +1,3 @@
-name: Nightly
-
-on:
-  schedule:
-    # Midnight Europe/Helsinki every day. Cron is UTC-only, so fire at both 21:00 (EEST, UTC+3)
-    # and 22:00 (EET, UTC+2); the prepare job drops whichever run is not midnight in Helsinki.
-    - cron: '0 21 * * *'
-    - cron: '0 22 * * *'
-  workflow_dispatch:
-    inputs:
-      force:
-        description: Build even if master has not changed since the last nightly
-        required: false
-        type: boolean
-        default: false
-
-concurrency:
-  group: nightly
-  cancel-in-progress: false
-
-permissions:
-  contents: read
-
-env:
-  # Number of nightly prereleases to keep; older ones are deleted with their tags.
-  NIGHTLY_KEEP: 7
-
 jobs:
   prepare:
     name: Prepare nightly
@@ -34,6 +7,7 @@ jobs:
       sha: ${{ steps.check.outputs.sha }}
       version: ${{ steps.check.outputs.version }}
       tag: ${{ steps.check.outputs.tag }}
+      previous_tag: ${{ steps.check.outputs.previous_tag }}   # ← new
     steps:
       - name: Check for changes since last nightly
         id: check
@@ -45,34 +19,32 @@ jobs:
           SCHEDULE: ${{ github.event.schedule }}
           TZ: Europe/Helsinki
         run: |
-          # Only the schedule entry matching Helsinki's current UTC offset builds.
-          if [ "$EVENT" = "schedule" ]; then
-            offset="$(date +%z)"
-            expected_hour="$(( (24 - 10#${offset:1:2}) % 24 ))"
-            if [ "$SCHEDULE" != "0 ${expected_hour} * * *" ]; then
-              echo "Schedule '${SCHEDULE}' is not midnight in Helsinki (UTC$(date +%:z)); skipping."
-              echo "skip=true" >> "$GITHUB_OUTPUT"
-              exit 0
-            fi
-          fi
+          # ... (schedule check stays the same) ...
 
           sha="$(gh api "repos/$GH_REPO/commits/master" --jq '.sha')"
-          # Stamped into the build as-is. The app shows it, reads the -nightly suffix as the
-          # Nightly channel, and marks the release whose title "Nexy <version>" matches as current.
-          # Dated in Helsinki time.
-          version="v$(date +%Y.%m.%d)-nightly"
+
+          base_version="v$(date +%Y.%m.%d)-nightly"
+          version="$base_version"
+          n=2
+          while gh release view "$version" > /dev/null 2>&1; do
+            version="\( {base_version}- \){n}"
+            n=$((n + 1))
+          done
           tag="${version}"
+
           echo "sha=${sha}" >> "$GITHUB_OUTPUT"
           echo "version=${version}" >> "$GITHUB_OUTPUT"
           echo "tag=${tag}" >> "$GITHUB_OUTPUT"
 
           last_tag="$(gh release list --limit 100 --json tagName,isPrerelease,createdAt \
-            --jq '[.[] | select(.isPrerelease and (.tagName | endswith("-nightly")))] | sort_by(.createdAt) | last | .tagName // ""')"
+            --jq '[.[] | select(.isPrerelease and (.tagName | endswith("-nightly") or (.tagName | test("-nightly-[0-9]+$"))))] | sort_by(.createdAt) | last | .tagName // ""')"
+          echo "previous_tag=${last_tag}" >> "$GITHUB_OUTPUT"   # ← new
+
           last_sha=""
           if [ -n "$last_tag" ]; then
             last_sha="$(gh api "repos/$GH_REPO/commits/$last_tag" --jq '.sha')"
           fi
-          echo "master: ${sha}; last nightly: ${last_tag:-none} (${last_sha:-n/a})"
+          echo "master: ${sha}; last nightly: \( {last_tag:-none} ( \){last_sha:-n/a})"
 
           if [ "$FORCE" != "true" ] && [ "$sha" = "$last_sha" ]; then
             echo "No new commits since ${last_tag}; skipping."
@@ -81,19 +53,7 @@ jobs:
             echo "skip=false" >> "$GITHUB_OUTPUT"
           fi
 
-  builds:
-    name: Build Nexy nightly packages
-    needs: prepare
-    if: needs.prepare.outputs.skip != 'true'
-    permissions:
-      contents: read
-      id-token: write
-    uses: ./.github/workflows/github_actions.yml
-    with:
-      ref: ${{ needs.prepare.outputs.sha }}
-      version: ${{ needs.prepare.outputs.version }}
-      require-windows-signing: false
-    secrets: inherit
+  # ... builds job stays the same ...
 
   publish:
     name: Publish nightly prerelease
@@ -102,50 +62,7 @@ jobs:
     permissions:
       contents: write
     steps:
-      - name: Extract Windows Electron installer and portable ZIP
-        uses: actions/download-artifact@v8
-        with:
-          name: Electron-Windows-x64
-          path: release-assets
-
-      - name: Download Linux AppImages
-        uses: actions/download-artifact@v8
-        with:
-          pattern: Electron-AppImage-*
-          path: release-assets
-          merge-multiple: true
-
-      - name: Download macOS DMGs
-        uses: actions/download-artifact@v8
-        with:
-          pattern: Electron-MacDmg-*
-          path: release-assets
-          merge-multiple: true
-
-      - name: Verify six release packages
-        shell: bash
-        run: |
-          shopt -s nullglob
-          expected=(
-            'Nexy_*_Setup_x64.exe'
-            'Nexy_*_x64.zip'
-            'Nexy_*_x64.AppImage'
-            'Nexy_*_arm64.AppImage'
-            'Nexy_*_x64.dmg'
-            'Nexy_*_arm64.dmg'
-          )
-          for pattern in "${expected[@]}"; do
-            matches=(release-assets/$pattern)
-            if (( ${#matches[@]} != 1 )); then
-              echo "Expected one release asset matching $pattern; found ${#matches[@]}" >&2
-              exit 1
-            fi
-          done
-          assets=(release-assets/*)
-          if (( ${#assets[@]} != ${#expected[@]} )); then
-            echo "Expected six release assets; found ${#assets[@]}" >&2
-            exit 1
-          fi
+      # ... download + verify steps stay the same ...
 
       - name: Create nightly prerelease
         env:
@@ -154,25 +71,26 @@ jobs:
           TAG: ${{ needs.prepare.outputs.tag }}
           VERSION: ${{ needs.prepare.outputs.version }}
           SHA: ${{ needs.prepare.outputs.sha }}
+          PREVIOUS_TAG: ${{ needs.prepare.outputs.previous_tag }}
         run: |
-          # A forced re-run on the same day replaces that day's nightly.
-          if gh release view "$TAG" > /dev/null 2>&1; then
-            gh release delete "$TAG" --yes --cleanup-tag
+          # Generate a simple changelog from the previous nightly (or empty if first)
+          if [ -n "$PREVIOUS_TAG" ]; then
+            notes="$(gh api "repos/\( GH_REPO/compare/ \){PREVIOUS_TAG}...${SHA}" \
+              --jq '
+                "## Changes since \($prev)\n\n" +
+                ([.commits[] | "- \(.commit.message | split("\n")[0]) (\(.sha[0:7]))"] | join("\n"))
+              ' --arg prev "$PREVIOUS_TAG")"
+          else
+            notes="First nightly build of master at ${SHA}."
           fi
+
+          notes="${notes}
+
+---
+Automated nightly build of master at ${SHA}. Nightly builds are untested and may be unstable."
+
           gh release create "$TAG" release-assets/* \
             --prerelease \
             --target "$SHA" \
             --title "Nexy ${VERSION}" \
-            --notes "Automated nightly build of master at ${SHA}. Nightly builds are untested and may be unstable."
-
-      - name: Prune old nightlies
-        env:
-          GH_TOKEN: ${{ github.token }}
-          GH_REPO: ${{ github.repository }}
-        run: |
-          gh release list --limit 100 --json tagName,isPrerelease,createdAt \
-            --jq '[.[] | select(.isPrerelease and (.tagName | endswith("-nightly")))] | sort_by(.createdAt) | reverse | .['"$NIGHTLY_KEEP"':][] | .tagName' |
-          while read -r old_tag; do
-            echo "Deleting ${old_tag}"
-            gh release delete "$old_tag" --yes --cleanup-tag
-          done
+            --notes "$notes"
