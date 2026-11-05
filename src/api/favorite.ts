@@ -58,6 +58,7 @@ const favoriteReq = {
         });
     },
 
+    // Not available on NexVR: the shim answers 501
     addFavorite(params: {
         type: string;
         favoriteId: string;
@@ -77,6 +78,7 @@ const favoriteReq = {
         });
     },
 
+    // Not available on NexVR: the shim answers 501
     deleteFavorite(params: { objectId: string }): Promise<{ json: Json<Success>; params }> {
         return request(`favorites/${params.objectId}`, {
             method: 'DELETE'
@@ -106,6 +108,7 @@ const favoriteReq = {
         });
     },
 
+    // Not available on NexVR: the shim answers 501
     saveFavoriteGroup(params: UpdateFavoriteGroupRequest & { type: string; group: string }): Promise<{
         json: Json<UpdateFavoriteGroupResponse>;
         params: UpdateFavoriteGroupRequest & { type: string; group: string };
@@ -123,6 +126,7 @@ const favoriteReq = {
         });
     },
 
+    // Not available on NexVR: the shim answers 501
     clearFavoriteGroup(params: { type: string; group: string }): Promise<{ json: Json<Success>; params }> {
         return request(`favorite/group/${params.type}/${params.group}/${getCurrentUserId()}`, {
             method: 'DELETE',
@@ -153,6 +157,7 @@ const favoriteReq = {
         });
     },
 
+    // Not available on NexVR: the shim answers 501
     getFavoriteAvatars(
         params: GetFavoritedAvatars['query']
     ): Promise<{ json: Json<Avatar[]>; params: GetFavoritedAvatars['query'] }> {

@@ -15,6 +15,7 @@ function refetchActiveGalleryQueries() {
 }
 
 const VRCPlusIconsReq = {
+    // Not available on NexVR: the shim answers 501
     getFileList(params: GetFiles['query']): Promise<{ json: Json<File[]>; params: GetFiles['query'] }> {
         return request('files', {
             method: 'GET',
@@ -28,6 +29,7 @@ const VRCPlusIconsReq = {
         });
     },
 
+    // Not available on NexVR: the shim answers 501
     deleteFile(fileId: string): Promise<{ json: Json<File>; fileId: string }> {
         return request(`file/${fileId}`, {
             method: 'DELETE'
@@ -41,6 +43,7 @@ const VRCPlusIconsReq = {
         });
     },
 
+    // Not available on NexVR: the shim answers 501
     uploadVRCPlusIcon(imageData: string): Promise<{ json: Json<File>; params: { tag: string } }> {
         const params = {
             tag: 'icon'

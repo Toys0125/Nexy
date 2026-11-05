@@ -8,7 +8,8 @@ const MAX_ISSUE_URL_LENGTH = 7500;
 
 // Network/disk noise that isn't actionable as a bug report.
 // Status codes match as whole numbers so "array length 1500" isn't dropped.
-const IGNORED_STATUS_CODES = /\b(?:401|403|404|500|503)\b/;
+// 501 is NexVR answering for endpoints it doesn't implement, nothing to fix client-side.
+const IGNORED_STATUS_CODES = /\b(?:401|403|404|500|501|503)\b/;
 const IGNORED_MESSAGES = [
     'No such host is known',
     'The SSL connection could not be established',

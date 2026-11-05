@@ -46,6 +46,12 @@ describe('useErrorReportStore', () => {
         expect(store.errorReportDialog.visible).toBe(false);
     });
 
+    test('ignores 501 from endpoints NexVR does not implement', async () => {
+        const store = await createStore();
+        store.reportError(new Error('Request failed with status 501'), 'unhandledrejection');
+        expect(store.errorReportDialog.visible).toBe(false);
+    });
+
     test('only ignores status codes as whole numbers', async () => {
         const store = await createStore();
         store.reportError(new RangeError('Invalid array length 1500'), 'window.onerror');

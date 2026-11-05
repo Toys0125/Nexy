@@ -80,6 +80,7 @@ function refetchActiveGroupScope(groupId) {
         });
 }
 const groupReq = {
+    // Not available on NexVR: the shim answers 501
     setGroupRepresentation(groupId: string, params: UpdateGroupRepresentation['body']) {
         return request(`groups/${groupId}/representation`, {
             method: 'PUT',
@@ -95,6 +96,7 @@ const groupReq = {
         });
     },
 
+    // Not available on NexVR: the shim answers 501
     cancelGroupRequest(params: { groupId: string }): Promise<{ json: unknown; params }> {
         return request(`groups/${params.groupId}/requests`, {
             method: 'DELETE'
@@ -159,6 +161,7 @@ const groupReq = {
         });
     },
 
+    // Not available on NexVR: the shim answers 501
     checkTransferGroup(
         params: { groupId: string } & GetGroupTransferability['query']
     ): Promise<{ json: Json<GroupTransferable>; params: { groupId: string } & GetGroupTransferability['query'] }> {
@@ -176,6 +179,7 @@ const groupReq = {
         });
     },
 
+    // Not available on NexVR: the shim answers 501
     transferGroup(
         params: { groupId: string } & TransferGroupRequest
     ): Promise<{ json: Json<Success>; params: { groupId: string } & TransferGroupRequest }> {
@@ -194,6 +198,7 @@ const groupReq = {
         });
     },
 
+    // Not available on NexVR: the shim answers 501
     deleteGroup(
         params: { groupId: string } & DeleteGroup['query']
     ): Promise<{ json: Json<Success>; params: { groupId: string } & DeleteGroup['query'] }> {
@@ -247,6 +252,7 @@ const groupReq = {
             return args;
         });
     },
+    // Not available on NexVR: the shim answers 501
     setGroupMemberProps(
         userId: string,
         groupId: string,
@@ -266,6 +272,7 @@ const groupReq = {
             return args;
         });
     },
+    // Not available on NexVR: the shim answers 501
     addGroupMemberRole(params: {
         userId: string;
         groupId: string;
@@ -282,6 +289,7 @@ const groupReq = {
             return args;
         });
     },
+    // Not available on NexVR: the shim answers 501
     removeGroupMemberRole(params: {
         userId: string;
         groupId: string;
@@ -298,6 +306,7 @@ const groupReq = {
             return args;
         });
     },
+    // Not available on NexVR: the shim answers 501
     getGroupPermissions(params: {
         userId: string;
     }): Promise<{ json: Json<UserAllGroupPermissions>; params: { userId: string } }> {
@@ -325,6 +334,7 @@ const groupReq = {
             return args;
         });
     },
+    // Not available on NexVR: the shim answers 501
     editGroupPost(params: { groupId: string; postId: string } & Partial<CreateGroupPostRequest>): Promise<{
         json: Json<GroupPost>;
         params: { groupId: string; postId: string } & Partial<CreateGroupPostRequest>;
@@ -399,6 +409,7 @@ const groupReq = {
         });
     },
 
+    // Not available on NexVR: the shim answers 501
     getMyGroupsByStatus(params: {
         membershipStatus: 'invited' | 'requested' | 'userblocked';
     }): Promise<{ json: Json<Group[]>; params }> {
@@ -413,6 +424,7 @@ const groupReq = {
         });
     },
 
+    // Not available on NexVR: the shim answers 501
     blockGroup(params: { groupId: string }): Promise<{ json: Json<Success>; params }> {
         return request(`groups/${params.groupId}/block`, {
             method: 'POST'
@@ -425,6 +437,7 @@ const groupReq = {
             return args;
         });
     },
+    // Not available on NexVR: the shim answers 501
     unblockGroup(params: { groupId: string; userId: string }): Promise<{ json: Json<Success>; params }> {
         return request(`groups/${params.groupId}/members/${params.userId}`, {
             method: 'DELETE'
@@ -437,6 +450,7 @@ const groupReq = {
             return args;
         });
     },
+    // Not available on NexVR: the shim answers 501
     declineGroupInvite(params: { groupId: string }): Promise<{ json: Json<Success>; params }> {
         return request(`groups/${params.groupId}/members/${getCurrentUserId()}`, {
             method: 'DELETE'
@@ -448,6 +462,7 @@ const groupReq = {
             return args;
         });
     },
+    // Not available on NexVR: the shim answers 501
     sendGroupInvite(
         params: { groupId: string } & CreateGroupInviteRequest
     ): Promise<{ json: Json<Success>; params: { groupId: string } & CreateGroupInviteRequest }> {
@@ -464,6 +479,7 @@ const groupReq = {
             return args;
         });
     },
+    // Not available on NexVR: the shim answers 501
     kickGroupMember(params: { groupId: string; userId: string }): Promise<{ json: Json<Success>; params }> {
         return request(`groups/${params.groupId}/members/${params.userId}`, {
             method: 'DELETE'
@@ -476,6 +492,7 @@ const groupReq = {
             return args;
         });
     },
+    // Not available on NexVR: the shim answers 501
     banGroupMember(
         params: { groupId: string } & BanGroupMemberRequest
     ): Promise<{ json: Json<GroupMember>; params: { groupId: string } & BanGroupMemberRequest }> {
@@ -493,6 +510,7 @@ const groupReq = {
             return args;
         });
     },
+    // Not available on NexVR: the shim answers 501
     unbanGroupMember(params: {
         groupId: string;
         userId: string;
@@ -508,6 +526,7 @@ const groupReq = {
             return args;
         });
     },
+    // Not available on NexVR: the shim answers 501
     deleteSentGroupInvite(params: { groupId: string; userId: string }): Promise<{ json: Json<Success>; params }> {
         return request(`groups/${params.groupId}/invites/${params.userId}`, {
             method: 'DELETE'
@@ -519,6 +538,7 @@ const groupReq = {
             return args;
         });
     },
+    // Not available on NexVR: the shim answers 501
     deleteBlockedGroupRequest(params: {
         groupId: string;
         userId: string;
@@ -533,6 +553,7 @@ const groupReq = {
             return args;
         });
     },
+    // Not available on NexVR: the shim answers 501
     acceptGroupInviteRequest(params: {
         groupId: string;
         userId: string;
@@ -551,6 +572,7 @@ const groupReq = {
             return args;
         });
     },
+    // Not available on NexVR: the shim answers 501
     rejectGroupInviteRequest(params: {
         groupId: string;
         userId: string;
@@ -569,6 +591,7 @@ const groupReq = {
             return args;
         });
     },
+    // Not available on NexVR: the shim answers 501
     blockGroupInviteRequest(params: {
         groupId: string;
         userId: string;
@@ -588,6 +611,7 @@ const groupReq = {
             return args;
         });
     },
+    // Not available on NexVR: the shim answers 501
     getGroupBans(
         params: { groupId: string } & GetGroupBans['query']
     ): Promise<{ json: Json<GroupMember[]>; params: { groupId: string } & GetGroupBans['query'] }> {
@@ -602,6 +626,7 @@ const groupReq = {
             return args;
         });
     },
+    // Not available on NexVR: the shim answers 501
     getGroupAuditLogTypes(params: { groupId: string }): Promise<{ json: Json<GroupAuditLogEntryType[]>; params }> {
         return request(`groups/${params.groupId}/auditLogTypes`, {
             method: 'GET'
@@ -613,6 +638,7 @@ const groupReq = {
             return args;
         });
     },
+    // Not available on NexVR: the shim answers 501
     getGroupLogs(params: { groupId: string; n: number; offset: number; eventTypes?: string[] }): Promise<{
         json: Json<PaginatedGroupAuditLogEntryList>;
         params: { groupId: string; n: number; offset: number; eventTypes?: string[] };
@@ -628,6 +654,7 @@ const groupReq = {
             return args;
         });
     },
+    // Not available on NexVR: the shim answers 501
     getGroupInvites(
         params: { groupId: string } & GetGroupInvites['query']
     ): Promise<{ json: Json<GroupMember[]>; params: { groupId: string } & GetGroupInvites['query'] }> {
@@ -642,6 +669,7 @@ const groupReq = {
             return args;
         });
     },
+    // Not available on NexVR: the shim answers 501
     getGroupJoinRequests(
         params: { groupId: string } & GetGroupRequests['query']
     ): Promise<{ json: Json<GroupMember[]>; params: { groupId: string } & GetGroupRequests['query'] }> {
@@ -669,6 +697,7 @@ const groupReq = {
             return args;
         });
     },
+    // Not available on NexVR: the shim answers 501
     getGroupRoles(params: { groupId: string }): Promise<{ json: Json<GroupRole[]>; params }> {
         return request(`groups/${params.groupId}/roles`, {
             method: 'GET',
@@ -682,6 +711,7 @@ const groupReq = {
         });
     },
 
+    // Not available on NexVR: the shim answers 501
     createGroupRole(
         params: { groupId: string } & CreateGroupRoleRequest & {
                 isAddedOnJoin?: boolean;
@@ -710,6 +740,7 @@ const groupReq = {
         });
     },
 
+    // Not available on NexVR: the shim answers 501
     editGroupRole(
         params: { groupId: string; roleId: string } & UpdateGroupRoleRequest & {
                 isAddedOnJoin?: boolean;
@@ -738,6 +769,7 @@ const groupReq = {
         });
     },
 
+    // Not available on NexVR: the shim answers 501
     deleteGroupRole(params: { groupId: string; roleId: string }): Promise<{ json: Json<GroupRole[]>; params }> {
         return request(`groups/${params.groupId}/roles/${params.roleId}`, {
             method: 'DELETE'
@@ -751,6 +783,7 @@ const groupReq = {
         });
     },
 
+    // Not available on NexVR: the shim answers 501
     getGroupPermissionList(params: { groupId: string }): Promise<{ json: Json<GroupPermission[]>; params }> {
         return request(`groups/${params.groupId}/permissions`, {
             method: 'GET'
@@ -786,6 +819,7 @@ const groupReq = {
             return args;
         });
     },
+    // Not available on NexVR: the shim answers 501
     getGroupGallery(params: { groupId: string; galleryId: string } & GetGroupGalleryImages['query']): Promise<{
         json: Json<GetGroupGalleryImagesResponse>;
         params: { groupId: string; galleryId: string } & GetGroupGalleryImages['query'];
@@ -805,6 +839,7 @@ const groupReq = {
         });
     },
 
+    // Not available on NexVR: the shim answers 501
     createGroupGallery(params: { groupId: string } & CreateGroupGalleryRequest): Promise<{
         json: Json<GroupGallery>;
         params: { groupId: string } & CreateGroupGalleryRequest;
@@ -823,6 +858,7 @@ const groupReq = {
         });
     },
 
+    // Not available on NexVR: the shim answers 501
     deleteGroupGallery(params: {
         groupId: string;
         galleryId: string;
@@ -839,6 +875,7 @@ const groupReq = {
         });
     },
 
+    // Not available on NexVR: the shim answers 501
     editGroupGallery(params: { groupId: string; galleryId: string } & UpdateGroupGalleryRequest): Promise<{
         json: Json<GroupGallery>;
         params: { groupId: string; galleryId: string } & UpdateGroupGalleryRequest;
@@ -857,6 +894,7 @@ const groupReq = {
         });
     },
 
+    // Not available on NexVR: the shim answers 501
     addGroupGalleryImage(params: { groupId: string; galleryId: string } & AddGroupGalleryImageRequest): Promise<{
         json: Json<GroupGalleryImage>;
         params: { groupId: string; galleryId: string } & AddGroupGalleryImageRequest;
@@ -876,6 +914,7 @@ const groupReq = {
         });
     },
 
+    // Not available on NexVR: the shim answers 501
     deleteGroupGalleryImage(params: {
         groupId: string;
         galleryId: string;
@@ -925,6 +964,7 @@ const groupReq = {
             return args;
         });
     },
+    // Not available on NexVR: the shim answers 501
     getGroupCalendars(params: Json<GetCalendarEvents['query']>): Promise<Json<PaginatedCalendarEventList>> {
         return request('calendar', {
             method: 'GET',

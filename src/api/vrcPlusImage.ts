@@ -19,6 +19,7 @@ function refetchActiveGalleryQueries() {
         });
 }
 const vrcPlusImageReq = {
+    // Not available on NexVR: the shim answers 501
     uploadGalleryImage(imageData: string): Promise<{ json: Json<File>; params: { tag: string } }> {
         const params = {
             tag: 'gallery'
@@ -38,6 +39,7 @@ const vrcPlusImageReq = {
         });
     },
 
+    // Not available on NexVR: the shim answers 501
     uploadSticker(
         imageData: string,
         params: Omit<NonNullable<UploadImage['body']>, 'file'>
@@ -57,6 +59,7 @@ const vrcPlusImageReq = {
         });
     },
 
+    // Not available on NexVR: the shim answers 501
     getPrints(params: { n?: number }): Promise<{ json: Json<Print[]>; params: { n?: number } }> {
         return request(`prints/user/${getCurrentUserId()}`, {
             method: 'GET',
@@ -70,6 +73,7 @@ const vrcPlusImageReq = {
         });
     },
 
+    // Not available on NexVR: the shim answers 501
     deletePrint(printId: string): Promise<{ json: unknown; printId: string }> {
         return request(`prints/${printId}`, {
             method: 'DELETE'
@@ -83,6 +87,7 @@ const vrcPlusImageReq = {
         });
     },
 
+    // Not available on NexVR: the shim answers 501
     uploadPrint(
         imageData: string,
         cropWhiteBorder: boolean,
@@ -103,6 +108,7 @@ const vrcPlusImageReq = {
         });
     },
 
+    // Not available on NexVR: the shim answers 501
     getPrint(params: { printId: string }): Promise<{ json: Json<Print>; params: { printId: string } }> {
         return request(`prints/${params.printId}`, {
             method: 'GET'
@@ -115,6 +121,7 @@ const vrcPlusImageReq = {
         });
     },
 
+    // Not available on NexVR: the shim answers 501
     uploadEmoji(
         imageData: string,
         params: Omit<NonNullable<UploadImage['body']>, 'file'>

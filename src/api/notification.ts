@@ -86,6 +86,7 @@ const notificationReq = {
             return args;
         });
     },
+    // Not available on NexVR: the shim answers 501
     sendInvitePhoto(
         params: InviteRequest & { worldId?: string; worldName?: string; rsvp?: boolean },
         receiverUserId: string
@@ -129,6 +130,7 @@ const notificationReq = {
         });
     },
 
+    // Not available on NexVR: the shim answers 501
     sendRequestInvitePhoto(
         params: RequestInviteRequest & { platform?: string },
         receiverUserId: string
@@ -151,6 +153,7 @@ const notificationReq = {
         });
     },
 
+    // Not available on NexVR: the shim answers 501
     sendInviteResponse(
         params: InviteResponse,
         inviteId: string
@@ -168,6 +171,7 @@ const notificationReq = {
         });
     },
 
+    // Not available on NexVR: the shim answers 501
     sendInviteResponsePhoto(
         params: InviteResponse,
         inviteId: string
@@ -223,6 +227,7 @@ const notificationReq = {
         });
     },
 
+    // Not available on NexVR: the shim answers 501
     seeNotificationV2(params: { notificationId: string }): Promise<{ json: Json<NotificationV2>; params }> {
         return request(`notifications/${params.notificationId}/see`, {
             method: 'POST'
@@ -235,6 +240,7 @@ const notificationReq = {
         });
     },
 
+    // Not available on NexVR: the shim answers 501
     sendNotificationResponse(
         params: { notificationId: string } & RespondNotificationV2Request
     ): Promise<{ json: string; params: { notificationId: string } & RespondNotificationV2Request }> {
@@ -250,6 +256,7 @@ const notificationReq = {
         });
     },
 
+    // Not available on NexVR: the shim answers 501
     hideNotificationV2(notificationId: string): Promise<{ json: Json<Success>; params: { notificationId: string } }> {
         return request(`notifications/${notificationId}`, {
             method: 'DELETE'

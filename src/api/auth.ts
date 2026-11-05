@@ -65,6 +65,7 @@ const loginReq = {
         });
     },
 
+    // Not available on NexVR: the shim answers 501
     getDeviceCode(): Promise<{
         json: { deviceCode: string; verificationUrlComplete: string; interval: number; expiresIn: number };
     }> {
@@ -78,6 +79,7 @@ const loginReq = {
         });
     },
 
+    // Not available on NexVR: the shim answers 501
     getDeviceStatus(params: {
         deviceCode: string;
     }): Promise<{ json: { user?: object }; params: { deviceCode: string } }> {
@@ -93,6 +95,7 @@ const loginReq = {
         });
     },
 
+    // Not available on NexVR: the shim answers 501
     resetPassword(params: { email: string }): Promise<{ json: Json<Success>; params: { email: string } }> {
         return request('auth/password', {
             method: 'PUT',
