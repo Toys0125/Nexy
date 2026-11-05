@@ -225,6 +225,10 @@ export const useUserStore = defineStore('User', () => {
         isFavoriteWorldsLoading: false,
         isAvatarsLoading: false,
         isGroupsLoading: false,
+        // Kept here, not in the tabs, so they survive the dialog remounting
+        groupsRequestId: 0,
+        worldsRequestId: 0,
+        worldsRequestUserId: null,
         userFavoriteWorlds: [],
         userGroups: {
             groups: [],

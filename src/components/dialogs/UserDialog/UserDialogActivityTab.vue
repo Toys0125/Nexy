@@ -289,6 +289,8 @@
     const worldStore = useWorldStore();
 
     const isLoading = ref(false);
+    let loadingUserId = null;
+    let loadInvocationId = 0;
     const currentRangeDays = ref(30);
     const cachedSessions = ref([]);
     const filteredEventCount = ref(0);
@@ -351,7 +353,7 @@
     const ACTIVITY_SELF_TOP_WORLDS_SORT_KEY = 'VRCX_activitySelfTopWorldsSortBy';
     const ACTIVITY_SELF_EXCLUDE_HOME_WORLD_KEY = 'VRCX_activitySelfExcludeHomeWorld';
 
-    async function applySettingsAndRefresh() {
+    async function applySettingsAndRefresh(invocationId) {
         isRestoringSettings.value = true;
         const [sortBy, excludeHomeWorld, overlapExcludeEnabled, overlapExcludeStart, overlapExcludeEnd] =
             await Promise.all([
@@ -361,17 +363,31 @@
                 configRepository.getString('VRCX_overlapExcludeStart', '1'),
                 configRepository.getString('VRCX_overlapExcludeEnd', '6')
             ]);
+        // A newer load started while the settings were read; it restores them
+        // and refreshes, so this one must not touch them or the restoring flag
+        if (invocationId !== loadInvocationId) {
+            return;
+        }
         topWorldsSortBy.value = ['time', 'count'].includes(sortBy) ? sortBy : 'count';
         excludeHomeWorldEnabled.value = excludeHomeWorld;
         excludeHoursEnabled.value = overlapExcludeEnabled;
         excludeStartHour.value = String(overlapExcludeStart);
         excludeEndHour.value = String(overlapExcludeEnd);
         await nextTick();
+        if (invocationId !== loadInvocationId) {
+            return;
+        }
         isRestoringSettings.value = false;
         await refreshData();
     }
 
     function resetActivityState() {
+        // Requests still in flight belong to the previous user; advancing the
+        // ids makes them discard their responses instead of passing the guards
+        // again if the dialog comes back to that user before they return
+        ++userActivity.value.activeRequestId;
+        ++userActivity.value.activeOverlapRequestId;
+        ++userActivity.value.activeTopWorldsRequestId;
         isLoading.value = false;
         filteredEventCount.value = 0;
         peakDayText.value = '';
@@ -520,6 +536,7 @@
 
         const requestId = ++userActivity.value.activeRequestId;
         const overlapRequestId = ++userActivity.value.activeOverlapRequestId;
+        loadingUserId = userId;
         if (!silent) {
             isLoading.value = true;
         }
@@ -552,6 +569,11 @@
             if (isSelf.value) {
                 currentRangeDays.value = rangeDays;
                 const cache = await activityStore.getCache(userId, true);
+                // A stale request must not start a top-worlds load, which would
+                // supersede the newer request's one and leave its spinner on
+                if (requestId !== userActivity.value.activeRequestId || userDialog.value.id !== userId) {
+                    return;
+                }
                 cachedSessions.value = cache.sessions || [];
             }
 
@@ -860,11 +882,13 @@
         }
         if (userId !== userActivity.value.lastLoadedUserId) {
             resetActivityState();
-        } else if (isLoading.value || filteredEventCount.value > 0) {
+        } else if ((isLoading.value && loadingUserId === userId) || filteredEventCount.value > 0) {
+            // A pending load for another user is discarded once it returns,
+            // so only one for this user counts as already loading
             return;
         }
 
-        await applySettingsAndRefresh();
+        await applySettingsAndRefresh(++loadInvocationId);
     }
 
     watch(
@@ -919,6 +943,9 @@
     );
 
     onBeforeUnmount(() => {
+        // A settings load still pending must not call refreshData, which would
+        // advance the shared request ids and supersede the remounted tab's load
+        ++loadInvocationId;
         clearTimeout(easterEggTimer);
         clearTimeout(topWorldsLoadingTimer);
         clearOverlapLoadingTimer();
