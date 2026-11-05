@@ -1,7 +1,12 @@
 name: Build Nexy
 
 on:
-  workflow_dispatch: {}
+  workflow_dispatch:
+    inputs:
+      build-macos:
+        description: Build the macOS packages
+        type: boolean
+        default: true
   workflow_call:
     inputs:
       ref:
