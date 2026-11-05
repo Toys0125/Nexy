@@ -6,13 +6,10 @@ import configRepository from '../services/config';
 const NEW_ISSUE_URL = 'https://github.com/valzzu/Nexy/issues/new';
 const MAX_ISSUE_URL_LENGTH = 7500;
 
-// Network/disk noise that isn't actionable as a bug report
+// Network/disk noise that isn't actionable as a bug report.
+// Status codes match as whole numbers so "array length 1500" isn't dropped.
+const IGNORED_STATUS_CODES = /\b(?:401|403|404|500|503)\b/;
 const IGNORED_MESSAGES = [
-    '401',
-    '403',
-    '404',
-    '500',
-    '503',
     'No such host is known',
     'The SSL connection could not be established',
     'A connection attempt failed',
@@ -101,7 +98,13 @@ export const useErrorReportStore = defineStore('ErrorReport', () => {
         const normalized = normalizeError(error);
         const message = scrubUserPaths(normalized.message);
         const stack = scrubUserPaths(normalized.stack);
-        if (!message || IGNORED_MESSAGES.some((ignored) => message.includes(ignored))) return;
+        if (
+            !message ||
+            IGNORED_STATUS_CODES.test(message) ||
+            IGNORED_MESSAGES.some((ignored) => message.includes(ignored))
+        ) {
+            return;
+        }
 
         const signature = `${message}\n${stack.split('\n', 1)[0]}`;
         if (dismissedSignatures.has(signature)) return;

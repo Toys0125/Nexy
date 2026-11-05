@@ -46,6 +46,12 @@ describe('useErrorReportStore', () => {
         expect(store.errorReportDialog.visible).toBe(false);
     });
 
+    test('only ignores status codes as whole numbers', async () => {
+        const store = await createStore();
+        store.reportError(new RangeError('Invalid array length 1500'), 'window.onerror');
+        expect(store.errorReportDialog.visible).toBe(true);
+    });
+
     test('does not reshow a dismissed error', async () => {
         const store = await createStore();
         const error = new Error('boom');
