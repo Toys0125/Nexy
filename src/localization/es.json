@@ -97,8 +97,7 @@
             },
             "world": {
                 "header": "Mundo",
-                "category": "Buscar por categoría",
-                "community_lab": "Incluir laboratorios comunitarios"
+                "category": "Buscar por categoría"
             },
             "avatar": {
                 "header": "Avatar",

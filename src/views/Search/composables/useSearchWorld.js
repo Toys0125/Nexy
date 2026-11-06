@@ -23,7 +23,6 @@ export function useSearchWorld() {
     const { cachedConfig } = storeToRefs(useAuthStore());
 
     const searchWorldOption = ref('');
-    const searchWorldLabs = ref(false);
     const searchWorldParams = ref(createDefaultSearchWorldParams());
     const searchWorldCategoryIndex = ref(null);
     const searchWorldResults = ref([]);
@@ -86,13 +85,6 @@ export function useSearchWorld() {
         if (ref.tag) {
             params.tag = ref.tag;
         }
-        if (!searchWorldLabs.value) {
-            if (params.tag) {
-                params.tag += ',system_approved';
-            } else {
-                params.tag = 'system_approved';
-            }
-        }
         // TODO: option.platform
         searchWorldParams.value = params;
         moreSearchWorld();
@@ -144,7 +136,6 @@ export function useSearchWorld() {
 
     return {
         searchWorldOption,
-        searchWorldLabs,
         searchWorldParams,
         searchWorldCategoryIndex,
         searchWorldResults,

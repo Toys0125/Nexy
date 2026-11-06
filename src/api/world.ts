@@ -22,7 +22,8 @@ const worldReq = {
         option?: string
     ): Promise<{ json: Json<LimitedWorld[]>; params: SearchWorlds['query']; option?: string }> {
         let endpoint = 'worlds';
-        if (typeof option !== 'undefined') {
+        // search passes '' for a plain search; 'worlds/' would match no shim route
+        if (option) {
             endpoint = `worlds/${option}`;
         }
         return request(endpoint, {

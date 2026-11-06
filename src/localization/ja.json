@@ -330,8 +330,7 @@
             },
             "world": {
                 "header": "ワールド",
-                "category": "カテゴリで検索",
-                "community_lab": "コミュニティ ラボを表示"
+                "category": "カテゴリで検索"
             },
             "avatar": {
                 "header": "アバター",

@@ -350,8 +350,7 @@
             },
             "world": {
                 "header": "World",
-                "category": "Search by category",
-                "community_lab": "Include community labs"
+                "category": "Search by category"
             },
             "avatar": {
                 "header": "Avatar",
