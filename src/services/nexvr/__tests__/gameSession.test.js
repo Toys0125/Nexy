@@ -261,13 +261,17 @@ describe('NexVR game session', () => {
             restorePlayerList.mockReturnValueOnce(restoration);
             realtime.friends = new Map([['me', presence('me', 'i1')]]);
             stop = startGameSession();
+            let canRestore;
             if (when === 'during history restoration') {
                 await flush();
                 expect(restorePlayerList).toHaveBeenCalledOnce();
+                canRestore = restorePlayerList.mock.calls[0][0];
+                expect(canRestore()).toBe(true);
                 // A presence frame queued before teardown must also be cancelled.
                 realtime.emit('friends', { snapshot: false, changed: [], removed: [] });
             }
             stop();
+            if (canRestore) expect(canRestore()).toBe(false);
             finishRestore();
             await flush();
 
