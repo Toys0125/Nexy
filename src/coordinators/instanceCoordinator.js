@@ -2,7 +2,7 @@ import { instanceRequest } from '../api';
 import { parseLocation } from '../shared/utils/locationParser';
 import { findCachedInstance } from '../shared/utils/instanceDetails';
 import { useInstanceStore, useUiStore } from '../stores';
-import { assertRequestSession, getRequestSession } from '../services/requestSession';
+import { StaleRequestError, assertRequestSession, getRequestSession } from '../services/requestSession';
 
 const pendingInstances = new Map();
 const failedInstances = new Map();
@@ -39,13 +39,13 @@ export function fetchInstanceDetails(location, force = false) {
         .then(() => {
             assertRequestSession(session);
             if (pendingInstances.get(key) !== pending)
-                throw new Error('Instance details request superseded by a newer refresh');
+                throw new StaleRequestError('Instance details request superseded by a newer refresh');
             return instanceRequest.getInstance({ worldId: parsed.worldId, instanceId: parsed.instanceId }, force);
         })
         .then(({ ref }) => {
             assertRequestSession(session);
             if (pendingInstances.get(key) !== pending)
-                throw new Error('Instance details request superseded by a newer refresh');
+                throw new StaleRequestError('Instance details request superseded by a newer refresh');
             failedInstances.delete(key);
             return ref;
         })

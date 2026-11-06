@@ -2,6 +2,7 @@ import { defineStore } from 'pinia';
 import { ref } from 'vue';
 
 import configRepository from '../services/config';
+import { StaleRequestError } from '../services/requestSession';
 
 const NEW_ISSUE_URL = 'https://github.com/valzzu/Nexy/issues/new';
 const MAX_ISSUE_URL_LENGTH = 7500;
@@ -104,6 +105,8 @@ export const useErrorReportStore = defineStore('ErrorReport', () => {
             typeof error === 'object' && error !== null ? /** @type {{ status?: number }} */ (error).status : undefined;
         if (
             !message ||
+            // Fire-and-forget refreshes outlived their login session or were superseded
+            error instanceof StaleRequestError ||
             IGNORED_STATUS_CODES.has(status) ||
             IGNORED_MESSAGES.some((ignored) => message.includes(ignored))
         ) {
