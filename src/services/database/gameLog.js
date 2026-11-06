@@ -530,6 +530,7 @@ const gameLog = {
         return data;
     },
 
+    /** Retrieves recent game log entries matching a location and optional type and VIP filters. */
     async getGameLogByLocation(instanceId, filters, vipList = []) {
         let vipQuery = '';
         const vipArgs = {};
@@ -619,7 +620,7 @@ const gameLog = {
                 }
             }
             selects.push(
-                `SELECT * FROM (SELECT id, created_at, type, display_name, location, user_id, time, NULL AS world_id, NULL AS world_name, NULL AS group_name, NULL AS instance_id, NULL AS video_url, NULL AS video_name, NULL AS video_id, NULL AS resource_url, NULL AS resource_type FROM gamelog_join_leave WHERE (location LIKE @locationLike AND user_id != '${dbVars.userId}') ${vipQuery} ${query} ORDER BY id DESC LIMIT @perTable)`
+                `SELECT * FROM (SELECT id, created_at, type, display_name, location, user_id, time, NULL AS world_id, NULL AS world_name, NULL AS group_name, NULL AS instance_id, NULL AS video_url, NULL AS video_name, NULL AS video_id, NULL AS resource_url, NULL AS resource_type FROM gamelog_join_leave WHERE (location LIKE @locationLike AND user_id != '${dbVars.userId}') ${vipQuery} ${query} ORDER BY created_at DESC, CASE WHEN type = 'OnPlayerLeft' THEN 1 ELSE 2 END, id DESC LIMIT @perTable)`
             );
         }
         if (portalspawn) {
@@ -703,12 +704,13 @@ const gameLog = {
                 }
                 gamelogDatabase.push(row);
             },
-            `SELECT ${baseColumns} FROM (${selects.join(' UNION ALL ')}) ORDER BY created_at DESC, id DESC LIMIT @limit`,
+            `SELECT ${baseColumns} FROM (${selects.join(' UNION ALL ')}) ORDER BY created_at DESC, CASE WHEN type = 'Location' THEN 0 WHEN type = 'OnPlayerLeft' THEN 1 ELSE 2 END, id DESC LIMIT @limit`,
             args
         );
         return gamelogDatabase;
     },
 
+    /** Retrieves the newest game log entries, prioritizing locations and leaves at equal timestamps. */
     async lookupGameLogDatabase(filters, vipList, maxEntries = dbVars.maxTableSize) {
         const baseColumns = [
             'id',
@@ -808,7 +810,7 @@ const gameLog = {
                 }
             }
             selects.push(
-                `SELECT * FROM (SELECT id, created_at, type, display_name, location, user_id, time, NULL AS world_id, NULL AS world_name, NULL AS group_name, NULL AS instance_id, NULL AS video_url, NULL AS video_name, NULL AS video_id, NULL AS resource_url, NULL AS resource_type, NULL AS data, NULL AS message FROM gamelog_join_leave WHERE 1=1 ${vipQuery} ${query} ORDER BY id DESC LIMIT @perTable)`
+                `SELECT * FROM (SELECT id, created_at, type, display_name, location, user_id, time, NULL AS world_id, NULL AS world_name, NULL AS group_name, NULL AS instance_id, NULL AS video_url, NULL AS video_name, NULL AS video_id, NULL AS resource_url, NULL AS resource_type, NULL AS data, NULL AS message FROM gamelog_join_leave WHERE 1=1 ${vipQuery} ${query} ORDER BY created_at DESC, CASE WHEN type = 'OnPlayerLeft' THEN 1 ELSE 2 END, id DESC LIMIT @perTable)`
             );
         }
         if (portalspawn) {
@@ -906,7 +908,7 @@ const gameLog = {
                 }
                 gamelogDatabase.push(row);
             },
-            `SELECT ${baseColumns} FROM (${selects.join(' UNION ALL ')}) ORDER BY created_at DESC, id DESC LIMIT @limit`,
+            `SELECT ${baseColumns} FROM (${selects.join(' UNION ALL ')}) ORDER BY created_at DESC, CASE WHEN type = 'Location' THEN 0 WHEN type = 'OnPlayerLeft' THEN 1 ELSE 2 END, id DESC LIMIT @limit`,
             args
         );
         return gamelogDatabase;
@@ -1024,7 +1026,7 @@ const gameLog = {
                 }
             }
             selects.push(
-                `SELECT * FROM (SELECT id, created_at, type, display_name, location, user_id, time, NULL AS world_id, NULL AS world_name, NULL AS group_name, NULL AS instance_id, NULL AS video_url, NULL AS video_name, NULL AS video_id, NULL AS resource_url, NULL AS resource_type, NULL AS data, NULL AS message FROM gamelog_join_leave WHERE (display_name LIKE @searchLike AND user_id != '${dbVars.userId}') ${vipQuery} ${query} ORDER BY id DESC LIMIT @perTable)`
+                `SELECT * FROM (SELECT id, created_at, type, display_name, location, user_id, time, NULL AS world_id, NULL AS world_name, NULL AS group_name, NULL AS instance_id, NULL AS video_url, NULL AS video_name, NULL AS video_id, NULL AS resource_url, NULL AS resource_type, NULL AS data, NULL AS message FROM gamelog_join_leave WHERE (display_name LIKE @searchLike AND user_id != '${dbVars.userId}') ${vipQuery} ${query} ORDER BY created_at DESC, CASE WHEN type = 'OnPlayerLeft' THEN 1 ELSE 2 END, id DESC LIMIT @perTable)`
             );
         }
         if (portalspawn) {
@@ -1125,7 +1127,7 @@ const gameLog = {
                 }
                 gamelogDatabase.push(row);
             },
-            `SELECT ${baseColumns} FROM (${selects.join(' UNION ALL ')}) ORDER BY created_at DESC, id DESC LIMIT @limit`,
+            `SELECT ${baseColumns} FROM (${selects.join(' UNION ALL ')}) ORDER BY created_at DESC, CASE WHEN type = 'Location' THEN 0 WHEN type = 'OnPlayerLeft' THEN 1 ELSE 2 END, id DESC LIMIT @limit`,
             args
         );
         return gamelogDatabase;

@@ -11,7 +11,7 @@
 
 import { watch } from 'vue';
 
-import { addGameLogEntry } from '../../coordinators/gameLogCoordinator';
+import { addGameLogEntry, tryLoadPlayerList } from '../../coordinators/gameLogCoordinator';
 import { AppDebug } from '../appConfig';
 import { getWorldName } from '../../shared/utils/world';
 import { presenceState } from './mappers';
@@ -22,6 +22,8 @@ import { useLocationStore } from '../../stores/location';
 /** Location tag of the instance being logged, '' when none */
 let currentLocation = '';
 let currentInstanceId = '';
+/** Earliest join time to record in the current local session. */
+let currentSessionStart = 0;
 /** @type {Map<string, string>} userId → displayName of players logged as joined */
 const occupants = new Map();
 /** Whether NexVR is sending the instance's occupant list */
@@ -44,7 +46,10 @@ function now() {
  */
 async function logJoin(player) {
     occupants.set(player.userId, player.displayName);
-    const joinedAt = player.joinedAt && !Number.isNaN(Date.parse(player.joinedAt)) ? player.joinedAt : now();
+    const reportedJoin = player.joinedAt ? Date.parse(player.joinedAt) : NaN;
+    const joinedAt = new Date(
+        Math.max(Number.isNaN(reportedJoin) ? Date.now() : reportedJoin, currentSessionStart + 1)
+    ).toJSON();
     await addGameLogEntry(
         { type: 'player-joined', dt: joinedAt, userId: player.userId, displayName: player.displayName },
         currentLocation
@@ -106,7 +111,15 @@ function ownLocation() {
     return state.state === 'online' && state.location !== 'private' ? state.location : '';
 }
 
-async function sync() {
+/**
+ * Restores or starts the caller's instance session before recording its occupants.
+ *
+ * @param {{ active: boolean }} session The tracking lifetime that owns this sync.
+ */
+async function sync(session) {
+    if (!session.active) {
+        return;
+    }
     const location = useGameStore().isGameRunning ? ownLocation() : '';
     if (location === currentLocation) {
         if (location && !hasOccupantFeed) {
@@ -115,8 +128,26 @@ async function sync() {
         return;
     }
 
+    const locationStore = useLocationStore();
+    if (location && !locationStore.lastLocation.location) {
+        // A failed restore must leave the session uncommitted so the next sync retries it.
+        await tryLoadPlayerList(() => session.active && ownLocation() === location);
+        if (!session.active || !useGameStore().isGameRunning || ownLocation() !== location) {
+            return;
+        }
+    }
+
+    let worldName = '';
+    if (location && locationStore.lastLocation.location !== location) {
+        worldName = await getWorldName(location).catch(() => '');
+        if (!session.active || !useGameStore().isGameRunning || ownLocation() !== location) {
+            return;
+        }
+    }
+
     debug('instance changed', currentLocation, '→', location);
     currentLocation = location;
+    currentSessionStart = 0;
     currentInstanceId = location ? location.slice(location.indexOf(':') + 1).split('~')[0] : '';
     hasOccupantFeed = false;
     occupants.clear();
@@ -125,17 +156,21 @@ async function sync() {
         return;
     }
 
-    const locationStore = useLocationStore();
     if (locationStore.lastLocation.location === location) {
         // restored from the database after a restart: carry on with that list
+        currentSessionStart = locationStore.lastLocation.date || Date.now();
         for (const [userId, player] of locationStore.lastLocation.playerList) {
             occupants.set(userId, player.displayName);
         }
     } else {
-        const worldName = await getWorldName(location).catch(() => '');
-        await addGameLogEntry({ type: 'location', dt: now(), location, worldName }, location);
+        const dt = now();
+        currentSessionStart = Date.parse(dt);
+        await addGameLogEntry({ type: 'location', dt, location, worldName }, location);
     }
 
+    if (!session.active) {
+        return;
+    }
     // until (unless) the occupant feed shows up, friends stand in for it
     await applyOccupants(friendsInInstance());
 }
@@ -167,7 +202,12 @@ function onInstanceModeration({ instanceId, moderation }) {
         debug('occupant feed active for', instanceId);
     }
     hasOccupantFeed = true;
-    enqueue(() => applyOccupants(players));
+    enqueue(async () => {
+        // A presence update may have queued an instance change ahead of this frame.
+        if (instanceId !== currentInstanceId) return;
+        hasOccupantFeed = true;
+        await applyOccupants(players);
+    });
 }
 
 /**
@@ -176,19 +216,23 @@ function onInstanceModeration({ instanceId, moderation }) {
  * @returns {() => void} Stops following
  */
 export function startGameSession() {
-    const offFriends = realtime.on('friends', () => enqueue(sync));
+    const session = { active: true };
+    const syncSession = () => sync(session);
+    const offFriends = realtime.on('friends', () => enqueue(syncSession));
     const offModeration = realtime.on('instanceModeration', onInstanceModeration);
     const stopWatch = watch(
         () => useGameStore().isGameRunning,
-        () => enqueue(sync)
+        () => enqueue(syncSession)
     );
-    enqueue(sync);
+    enqueue(syncSession);
     return () => {
+        session.active = false;
         offFriends();
         offModeration();
         stopWatch();
         currentLocation = '';
         currentInstanceId = '';
+        currentSessionStart = 0;
         occupants.clear();
         realtime.watchInstances([]);
     };

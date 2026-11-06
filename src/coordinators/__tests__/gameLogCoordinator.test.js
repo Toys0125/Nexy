@@ -1,10 +1,17 @@
 const mocks = vi.hoisted(() => ({
-    database: { getGamelogDatabase: vi.fn() },
+    database: { getGamelogDatabase: vi.fn(), addGamelogJoinLeaveToDatabase: vi.fn() },
     isGameRunning: vi.fn(),
     userRequest: { getUser: vi.fn(), getPublicProfile: vi.fn() },
     game: { isGameRunning: true },
-    user: { cachedUsers: new Map(), cachedProfiles: new Map(), applyUserDialogLocation: vi.fn() },
-    friend: { friends: new Map() },
+    user: {
+        currentUser: { id: 'self' },
+        cachedUsers: new Map(),
+        cachedProfiles: new Map(),
+        applyUserDialogLocation: vi.fn()
+    },
+    friend: { friends: new Map(), updateFriendLastSeen: vi.fn() },
+    gameLog: { state: { lastLocationAvatarList: new Map() } },
+    photon: { photonLobbyAvatars: new Map() },
     instance: {
         updateCurrentInstanceWorld: vi.fn(),
         getCurrentInstanceUserList: vi.fn(),
@@ -39,19 +46,19 @@ vi.mock('../../stores/settings/advanced', () => ({ useAdvancedSettingsStore: () 
 vi.mock('../../stores/friend', () => ({ useFriendStore: () => mocks.friend }));
 vi.mock('../../stores/gallery', () => ({ useGalleryStore: () => ({}) }));
 vi.mock('../../stores/game', () => ({ useGameStore: () => mocks.game }));
-vi.mock('../../stores/gameLog', () => ({ useGameLogStore: () => ({}) }));
+vi.mock('../../stores/gameLog', () => ({ useGameLogStore: () => mocks.gameLog }));
 vi.mock('../../stores/settings/general', () => ({ useGeneralSettingsStore: () => ({}) }));
 vi.mock('../../stores/instance', () => ({ useInstanceStore: () => mocks.instance }));
 vi.mock('../../stores/modal', () => ({ useModalStore: () => ({}) }));
 vi.mock('../../stores/notification', () => ({ useNotificationStore: () => ({}) }));
-vi.mock('../../stores/photon', () => ({ usePhotonStore: () => ({}) }));
+vi.mock('../../stores/photon', () => ({ usePhotonStore: () => mocks.photon }));
 vi.mock('../../stores/sharedFeed', () => ({ useSharedFeedStore: () => ({}) }));
 vi.mock('../../stores/user', () => ({ useUserStore: () => mocks.user }));
 vi.mock('../../stores/vr', () => ({ useVrStore: () => mocks.vr }));
 vi.mock('../../stores/vrcx', () => ({ useVrcxStore: () => ({}) }));
 vi.mock('../../services/config', () => ({ default: {} }));
 
-import { tryLoadPlayerList } from '../gameLogCoordinator';
+import { addGameLogEntry, tryLoadPlayerList } from '../gameLogCoordinator';
 import { reactive } from 'vue';
 import { createPinia, setActivePinia } from 'pinia';
 import { useLocationStore } from '../../stores/location';
@@ -78,6 +85,15 @@ beforeEach(() => {
 });
 
 afterEach(() => vi.unstubAllGlobals());
+
+test('tracks the current user without logging their own join or leave', async () => {
+    const dt = '2026-11-05T22:33:45.000Z';
+    await addGameLogEntry({ type: 'player-joined', userId: 'self', displayName: 'Me', dt }, 'world:instance');
+    expect(locationStore.lastLocation.playerList.has('self')).toBe(true);
+    await addGameLogEntry({ type: 'player-left', userId: 'self', displayName: 'Me', dt }, 'world:instance');
+    expect(locationStore.lastLocation.playerList.has('self')).toBe(false);
+    expect(mocks.database.addGamelogJoinLeaveToDatabase).not.toHaveBeenCalled();
+});
 
 test('startup does not restore a VRChat session imported by an older build', async () => {
     mocks.database.getGamelogDatabase.mockResolvedValue([
@@ -217,6 +233,39 @@ test.each(['location', 'player joins', 'player leaves', 'player changes'])(
         expect([...liveLocation.playerList.entries()]).toEqual(livePlayers);
         expect(mocks.userRequest.getUser).not.toHaveBeenCalled();
         expect(mocks.userRequest.getPublicProfile).not.toHaveBeenCalled();
+    }
+);
+
+test.each(['history read', 'process check'])(
+    'cancelled tracking cannot restore shared state after the %s',
+    async (when) => {
+        let active = true;
+        let finishRead;
+        const pendingRead = new Promise((resolve) => {
+            finishRead = resolve;
+        });
+        mocks.database.getGamelogDatabase.mockResolvedValue(history());
+        if (when === 'history read') {
+            mocks.database.getGamelogDatabase.mockReturnValueOnce(pendingRead);
+        } else {
+            mocks.isGameRunning.mockReturnValueOnce(pendingRead);
+        }
+        const originalLocation = locationStore.lastLocation;
+        const restoration = tryLoadPlayerList(() => active);
+        await Promise.resolve();
+        active = false;
+        finishRead(when === 'history read' ? history() : true);
+        await restoration;
+
+        expect(locationStore.setLastLocation).not.toHaveBeenCalled();
+        expect(locationStore.lastLocation).toBe(originalLocation);
+        expect(locationStore.lastLocation.playerList.size).toBe(0);
+        expect(mocks.userRequest.getUser).not.toHaveBeenCalled();
+        expect(mocks.userRequest.getPublicProfile).not.toHaveBeenCalled();
+        expect(mocks.instance.updateCurrentInstanceWorld).not.toHaveBeenCalled();
+        if (when === 'history read') {
+            expect(mocks.isGameRunning).not.toHaveBeenCalled();
+        }
     }
 );
 

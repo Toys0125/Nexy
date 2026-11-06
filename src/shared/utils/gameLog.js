@@ -98,7 +98,8 @@ function getGameLogCreatedAtTs(row) {
 /**
  * Compare two game log rows for descending sort order.
  * Primary key: created_at timestamp (newest first).
- * Secondary: rowId (highest first).
+ * Secondary: location, then player leaves, then other types at the same timestamp.
+ * Then rowId (highest first).
  * Tertiary: uid string (reverse lexicographic).
  *
  * @param {object} a
@@ -111,6 +112,10 @@ function compareGameLogRows(a, b) {
     if (aTs !== bTs) {
         return bTs - aTs;
     }
+
+    const typeOrder = (row) => (row?.type === 'Location' ? 0 : row?.type === 'OnPlayerLeft' ? 1 : 2);
+    const typeDifference = typeOrder(a) - typeOrder(b);
+    if (typeDifference) return typeDifference;
 
     const aRowId = typeof a?.rowId === 'number' ? a.rowId : 0;
     const bRowId = typeof b?.rowId === 'number' ? b.rowId : 0;
