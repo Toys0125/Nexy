@@ -12,6 +12,11 @@ watch(
     { flush: 'sync' }
 );
 
+/** Expected rejection for instance work a logout or newer refresh made stale, not a bug. */
+export class StaleRequestError extends Error {
+    name = 'StaleRequestError';
+}
+
 /** Identify the login session without retaining credentials or user data. */
 export function getRequestSession() {
     return generation;
@@ -24,6 +29,6 @@ export function getRequestSession() {
  */
 export function assertRequestSession(expected) {
     if (expected !== generation) {
-        throw new Error('Instance request belongs to a previous login session.');
+        throw new StaleRequestError('Instance request belongs to a previous login session.');
     }
 }
