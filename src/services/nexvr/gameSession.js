@@ -111,8 +111,15 @@ function ownLocation() {
     return state.state === 'online' && state.location !== 'private' ? state.location : '';
 }
 
-/** Restores or starts the caller's instance session before recording its occupants. */
-async function sync() {
+/**
+ * Restores or starts the caller's instance session before recording its occupants.
+ *
+ * @param {{ active: boolean }} session The tracking lifetime that owns this sync.
+ */
+async function sync(session) {
+    if (!session.active) {
+        return;
+    }
     const location = useGameStore().isGameRunning ? ownLocation() : '';
     if (location === currentLocation) {
         if (location && !hasOccupantFeed) {
@@ -125,7 +132,7 @@ async function sync() {
     if (location && !locationStore.lastLocation.location) {
         // A failed restore must leave the session uncommitted so the next sync retries it.
         await tryLoadPlayerList();
-        if (!useGameStore().isGameRunning || ownLocation() !== location) {
+        if (!session.active || !useGameStore().isGameRunning || ownLocation() !== location) {
             return;
         }
     }
@@ -199,14 +206,17 @@ function onInstanceModeration({ instanceId, moderation }) {
  * @returns {() => void} Stops following
  */
 export function startGameSession() {
-    const offFriends = realtime.on('friends', () => enqueue(sync));
+    const session = { active: true };
+    const syncSession = () => sync(session);
+    const offFriends = realtime.on('friends', () => enqueue(syncSession));
     const offModeration = realtime.on('instanceModeration', onInstanceModeration);
     const stopWatch = watch(
         () => useGameStore().isGameRunning,
-        () => enqueue(sync)
+        () => enqueue(syncSession)
     );
-    enqueue(sync);
+    enqueue(syncSession);
     return () => {
+        session.active = false;
         offFriends();
         offModeration();
         stopWatch();
