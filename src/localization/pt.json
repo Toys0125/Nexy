@@ -293,8 +293,7 @@
             },
             "world": {
                 "header": "Mundo",
-                "category": "Pesquisar por categoria",
-                "community_lab": "Incluir labs da comunidade"
+                "category": "Pesquisar por categoria"
             },
             "avatar": {
                 "header": "Avatar",
