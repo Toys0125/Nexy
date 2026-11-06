@@ -21,6 +21,13 @@ async function createStore() {
     return store;
 }
 
+/** Shaped like the errors $throw raises for failed API requests */
+function apiError(status) {
+    const e = new Error(`${status} Status\nEndpoint: "users/usr_1"`);
+    e.status = status;
+    return e;
+}
+
 describe('useErrorReportStore', () => {
     beforeEach(() => {
         setActivePinia(createPinia());
@@ -42,21 +49,31 @@ describe('useErrorReportStore', () => {
 
     test('ignores network noise', async () => {
         const store = await createStore();
-        store.reportError(new Error('Request failed with status 503'), 'unhandledrejection');
+        store.reportError(new Error('No such host is known'), 'unhandledrejection');
+        store.reportError(apiError(503), 'unhandledrejection');
         expect(store.errorReportDialog.visible).toBe(false);
     });
 
     test('ignores 501 from endpoints NexVR does not implement', async () => {
         const store = await createStore();
-        store.reportError(new Error('Request failed with status 501'), 'unhandledrejection');
+        store.reportError(apiError(501), 'unhandledrejection');
         expect(store.errorReportDialog.visible).toBe(false);
     });
 
-    test('only ignores status codes as whole numbers', async () => {
+    test('reports API errors with other statuses', async () => {
         const store = await createStore();
-        store.reportError(new RangeError('Invalid array length 1500'), 'window.onerror');
+        store.reportError(apiError(400), 'unhandledrejection');
         expect(store.errorReportDialog.visible).toBe(true);
     });
+
+    test.each(['Invalid array length 500', 'Child process exited with code 500', 'Ratio was 500.5'])(
+        'does not treat "%s" as an HTTP status',
+        async (text) => {
+            const store = await createStore();
+            store.reportError(new Error(text), 'window.onerror');
+            expect(store.errorReportDialog.visible).toBe(true);
+        }
+    );
 
     test('does not reshow a dismissed error', async () => {
         const store = await createStore();

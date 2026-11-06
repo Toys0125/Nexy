@@ -7,9 +7,10 @@ const NEW_ISSUE_URL = 'https://github.com/valzzu/Nexy/issues/new';
 const MAX_ISSUE_URL_LENGTH = 7500;
 
 // Network/disk noise that isn't actionable as a bug report.
-// Status codes match as whole numbers so "array length 1500" isn't dropped.
+// Status codes come from the `status` $throw sets on API errors, so numbers in
+// other messages ("array length 500", "exit code 500") aren't mistaken for them.
 // 501 is NexVR answering for endpoints it doesn't implement, nothing to fix client-side.
-const IGNORED_STATUS_CODES = /\b(?:401|403|404|500|501|503)\b/;
+const IGNORED_STATUS_CODES = new Set([401, 403, 404, 500, 501, 503]);
 const IGNORED_MESSAGES = [
     'No such host is known',
     'The SSL connection could not be established',
@@ -99,9 +100,10 @@ export const useErrorReportStore = defineStore('ErrorReport', () => {
         const normalized = normalizeError(error);
         const message = scrubUserPaths(normalized.message);
         const stack = scrubUserPaths(normalized.stack);
+        const status = typeof error === 'object' && error !== null ? error.status : undefined;
         if (
             !message ||
-            IGNORED_STATUS_CODES.test(message) ||
+            IGNORED_STATUS_CODES.has(status) ||
             IGNORED_MESSAGES.some((ignored) => message.includes(ignored))
         ) {
             return;
