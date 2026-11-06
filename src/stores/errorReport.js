@@ -100,7 +100,8 @@ export const useErrorReportStore = defineStore('ErrorReport', () => {
         const normalized = normalizeError(error);
         const message = scrubUserPaths(normalized.message);
         const stack = scrubUserPaths(normalized.stack);
-        const status = typeof error === 'object' && error !== null ? error.status : undefined;
+        const status =
+            typeof error === 'object' && error !== null ? /** @type {{ status?: number }} */ (error).status : undefined;
         if (
             !message ||
             IGNORED_STATUS_CODES.has(status) ||
