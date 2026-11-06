@@ -156,11 +156,17 @@ async function sync(session) {
         }
     } else {
         const worldName = await getWorldName(location).catch(() => '');
+        if (!session.active) {
+            return;
+        }
         const dt = now();
         currentSessionStart = Date.parse(dt);
         await addGameLogEntry({ type: 'location', dt, location, worldName }, location);
     }
 
+    if (!session.active) {
+        return;
+    }
     // until (unless) the occupant feed shows up, friends stand in for it
     await applyOccupants(friendsInInstance());
 }

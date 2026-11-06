@@ -14,8 +14,9 @@ vi.mock('../../../coordinators/gameLogCoordinator', () => ({
 }));
 vi.mock('../../../stores/game', () => ({ useGameStore: () => game }));
 vi.mock('../../../stores/location', () => ({ useLocationStore: () => location }));
-vi.mock('../../../shared/utils/world', () => ({ getWorldName: async () => 'Club' }));
+vi.mock('../../../shared/utils/world', () => ({ getWorldName: vi.fn(async () => 'Club') }));
 
+import { getWorldName } from '../../../shared/utils/world';
 import { PresenceStatus } from '../realtimeSchema';
 import { realtime } from '../realtime';
 import { startGameSession } from '../gameSession';
@@ -59,6 +60,7 @@ describe('NexVR game session', () => {
     beforeEach(() => {
         entries.length = 0;
         restorePlayerList.mockReset();
+        getWorldName.mockReset().mockResolvedValue('Club');
         realtime.userId = 'me';
         realtime.watchedInstances = [];
         game.isGameRunning = true;
@@ -279,6 +281,30 @@ describe('NexVR game session', () => {
             expect(realtime.watchedInstances).toEqual(['i1']);
         }
     );
+
+    test('stopping tracking during a world lookup prevents stale entries and allows reconnecting', async () => {
+        let finishLookup;
+        const lookup = new Promise((resolve) => {
+            finishLookup = resolve;
+        });
+        getWorldName.mockReturnValueOnce(lookup);
+        realtime.friends = new Map([['me', presence('me', 'i1')]]);
+        stop = startGameSession();
+        await flush();
+        expect(getWorldName).toHaveBeenCalledOnce();
+        expect(entries).toEqual([]);
+
+        stop();
+        finishLookup('Club');
+        await flush();
+        expect(entries).toEqual([]);
+        expect(realtime.watchedInstances).toEqual([]);
+
+        stop = startGameSession();
+        await flush();
+        expect(summary()).toEqual(['location:w1:i1~region(ca)', 'player-joined:me']);
+        expect(realtime.watchedInstances).toEqual(['i1']);
+    });
 
     test('retries a failed history read before logging the location and its occupants', async () => {
         const error = new Error('history read failed');
