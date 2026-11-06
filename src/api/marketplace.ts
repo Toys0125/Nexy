@@ -20,6 +20,7 @@ type MarketplaceAvatarSearchResponse = {
 };
 
 const marketplaceReq = {
+    // Not available on NexVR: the shim answers 501
     searchAvatars(
         params: MarketplaceAvatarSearchParams
     ): Promise<{ json: MarketplaceAvatarSearchResponse; params: MarketplaceAvatarSearchParams }> {
@@ -36,6 +37,7 @@ const marketplaceReq = {
         });
     },
 
+    // Not available on NexVR: the shim answers 501
     getStoreShelves(
         params: GetStoreShelves['query']
     ): Promise<{ json: Json<StoreShelf>[]; params: GetStoreShelves['query'] }> {
@@ -51,6 +53,7 @@ const marketplaceReq = {
         });
     },
 
+    // Not available on NexVR: the shim answers 501
     getProductPurchases(
         params: GetProductPurchases['query']
     ): Promise<{ json: Json<ProductPurchase>[]; params: GetProductPurchases['query'] }> {
@@ -67,6 +70,7 @@ const marketplaceReq = {
         });
     },
 
+    // Not available on NexVR: the shim answers 501
     getProductListing(params: {
         listingId: string;
     }): Promise<{ json: Json<ProductListing>; params: { listingId: string } }> {
@@ -82,6 +86,7 @@ const marketplaceReq = {
         });
     },
 
+    // Not available on NexVR: the shim answers 501
     purchaseListing(params: { listingId: string; totalPrice: number; quantity: number }) {
         return request('economy/purchase/listing', {
             method: 'POST',
@@ -95,6 +100,7 @@ const marketplaceReq = {
         });
     },
 
+    // Not available on NexVR: the shim answers 501
     getEconomySubscriptions(params: { subscriberId: string; n?: number; offset?: number }) {
         return request('economy/subscriptions', {
             method: 'GET',
@@ -108,6 +114,7 @@ const marketplaceReq = {
         });
     },
 
+    // Not available on NexVR: the shim answers 501
     getEconomyTransactions(
         params: GetProductPurchaseHistory['query']
     ): Promise<{ json: Json<ProductPurchaseHistory>; params: GetProductPurchaseHistory['query'] }> {

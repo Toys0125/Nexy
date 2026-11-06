@@ -30,6 +30,7 @@ const instanceReq = {
         });
     },
 
+    // Not available on NexVR: the shim answers 501
     createInstance(params: any): Promise<{ json: Json<Instance>; params: any }> {
         const instanceStore = useInstanceStore();
         return request('instances', {
@@ -45,6 +46,7 @@ const instanceReq = {
         });
     },
 
+    // Not available on NexVR: the shim answers 501
     getInstanceShortName(instance: { worldId: string; instanceId: string; shortName?: string }): Promise<{
         json: Json<InstanceShortNameResponse>;
         instance: { worldId: string; instanceId: string };
@@ -67,6 +69,7 @@ const instanceReq = {
         });
     },
 
+    // Not available on NexVR: the shim answers 501
     getInstanceFromShortName(params: { shortName: string }): Promise<{ json: Json<Instance>; params }> {
         const instanceStore = useInstanceStore();
         return request(`instances/s/${params.shortName}`, {
@@ -121,6 +124,7 @@ const instanceReq = {
         });
     },
 
+    // Not available on NexVR: the shim answers 501
     updateInstance(params: VrcxUpdateInstanceRequest): Promise<{ json: Json<Instance>; params; ref: any }> {
         const instanceStore = useInstanceStore();
         const { location, ...body } = params;
@@ -136,6 +140,7 @@ const instanceReq = {
         });
     },
 
+    // Not available on NexVR: the shim answers 501
     instanceAnnouncement(params: {
         location: string;
         title: string;

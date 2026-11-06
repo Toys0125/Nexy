@@ -11,6 +11,7 @@ import { database } from '../services/database';
 import { refreshCustomScript } from '../shared/utils/base/ui';
 import { useAdvancedSettingsStore } from './settings/advanced';
 import { useAvatarProviderStore } from './avatarProvider';
+import { useErrorReportStore } from './errorReport';
 import { addLocalWorldFavorite, addLocalAvatarFavorite } from '../coordinators/favoriteCoordinator';
 import { useFavoriteStore } from './favorite';
 import { useGameLogStore } from './gameLog';
@@ -542,6 +543,7 @@ export const useVrcxStore = defineStore('Vrcx', () => {
             }
 
             toast.success(t('message.crash.vrcx_reload'));
+            useErrorReportStore().reportError(`Crash: ${crashMessage}`, 'crash-recovery');
             return;
         }
         eventLaunchCommand(command);

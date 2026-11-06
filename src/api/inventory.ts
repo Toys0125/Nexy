@@ -24,6 +24,7 @@ function refetchActiveInventoryQueries() {
 }
 
 const inventoryReq = {
+    // Not available on NexVR: the shim answers 501
     getUserInventoryItem(params: {
         inventoryId: string;
         userId: string;
@@ -40,6 +41,7 @@ const inventoryReq = {
         });
     },
 
+    // Not available on NexVR: the shim answers 501
     getInventoryItem(params: { inventoryId: string }): Promise<{ json: Json<InventoryItem>; params }> {
         return request(`inventory/${params.inventoryId}`, {
             method: 'GET',
@@ -53,6 +55,7 @@ const inventoryReq = {
         });
     },
 
+    // Not available on NexVR: the shim answers 501
     getInventoryItems(
         params: GetInventory['query']
     ): Promise<{ json: Json<Inventory>; params: GetInventory['query'] }> {
@@ -68,6 +71,7 @@ const inventoryReq = {
         });
     },
 
+    // Not available on NexVR: the shim answers 501
     consumeInventoryBundle(params: {
         inventoryId: string;
     }): Promise<{ json: Json<InventoryConsumptionResults>; params }> {
@@ -84,6 +88,7 @@ const inventoryReq = {
         });
     },
 
+    // Not available on NexVR: the shim answers 501
     getInventoryTemplate(params: { inventoryTemplateId: string }): Promise<{ json: Json<InventoryTemplate>; params }> {
         return request(`inventory/template/${params.inventoryTemplateId}`, {
             method: 'GET',
@@ -97,6 +102,7 @@ const inventoryReq = {
         });
     },
 
+    // Not available on NexVR: the shim answers 501
     redeemReward(
         params: RewardRedemptionRequest
     ): Promise<{ json: Json<RewardRedemptionResult[]>; params: RewardRedemptionRequest }> {
@@ -113,6 +119,7 @@ const inventoryReq = {
         });
     },
 
+    // Not available on NexVR: the shim answers 501
     getGlobalInventory(): Promise<{ json: any; params }> {
         return request('inventory/global', {
             method: 'GET'
@@ -125,6 +132,7 @@ const inventoryReq = {
         });
     },
 
+    // Not available on NexVR: the shim answers 501
     getEquipSlot(params: GetInventory['query']): Promise<{ json: Json<Inventory>; params: GetInventory['query'] }> {
         return request('inventory', {
             method: 'GET',
@@ -138,6 +146,7 @@ const inventoryReq = {
         });
     },
 
+    // Not available on NexVR: the shim answers 501
     equipItem(
         params: { inventoryId: string } & EquipInventoryItemRequest
     ): Promise<{ json: Json<InventoryItem>; params: { inventoryId: string } & EquipInventoryItemRequest }> {
@@ -153,6 +162,7 @@ const inventoryReq = {
         });
     },
 
+    // Not available on NexVR: the shim answers 501
     archiveItem(params: {
         inventoryId: string;
     }): Promise<{ json: Json<InventoryItem>; params: { inventoryId: string } }> {
@@ -170,6 +180,7 @@ const inventoryReq = {
         });
     },
 
+    // Not available on NexVR: the shim answers 501
     unArchiveItem(params: {
         inventoryId: string;
     }): Promise<{ json: Json<InventoryItem>; params: { inventoryId: string } }> {
