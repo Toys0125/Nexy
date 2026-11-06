@@ -6,7 +6,7 @@ import { AppDebug, isApiLogSuppressed, logWebRequest } from './appConfig.js';
 import { i18n } from '../plugins/i18n';
 import { statusCodes } from '../shared/constants/api.js';
 import { watchState } from './watchState';
-import { assertRequestSession, getRequestSession } from './requestSession';
+import { StaleRequestError, assertRequestSession, getRequestSession } from './requestSession';
 
 import webApiService from './webapi.js';
 
@@ -95,7 +95,7 @@ export function request(endpoint, options) {
     function assertCurrentInstance() {
         if (instanceSession === null) return;
         assertRequestSession(instanceSession);
-        if (!instanceAttempt.current) throw new Error('Instance request superseded by a newer refresh');
+        if (!instanceAttempt.current) throw new StaleRequestError('Instance request superseded by a newer refresh');
     }
     // Access-tag variants identify the same instance; refresh must supersede every variant.
     const instanceDetail = instanceSession !== null && /^instances\/[^/]+:[^/]+$/.test(endpoint);

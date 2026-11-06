@@ -11,6 +11,7 @@ vi.mock('../../services/config', () => ({
 }));
 
 import { useErrorReportStore } from '../errorReport';
+import { StaleRequestError } from '../../services/requestSession';
 
 const flushPromises = () => new Promise((resolve) => setTimeout(resolve));
 
@@ -57,6 +58,15 @@ describe('useErrorReportStore', () => {
     test('ignores 501 from endpoints NexVR does not implement', async () => {
         const store = await createStore();
         store.reportError(apiError(501), 'unhandledrejection');
+        expect(store.errorReportDialog.visible).toBe(false);
+    });
+
+    test('ignores stale instance requests', async () => {
+        const store = await createStore();
+        store.reportError(
+            new StaleRequestError('Instance request belongs to a previous login session.'),
+            'unhandledrejection'
+        );
         expect(store.errorReportDialog.visible).toBe(false);
     });
 
