@@ -8,6 +8,7 @@ function getCurrentUserId() {
 }
 
 const inviteMessagesReq = {
+    // Not available on NexVR: the shim answers 501
     refreshInviteMessageTableData(
         messageType: InviteMessageType
     ): Promise<{ json: Json<InviteMessage[]>; messageType: InviteMessageType }> {
@@ -22,6 +23,7 @@ const inviteMessagesReq = {
         });
     },
 
+    // Not available on NexVR: the shim answers 501
     editInviteMessage(
         params: UpdateInviteMessageRequest,
         messageType: InviteMessageType,

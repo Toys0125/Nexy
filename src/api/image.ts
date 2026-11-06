@@ -13,6 +13,7 @@ import { applyWorld } from '../coordinators/worldCoordinator';
 import { request } from '../services/request';
 
 const imageReq = {
+    // Not available on NexVR: the shim answers 501
     async uploadAvatarFailCleanup(id: string) {
         const avatarStore = useAvatarStore();
         try {
@@ -33,6 +34,7 @@ const imageReq = {
         avatarStore.setAvatarDialogLoading(false);
     },
 
+    // Not available on NexVR: the shim answers 501
     async uploadAvatarImage(
         params: CreateFileVersionRequest,
         fileId: string
@@ -56,6 +58,7 @@ const imageReq = {
         }
     },
 
+    // Not available on NexVR: the shim answers 501
     async uploadAvatarImageFileStart(params: {
         fileId: string;
         fileVersion: number;
@@ -76,6 +79,7 @@ const imageReq = {
         }
     },
 
+    // Not available on NexVR: the shim answers 501
     uploadAvatarImageFileFinish(params: {
         fileId: string;
         fileVersion: number;
@@ -95,6 +99,7 @@ const imageReq = {
         });
     },
 
+    // Not available on NexVR: the shim answers 501
     async uploadAvatarImageSigStart(params: {
         fileId: string;
         fileVersion: number;
@@ -115,6 +120,7 @@ const imageReq = {
         }
     },
 
+    // Not available on NexVR: the shim answers 501
     uploadAvatarImageSigFinish(params: {
         fileId: string;
         fileVersion: number;
@@ -134,6 +140,7 @@ const imageReq = {
         });
     },
 
+    // Not available on NexVR: the shim answers 501
     setAvatarImage(
         params: { id: string } & UpdateAvatarRequest
     ): Promise<{ json: Json<Avatar>; params: { id: string } & UpdateAvatarRequest }> {
@@ -149,6 +156,7 @@ const imageReq = {
         });
     },
 
+    // Not available on NexVR: the shim answers 501
     async uploadWorldFailCleanup(id: string) {
         const worldStore = useWorldStore();
         try {
@@ -169,6 +177,7 @@ const imageReq = {
         worldStore.setWorldDialogLoading(false);
     },
 
+    // Not available on NexVR: the shim answers 501
     async uploadWorldImage(
         params: CreateFileVersionRequest,
         fileId: string
@@ -192,6 +201,7 @@ const imageReq = {
         return void 0;
     },
 
+    // Not available on NexVR: the shim answers 501
     async uploadWorldImageFileStart(params: {
         fileId: string;
         fileVersion: number;
@@ -213,6 +223,7 @@ const imageReq = {
         return void 0;
     },
 
+    // Not available on NexVR: the shim answers 501
     uploadWorldImageFileFinish(params: {
         fileId: string;
         fileVersion: number;
@@ -232,6 +243,7 @@ const imageReq = {
         });
     },
 
+    // Not available on NexVR: the shim answers 501
     async uploadWorldImageSigStart(params: {
         fileId: string;
         fileVersion: number;
@@ -253,6 +265,7 @@ const imageReq = {
         return void 0;
     },
 
+    // Not available on NexVR: the shim answers 501
     uploadWorldImageSigFinish(params: {
         fileId: string;
         fileVersion: number;
@@ -272,6 +285,7 @@ const imageReq = {
         });
     },
 
+    // Not available on NexVR: the shim answers 501
     setWorldImage(
         params: { id: string } & UpdateWorldRequest
     ): Promise<{ json: Json<World>; params: { id: string } & UpdateWorldRequest; ref: any }> {
@@ -287,6 +301,7 @@ const imageReq = {
         });
     },
 
+    // Not available on NexVR: the shim answers 501
     getAvatarImages(params: { fileId: string }): Promise<{ json: Json<File>; params: { fileId: string } }> {
         return request(`file/${params.fileId}`, {
             method: 'GET'
@@ -299,6 +314,7 @@ const imageReq = {
         });
     },
 
+    // Not available on NexVR: the shim answers 501
     getWorldImages(params: { fileId: string }): Promise<{ json: Json<File>; params: { fileId: string } }> {
         return request(`file/${params.fileId}`, {
             method: 'GET',

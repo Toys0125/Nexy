@@ -9,6 +9,7 @@ import type { Json } from '../types/vrcx';
 import { request } from '../services/request';
 
 const moderationReportReq = {
+    // Not available on NexVR: the shim answers 501
     getModerationReports(
         params: GetModerationReports['query']
     ): Promise<{ json: Json<PaginatedModerationReportList>; params: GetModerationReports['query'] }> {
@@ -24,6 +25,7 @@ const moderationReportReq = {
         });
     },
 
+    // Not available on NexVR: the shim answers 501
     submitModerationReport(
         params: SubmitModerationReportRequest
     ): Promise<{ json: Json<ModerationReport>; params: SubmitModerationReportRequest }> {
@@ -40,6 +42,7 @@ const moderationReportReq = {
     },
 
     // deprecated
+    // Not available on NexVR: the shim answers 501
     deleteModerationReport(params: {
         moderationReportId: string;
     }): Promise<{ json: Json<SuccessFlag>; params: { moderationReportId: string } }> {

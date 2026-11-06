@@ -383,6 +383,13 @@
         </Dialog>
 
         <SettingsGroup :title="t('view.settings.advanced_groups.diagnostics.header')">
+            <SettingsItem
+                :label="t('view.settings.advanced.advanced.error_report_popup.header')"
+                :description="t('view.settings.advanced.advanced.error_report_popup.description')"
+                toggle>
+                <Switch :model-value="errorReportPopup" @update:modelValue="setErrorReportPopup()" />
+            </SettingsItem>
+
             <SettingsItem :label="t('view.profile.game_info.online_users')">
                 <div class="flex items-center gap-2">
                     <span v-if="visits !== null" class="text-sm text-muted-foreground">{{
@@ -456,6 +463,7 @@
         useAppearanceSettingsStore,
         useAuthStore,
         useAvatarStore,
+        useErrorReportStore,
         useGeneralSettingsStore,
         useGroupStore,
         useInstanceStore,
@@ -499,6 +507,10 @@
 
     const { photonLoggingEnabled } = storeToRefs(usePhotonStore());
     const { branch } = storeToRefs(useVRCXUpdaterStore());
+
+    const errorReportStore = useErrorReportStore();
+    const { errorReportPopup } = storeToRefs(errorReportStore);
+    const { setErrorReportPopup } = errorReportStore;
 
     const { isDarkMode } = storeToRefs(useAppearanceSettingsStore());
 

@@ -9,6 +9,7 @@ import { useAvatarProviderStore } from './avatarProvider';
 import { useAvatarStore } from './avatar';
 import { useChartsStore } from './charts';
 import { useDashboardStore } from './dashboard';
+import { useErrorReportStore } from './errorReport';
 import { useExternalLinkStore } from './externalLink';
 import { useDiscordPresenceSettingsStore } from './settings/discordPresence';
 import { useFavoriteStore } from './favorite';
@@ -128,6 +129,7 @@ export function createGlobalStores() {
         notificationsSettings: useNotificationsSettingsStore(),
         wristOverlaySettings: useWristOverlaySettingsStore(),
         avatarProvider: useAvatarProviderStore(),
+        errorReport: useErrorReportStore(),
         externalLink: useExternalLinkStore(),
         favorite: useFavoriteStore(),
         friend: useFriendStore(),
@@ -167,6 +169,7 @@ export {
     useAuthStore,
     useAvatarStore,
     useAvatarProviderStore,
+    useErrorReportStore,
     useExternalLinkStore,
     useFavoriteStore,
     useFeedStore,

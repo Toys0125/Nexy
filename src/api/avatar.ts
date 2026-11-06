@@ -16,6 +16,7 @@ import { request } from '../services/request';
 import { applyCurrentUser } from '../coordinators/userCoordinator';
 
 const avatarReq = {
+    // Not available on NexVR: the shim answers 501
     getAvatar(params: { avatarId: string }): Promise<{ json: Json<Avatar>; params: { avatarId: string } }> {
         return request(`avatars/${params.avatarId}`, {
             method: 'GET'
@@ -28,6 +29,7 @@ const avatarReq = {
         });
     },
 
+    // Not available on NexVR: the shim answers 501
     getAvatars(params: SearchAvatars['query']): Promise<{ json: Json<Avatar[]>; params: SearchAvatars['query'] }> {
         return request('avatars', {
             method: 'GET',
@@ -42,6 +44,7 @@ const avatarReq = {
         });
     },
 
+    // Not available on NexVR: the shim answers 501
     saveAvatar(params: UpdateAvatarRequest): Promise<{ json: Json<Avatar>; params: UpdateAvatarRequest }> {
         return request(`avatars/${params.id}`, {
             method: 'PUT',
@@ -61,6 +64,7 @@ const avatarReq = {
         });
     },
 
+    // Not available on NexVR: the shim answers 501
     selectAvatar(params: { avatarId: string }): Promise<{ json: Json<CurrentUser>; params }> {
         return request(`avatars/${params.avatarId}/select`, {
             method: 'PUT',
@@ -85,6 +89,7 @@ const avatarReq = {
         });
     },
 
+    // Not available on NexVR: the shim answers 501
     selectFallbackAvatar(params: { avatarId: string }): Promise<{ json: Json<CurrentUser>; params }> {
         return request(`avatars/${params.avatarId}/selectfallback`, {
             method: 'PUT',
@@ -109,6 +114,7 @@ const avatarReq = {
         });
     },
 
+    // Not available on NexVR: the shim answers 501
     deleteAvatar(params: { avatarId: string }): Promise<{ json: Json<Avatar>; params }> {
         return request(`avatars/${params.avatarId}`, {
             method: 'DELETE'
@@ -121,6 +127,7 @@ const avatarReq = {
         });
     },
 
+    // Not available on NexVR: the shim answers 501
     createImposter(params: { avatarId: string }): Promise<{ json: Json<ServiceStatus>; params }> {
         return request(`avatars/${params.avatarId}/impostor/enqueue`, {
             method: 'POST'
@@ -133,6 +140,7 @@ const avatarReq = {
         });
     },
 
+    // Not available on NexVR: the shim answers 501
     deleteImposter(params: { avatarId: string }): Promise<{ json: unknown; params }> {
         return request(`avatars/${params.avatarId}/impostor`, {
             method: 'DELETE'
@@ -145,6 +153,7 @@ const avatarReq = {
         });
     },
 
+    // Not available on NexVR: the shim answers 501
     getAvailableAvatarStyles(): Promise<{ json: Json<AvatarStyle[]> }> {
         return request('avatarStyles', {
             method: 'GET'
@@ -156,6 +165,7 @@ const avatarReq = {
         });
     },
 
+    // Not available on NexVR: the shim answers 501
     getAvatarGallery(
         avatarId: string
     ): Promise<{ json: Json<File[]>; params: { tag: string; galleryId: string; n: number; offset: number } }> {
@@ -177,6 +187,7 @@ const avatarReq = {
         });
     },
 
+    // Not available on NexVR: the shim answers 501
     uploadAvatarImage(imageData: string): Promise<{ json: Json<File>; params: { tag: string } }> {
         const params = {
             tag: 'avatarimage'
@@ -195,6 +206,7 @@ const avatarReq = {
         });
     },
 
+    // Not available on NexVR: the shim answers 501
     uploadAvatarGalleryImage(imageData: string, avatarId: string): Promise<{ json: Json<File>; params: any }> {
         const params = {
             tag: 'avatargallery',
@@ -214,6 +226,7 @@ const avatarReq = {
         });
     },
 
+    // Not available on NexVR: the shim answers 501
     setAvatarGalleryOrder(
         order: string[],
         galleryId: string
@@ -234,6 +247,7 @@ const avatarReq = {
         });
     },
 
+    // Not available on NexVR: the shim answers 501
     getLicensedAvatars(
         params: GetLicensedAvatars['query']
     ): Promise<{ json: Json<Avatar[]>; params: GetLicensedAvatars['query'] }> {

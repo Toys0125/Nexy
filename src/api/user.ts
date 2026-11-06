@@ -61,6 +61,7 @@ const userReq = {
         });
     },
 
+    // Not available on NexVR: the shim answers 501
     addUserTags(params: ChangeUserTagsRequest): Promise<{ json: Json<CurrentUser>; params: ChangeUserTagsRequest }> {
         return request(`users/${getCurrentUserId()}/addTags`, {
             method: 'POST',
@@ -75,6 +76,7 @@ const userReq = {
         });
     },
 
+    // Not available on NexVR: the shim answers 501
     removeUserTags(params: ChangeUserTagsRequest): Promise<{ json: Json<CurrentUser>; params: ChangeUserTagsRequest }> {
         return request(`users/${getCurrentUserId()}/removeTags`, {
             method: 'POST',
@@ -89,6 +91,7 @@ const userReq = {
         });
     },
 
+    // Not available on NexVR: the shim answers 501
     getUserFeedback(params: { userId: string }): Promise<{ json: Json<Feedback[]>; params: { userId: string } }> {
         return request(`users/${params.userId}/feedback`, {
             method: 'GET',
@@ -126,6 +129,7 @@ const userReq = {
         });
     },
 
+    // Not available on NexVR: the shim answers 501
     getUserNotes(params: GetUserNotes['query']): Promise<{ json: Json<UserNote[]>; params: GetUserNotes['query'] }> {
         return request(`userNotes`, {
             method: 'GET',
@@ -139,6 +143,7 @@ const userReq = {
         });
     },
 
+    // Not available on NexVR: the shim answers 501
     getMutualCounts(params: { userId: string }): Promise<{ json: Json<Mutuals>; params: { userId: string } }> {
         return request(`users/${params.userId}/mutuals`, {
             method: 'GET'
@@ -151,6 +156,7 @@ const userReq = {
         });
     },
 
+    // Not available on NexVR: the shim answers 501
     getMutualFriends(
         params: GetMutualFriends['path'] & GetMutualFriends['query']
     ): Promise<{ json: Json<MutualFriend[]>; params: GetMutualFriends['path'] & GetMutualFriends['query'] }> {
@@ -166,6 +172,7 @@ const userReq = {
         });
     },
 
+    // Not available on NexVR: the shim answers 501
     getMutualGroups(
         params: GetMutualGroups['path'] & GetMutualGroups['query']
     ): Promise<{ json: Json<LimitedUserGroups[]>; params: GetMutualGroups['path'] & GetMutualGroups['query'] }> {
@@ -199,6 +206,7 @@ const userReq = {
         });
     },
 
+    // Not available on NexVR: the shim answers 501
     getPrivateProfile(params: { userId: string }): Promise<{ json: Json<PrivateProfile>; params: { userId: string } }> {
         return request(`profile/${params.userId}/private`, {
             method: 'GET'
@@ -211,6 +219,7 @@ const userReq = {
         });
     },
 
+    // Not available on NexVR: the shim answers 501
     getClientConfig(): Promise<{ json: Json<UserClientConfig> }> {
         return request(`users/${getCurrentUserId()}/clientConfig`, {
             method: 'GET'
@@ -222,6 +231,7 @@ const userReq = {
         });
     },
 
+    // Not available on NexVR: the shim answers 501
     saveClientConfig(
         params: UpdateUserClientConfigRequest
     ): Promise<{ json: Json<UserClientConfig>; params: UpdateUserClientConfigRequest }> {
@@ -237,6 +247,7 @@ const userReq = {
         });
     },
 
+    // Not available on NexVR: the shim answers 501
     getAccountStanding(): Promise<{ json: AccountStanding }> {
         return request('auth/user/accountStanding', {
             method: 'GET'
@@ -263,6 +274,7 @@ const userReq = {
         });
     },
 
+    // Not available on NexVR: the shim answers 501
     saveProfile(params: UpdateProfileRequest): Promise<{ json: Json<PublicProfile>; params: UpdateProfileRequest }> {
         return request(`profile/${getCurrentUserId()}`, {
             method: 'PUT',
@@ -276,6 +288,7 @@ const userReq = {
         });
     },
 
+    // Not available on NexVR: the shim answers 501
     saveProfileTheme(params: {
         buttonColor: string;
         iconColor: string;
@@ -295,6 +308,7 @@ const userReq = {
         });
     },
 
+    // Not available on NexVR: the shim answers 501
     createProfileTheme(params: { buttonColor?: string; iconColor?: string; name: string; subtextColor?: string }) {
         return request(`profile/theme`, {
             method: 'POST',
@@ -308,6 +322,7 @@ const userReq = {
         });
     },
 
+    // Not available on NexVR: the shim answers 501
     deleteProfileTheme(params: { id: string }) {
         return request(`profile/theme/${params.id}`, {
             method: 'DELETE'

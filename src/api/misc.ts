@@ -21,6 +21,7 @@ function getCurrentUserId() {
 }
 
 const miscReq = {
+    // Not available on NexVR: the shim answers 501
     getFile(params: { fileId: string }): Promise<{ json: Json<File>; params: { fileId: string } }> {
         return request(`file/${params.fileId}`, {
             method: 'GET'
@@ -33,6 +34,7 @@ const miscReq = {
         });
     },
 
+    // Not available on NexVR: the shim answers 501
     saveNote(
         params: UpdateUserNoteRequest
     ): Promise<{ json: Json<UpdateUserNoteResponse>; params: UpdateUserNoteRequest }> {
@@ -48,6 +50,7 @@ const miscReq = {
         });
     },
 
+    // Not available on NexVR: the shim answers 501
     getFileAnalysis(params: {
         fileId: string;
         version: number;
@@ -64,6 +67,7 @@ const miscReq = {
         });
     },
 
+    // Not available on NexVR: the shim answers 501
     getStore(params: GetStore['query']): Promise<{ json: Json<Store>; params: GetStore['query'] }> {
         return request('economy/store', {
             method: 'GET',
@@ -77,6 +81,7 @@ const miscReq = {
         });
     },
 
+    // Not available on NexVR: the shim answers 501
     closeInstance(params: { location: string; hardClose: boolean }): Promise<{ json: Json<Instance>; params }> {
         return request(`instances/${params.location}`, {
             method: 'DELETE',
@@ -92,6 +97,7 @@ const miscReq = {
         });
     },
 
+    // Not available on NexVR: the shim answers 501
     deleteWorldPersistData(params: { worldId: string }): Promise<{ json: unknown; params }> {
         return request(`users/${getCurrentUserId()}/${params.worldId}/persist`, {
             method: 'DELETE'
@@ -104,6 +110,7 @@ const miscReq = {
         });
     },
 
+    // Not available on NexVR: the shim answers 501
     hasWorldPersistData(params: { worldId: string }): Promise<{ json: unknown; params }> {
         return request(`users/${getCurrentUserId()}/${params.worldId}/persist/exists`, {
             method: 'GET'
@@ -116,6 +123,7 @@ const miscReq = {
         });
     },
 
+    // Not available on NexVR: the shim answers 501
     updateBadge(
         params: { badgeId: string } & UpdateUserBadgeRequest
     ): Promise<{ json: unknown; params: { badgeId: string } & UpdateUserBadgeRequest }> {
@@ -136,6 +144,7 @@ const miscReq = {
         });
     },
 
+    // Not available on NexVR: the shim answers 501
     getVisits(): Promise<{ json: number }> {
         return request('visits', {
             method: 'GET'
@@ -147,6 +156,7 @@ const miscReq = {
         });
     },
 
+    // Not available on NexVR: the shim answers 501
     deleteFile(fileId: string): Promise<{ json: Json<File>; fileId: string }> {
         return request(`file/${fileId}`, {
             method: 'DELETE'
@@ -163,6 +173,7 @@ const miscReq = {
         });
     },
 
+    // Not available on NexVR: the shim answers 501
     sendBoop(
         params: { userId: string } & BoopRequest
     ): Promise<{ json: Json<Success>; params: { userId: string } & BoopRequest }> {
@@ -181,6 +192,7 @@ const miscReq = {
         });
     },
 
+    // Not available on NexVR: the shim answers 501
     getInfoPush(params: { require?: string; include?: string[] }): Promise<{ json: Json<InfoPush[]>; params }> {
         const query: Record<string, any> = {
             require: params.require,
