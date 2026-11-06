@@ -236,6 +236,39 @@ test.each(['location', 'player joins', 'player leaves', 'player changes'])(
     }
 );
 
+test.each(['history read', 'process check'])(
+    'cancelled tracking cannot restore shared state after the %s',
+    async (when) => {
+        let active = true;
+        let finishRead;
+        const pendingRead = new Promise((resolve) => {
+            finishRead = resolve;
+        });
+        mocks.database.getGamelogDatabase.mockResolvedValue(history());
+        if (when === 'history read') {
+            mocks.database.getGamelogDatabase.mockReturnValueOnce(pendingRead);
+        } else {
+            mocks.isGameRunning.mockReturnValueOnce(pendingRead);
+        }
+        const originalLocation = locationStore.lastLocation;
+        const restoration = tryLoadPlayerList(() => active);
+        await Promise.resolve();
+        active = false;
+        finishRead(when === 'history read' ? history() : true);
+        await restoration;
+
+        expect(locationStore.setLastLocation).not.toHaveBeenCalled();
+        expect(locationStore.lastLocation).toBe(originalLocation);
+        expect(locationStore.lastLocation.playerList.size).toBe(0);
+        expect(mocks.userRequest.getUser).not.toHaveBeenCalled();
+        expect(mocks.userRequest.getPublicProfile).not.toHaveBeenCalled();
+        expect(mocks.instance.updateCurrentInstanceWorld).not.toHaveBeenCalled();
+        if (when === 'history read') {
+            expect(mocks.isGameRunning).not.toHaveBeenCalled();
+        }
+    }
+);
+
 test('keeps live updates made while the native process check is pending', async () => {
     mocks.database.getGamelogDatabase.mockResolvedValue(history());
     let finishCheck;

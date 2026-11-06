@@ -40,8 +40,10 @@ import { useVrcxStore } from '../stores/vrcx';
 /**
  * Loads the player list from game log history and syncs it to
  * locationStore, instanceStore, vrStore, and userStore.
+ *
+ * @param {() => boolean} [isActive] Whether the caller still owns the restoration.
  */
-export async function tryLoadPlayerList() {
+export async function tryLoadPlayerList(isActive = () => true) {
     const gameStore = useGameStore();
     const locationStore = useLocationStore();
     const userStore = useUserStore();
@@ -49,7 +51,7 @@ export async function tryLoadPlayerList() {
     const instanceStore = useInstanceStore();
     const vrStore = useVrStore();
 
-    if (!gameStore.isGameRunning) {
+    if (!isActive() || !gameStore.isGameRunning) {
         return;
     }
     console.log('Loading player list from game log...');
@@ -69,7 +71,7 @@ export async function tryLoadPlayerList() {
     let isProcessRunning;
     try {
         data = await database.getGamelogDatabase();
-        if (!gameStore.isGameRunning || data.length === 0 || sessionChanged) {
+        if (!isActive() || !gameStore.isGameRunning || data.length === 0 || sessionChanged) {
             return;
         }
         // The polling loop awaits this restore, so its stored flag alone
@@ -78,7 +80,7 @@ export async function tryLoadPlayerList() {
     } finally {
         stopWatching();
     }
-    if (!isProcessRunning || !gameStore.isGameRunning || sessionChanged) {
+    if (!isActive() || !isProcessRunning || !gameStore.isGameRunning || sessionChanged) {
         return;
     }
     let length = 0;

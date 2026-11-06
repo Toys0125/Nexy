@@ -131,7 +131,7 @@ async function sync(session) {
     const locationStore = useLocationStore();
     if (location && !locationStore.lastLocation.location) {
         // A failed restore must leave the session uncommitted so the next sync retries it.
-        await tryLoadPlayerList();
+        await tryLoadPlayerList(() => session.active && ownLocation() === location);
         if (!session.active || !useGameStore().isGameRunning || ownLocation() !== location) {
             return;
         }
