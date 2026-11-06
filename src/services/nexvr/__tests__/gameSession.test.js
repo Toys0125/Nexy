@@ -249,6 +249,37 @@ describe('NexVR game session', () => {
         }
     });
 
+    test.each(['before sync starts', 'during history restoration'])(
+        'stopping tracking %s cancels pending session work',
+        async (when) => {
+            let finishRestore;
+            const restoration = new Promise((resolve) => {
+                finishRestore = resolve;
+            });
+            restorePlayerList.mockReturnValueOnce(restoration);
+            realtime.friends = new Map([['me', presence('me', 'i1')]]);
+            stop = startGameSession();
+            if (when === 'during history restoration') {
+                await flush();
+                expect(restorePlayerList).toHaveBeenCalledOnce();
+                // A presence frame queued before teardown must also be cancelled.
+                realtime.emit('friends', { snapshot: false, changed: [], removed: [] });
+            }
+            stop();
+            finishRestore();
+            await flush();
+
+            expect(entries).toEqual([]);
+            expect(realtime.watchedInstances).toEqual([]);
+            // A fresh connection must still be able to initialize the same instance.
+            restorePlayerList.mockReset();
+            stop = startGameSession();
+            await flush();
+            expect(summary()).toEqual(['location:w1:i1~region(ca)', 'player-joined:me']);
+            expect(realtime.watchedInstances).toEqual(['i1']);
+        }
+    );
+
     test('retries a failed history read before logging the location and its occupants', async () => {
         const error = new Error('history read failed');
         const syncError = vi.spyOn(console, 'error').mockImplementation(() => {});
