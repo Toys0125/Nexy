@@ -10,6 +10,7 @@ import {
     presenceState,
     presenceToUser,
     toNexvrEventBody,
+    toNexVRAvatar,
     toNexVRCalendarEvent,
     toNexVRCurrentUser,
     toNexVRGroup,
@@ -548,6 +549,33 @@ async function worldSearch(query) {
 }
 
 /**
+ * @param {any[]} avatars NexVR avatars
+ * @param {URLSearchParams} query
+ * @returns {Promise<object[]>} One page of VRChat-shaped avatars
+ */
+async function avatarPage(avatars, query) {
+    const status = query.get('releaseStatus');
+    const listed =
+        status === 'public' || status === 'private'
+            ? avatars.filter((a) => (a.publicity === 'public' ? 'public' : 'private') === status)
+            : avatars;
+    return Promise.all(searchPage(listed, query).map(async (a) => toNexVRAvatar(a, await displayNameOf(a.owner))));
+}
+
+/**
+ * NexVR only lists the caller's own avatars, so anyone else's list is empty.
+ *
+ * @param {URLSearchParams} query
+ */
+async function avatarSearch(query) {
+    const own = query.get('user') === 'me' || (realtime.userId && query.get('userId') === realtime.userId);
+    if (!own) {
+        return [];
+    }
+    return avatarPage(await nexvr('/avatars/own/list'), query);
+}
+
+/**
  * Route table: [method, pattern, handler(match, query, body, headers)].
  * Patterns match the path after the API base, without the query string.
  *
@@ -715,6 +743,18 @@ const routes = [
         async (m) => {
             await nexvr(`/friends/${encodeURIComponent(m[1])}`, { method: 'DELETE' });
             return { success: { message: 'Friend request cancelled', status_code: 200 } };
+        }
+    ],
+    ['GET', /^avatars$/, (m, q) => avatarSearch(q)],
+    // avatars shared with the caller stand in for licensed ones.
+    // Must sit above avatars/{id}, which would take 'licensed' for an id.
+    ['GET', /^avatars\/licensed$/, async (m, q) => avatarPage(await nexvr('/avatars/shared'), q)],
+    [
+        'GET',
+        /^avatars\/([^/]+)$/,
+        async (m) => {
+            const avatar = await nexvr(`/avatars/${encodeURIComponent(m[1])}`);
+            return toNexVRAvatar(avatar, await displayNameOf(avatar.owner));
         }
     ],
     ['GET', /^worlds$/, (m, q) => worldSearch(q)],

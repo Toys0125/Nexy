@@ -16,7 +16,6 @@ import { request } from '../services/request';
 import { applyCurrentUser } from '../coordinators/userCoordinator';
 
 const avatarReq = {
-    // Not available on NexVR: the shim answers 501
     getAvatar(params: { avatarId: string }): Promise<{ json: Json<Avatar>; params: { avatarId: string } }> {
         return request(`avatars/${params.avatarId}`, {
             method: 'GET'
@@ -29,7 +28,7 @@ const avatarReq = {
         });
     },
 
-    // Not available on NexVR: the shim answers 501
+    // NexVR lists only the caller's own avatars
     getAvatars(params: SearchAvatars['query']): Promise<{ json: Json<Avatar[]>; params: SearchAvatars['query'] }> {
         return request('avatars', {
             method: 'GET',
@@ -247,7 +246,7 @@ const avatarReq = {
         });
     },
 
-    // Not available on NexVR: the shim answers 501
+    // NexVR: avatars shared with the caller
     getLicensedAvatars(
         params: GetLicensedAvatars['query']
     ): Promise<{ json: Json<Avatar[]>; params: GetLicensedAvatars['query'] }> {
