@@ -137,6 +137,14 @@ async function sync(session) {
         }
     }
 
+    let worldName = '';
+    if (location && locationStore.lastLocation.location !== location) {
+        worldName = await getWorldName(location).catch(() => '');
+        if (!session.active || !useGameStore().isGameRunning || ownLocation() !== location) {
+            return;
+        }
+    }
+
     debug('instance changed', currentLocation, '→', location);
     currentLocation = location;
     currentSessionStart = 0;
@@ -155,10 +163,6 @@ async function sync(session) {
             occupants.set(userId, player.displayName);
         }
     } else {
-        const worldName = await getWorldName(location).catch(() => '');
-        if (!session.active) {
-            return;
-        }
         const dt = now();
         currentSessionStart = Date.parse(dt);
         await addGameLogEntry({ type: 'location', dt, location, worldName }, location);
