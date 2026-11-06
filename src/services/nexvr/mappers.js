@@ -448,6 +448,42 @@ export function toNexVRWorld(world, authorName = '') {
     };
 }
 
+/**
+ * @param {any} avatar NexVR avatar
+ * @param {string} [authorName]
+ * @returns {object} VRChat-shaped Avatar
+ */
+export function toNexVRAvatar(avatar, authorName = '') {
+    const versions = avatar.versions || [];
+    const current = versions.find((v) => v.versionNumber === avatar.currentVersion) || versions[versions.length - 1];
+    const createdAt = versions[0]?.package?.uploadedAt || '';
+    const updatedAt = current?.package?.uploadedAt || createdAt;
+    const image = avatar.imageUrl || '';
+    return {
+        id: avatar.id,
+        name: avatar.name,
+        description: avatar.description || '',
+        authorId: avatar.owner,
+        authorName,
+        imageUrl: image,
+        thumbnailImageUrl: image,
+        releaseStatus: avatar.publicity === 'public' ? 'public' : 'private',
+        tags: avatar.system_tags || [],
+        created_at: createdAt,
+        updated_at: updatedAt,
+        version: versions.length,
+        unityPackages: (current?.package?.platforms || []).map((platform) => ({
+            id: `${avatar.id}_${platform}`,
+            platform: PLATFORMS[platform] || platform,
+            assetVersion: 4,
+            unityVersion: '',
+            created_at: updatedAt,
+            assetUrl: '',
+            variant: 'standard'
+        }))
+    };
+}
+
 const INSTANCE_TYPES = {
     public: 'public',
     'friends-of-friends': 'hidden',
