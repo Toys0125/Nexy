@@ -306,6 +306,41 @@ describe('NexVR game session', () => {
         expect(realtime.watchedInstances).toEqual(['i1']);
     });
 
+    test.each(['game stops', 'location changes'])('discards a world lookup when the %s', async (change) => {
+        let finishLookup;
+        getWorldName.mockReturnValueOnce(
+            new Promise((resolve) => {
+                finishLookup = resolve;
+            })
+        );
+        realtime.friends = new Map([['me', presence('me', 'i1')]]);
+        stop = startGameSession();
+        await flush();
+        expect(getWorldName).toHaveBeenCalledOnce();
+
+        if (change === 'game stops') {
+            game.isGameRunning = false;
+            await flush();
+        } else {
+            await setFriends([presence('me', 'i2')]);
+        }
+        finishLookup('Club');
+        await flush();
+
+        if (change === 'game stops') {
+            expect(entries).toEqual([]);
+            expect(realtime.watchedInstances).toEqual([]);
+            game.isGameRunning = true;
+            await flush();
+            expect(summary()).toEqual(['location:w1:i1~region(ca)', 'player-joined:me']);
+        } else {
+            expect(summary()).toEqual(['location:w1:i2~region(ca)', 'player-joined:me']);
+            await setFriends([presence('me', 'i1')]);
+            expect(summary().slice(2)).toEqual(['location:w1:i1~region(ca)', 'player-joined:me']);
+        }
+        expect(realtime.watchedInstances).toEqual(['i1']);
+    });
+
     test('retries a failed history read before logging the location and its occupants', async () => {
         const error = new Error('history read failed');
         const syncError = vi.spyOn(console, 'error').mockImplementation(() => {});
