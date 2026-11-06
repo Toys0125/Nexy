@@ -1,4 +1,5 @@
-import { beforeEach, describe, expect, test, vi } from 'vitest';
+import { DatabaseSync } from 'node:sqlite';
+import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 
 const mocks = vi.hoisted(() => ({
     execute: vi.fn()
@@ -13,6 +14,8 @@ vi.mock('../../sqlite.js', () => ({
 vi.mock('../index.js', () => ({
     dbVars: {
         maxTableSize: 500,
+        searchTableSize: 2,
+        userId: 'me',
         userPrefix: ''
     }
 }));
@@ -47,5 +50,52 @@ describe('gameLog.getMyTopWorlds', () => {
             '@daysOffset': '-30 days',
             '@excludeWorldId': 'wrld_home'
         });
+    });
+});
+
+describe('game log query ordering before row limits', () => {
+    let db;
+
+    beforeEach(() => {
+        db = new DatabaseSync(':memory:');
+        db.exec(`
+            CREATE TABLE gamelog_join_leave (
+                id INTEGER PRIMARY KEY, created_at TEXT, type TEXT,
+                display_name TEXT, location TEXT, user_id TEXT, time INTEGER
+            );
+            INSERT INTO gamelog_join_leave VALUES
+                (1, '2026-11-05T22:00:00.000Z', 'OnPlayerLeft', 'Player', 'world:instance', 'a', 1000),
+                (2, '2026-11-05T22:00:00.000Z', 'OnPlayerJoined', 'Player', 'world:instance', 'b', 0),
+                (3, '2026-11-05T22:00:00.000Z', 'OnPlayerJoined', 'Player', 'world:instance', 'c', 0);
+        `);
+        mocks.execute.mockImplementation(async (callback, sql, params) => {
+            const statement = db.prepare(sql);
+            statement.setReturnArrays(true);
+            for (const row of statement.all(params)) {
+                callback(row);
+            }
+        });
+    });
+
+    afterEach(() => db.close());
+
+    test.each(['location', 'lookup', 'search'])('%s retains priority rows at the limit', async (query) => {
+        const filters = ['OnPlayerJoined', 'OnPlayerLeft'];
+        const read = () => {
+            switch (query) {
+                case 'location':
+                    return gameLog.getGameLogByLocation('world:instance', filters);
+                case 'lookup':
+                    return gameLog.lookupGameLogDatabase(filters, [], 2);
+                default:
+                    return gameLog.searchGameLogDatabase('Player', filters, [], 2);
+            }
+        };
+        expect((await read()).map((row) => row.rowId)).toEqual([1, 3]);
+
+        // Later insertions with older timestamps must not displace newer entries.
+        db.exec(`INSERT INTO gamelog_join_leave VALUES
+            (4, '2026-11-05T21:00:00.000Z', 'OnPlayerLeft', 'Player', 'world:instance', 'd', 1000)`);
+        expect((await read()).map((row) => row.rowId)).toEqual([1, 3]);
     });
 });

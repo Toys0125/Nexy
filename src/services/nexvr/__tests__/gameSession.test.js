@@ -1,19 +1,22 @@
 import { nextTick, reactive } from 'vue';
 
 const entries = [];
+const restorePlayerList = vi.fn();
 const game = reactive({ isGameRunning: true });
 const location = reactive({ lastLocation: { location: '', playerList: new Map() } });
 
 vi.mock('../../appConfig', () => ({ AppDebug: { debugGameLog: false, websocketDomain: '' } }));
 vi.mock('../../../coordinators/gameLogCoordinator', () => ({
+    tryLoadPlayerList: (...args) => restorePlayerList(...args),
     addGameLogEntry: vi.fn(async (entry) => {
         entries.push(entry);
     })
 }));
 vi.mock('../../../stores/game', () => ({ useGameStore: () => game }));
 vi.mock('../../../stores/location', () => ({ useLocationStore: () => location }));
-vi.mock('../../../shared/utils/world', () => ({ getWorldName: async () => 'Club' }));
+vi.mock('../../../shared/utils/world', () => ({ getWorldName: vi.fn(async () => 'Club') }));
 
+import { getWorldName } from '../../../shared/utils/world';
 import { PresenceStatus } from '../realtimeSchema';
 import { realtime } from '../realtime';
 import { startGameSession } from '../gameSession';
@@ -56,13 +59,18 @@ describe('NexVR game session', () => {
 
     beforeEach(() => {
         entries.length = 0;
+        restorePlayerList.mockReset();
+        getWorldName.mockReset().mockResolvedValue('Club');
         realtime.userId = 'me';
         realtime.watchedInstances = [];
         game.isGameRunning = true;
         location.lastLocation = { location: '', playerList: new Map() };
     });
 
-    afterEach(() => stop?.());
+    afterEach(() => {
+        stop?.();
+        vi.restoreAllMocks();
+    });
 
     test('logs the instance and the friends in it, then the occupant feed', async () => {
         realtime.friends = new Map([
@@ -89,7 +97,7 @@ describe('NexVR game session', () => {
         });
         await flush();
         expect(summary().slice(3)).toEqual(['player-joined:x']);
-        expect(entries[3].dt).toBe('2026-10-31T00:00:00.000Z');
+        expect(Date.parse(entries[3].dt)).toBe(Date.parse(entries[0].dt) + 1);
 
         realtime.emit('instanceModeration', {
             instanceId: 'i1',
@@ -102,6 +110,38 @@ describe('NexVR game session', () => {
         });
         await flush();
         expect(summary().slice(4)).toEqual(['player-left:a']);
+    });
+
+    test('discards an old occupant frame queued behind an instance change', async () => {
+        realtime.friends = new Map([['me', presence('me', 'i1')]]);
+        stop = startGameSession();
+        await flush();
+        realtime.friends = new Map([['me', presence('me', 'i2')]]);
+        realtime.emit('friends', { snapshot: false, changed: [], removed: [] });
+        realtime.emit('instanceModeration', {
+            instanceId: 'i1',
+            moderation: { occupants: [{ userId: 'stale', displayName: 'Stale' }] }
+        });
+        await flush();
+        expect(entries.some((entry) => entry.userId === 'stale')).toBe(false);
+    });
+
+    test('keeps a reported join time after the local instance start', async () => {
+        realtime.friends = new Map([['me', presence('me', 'i1')]]);
+        stop = startGameSession();
+        await flush();
+        const joinedAt = new Date(Date.parse(entries[0].dt) + 5000).toISOString();
+        realtime.emit('instanceModeration', {
+            instanceId: 'i1',
+            moderation: {
+                occupants: [
+                    { userId: 'me', displayName: 'ME' },
+                    { userId: 'a', displayName: 'A', joinedAt }
+                ]
+            }
+        });
+        await flush();
+        expect(entries.find((entry) => entry.userId === 'a').dt).toBe(joinedAt);
     });
 
     test('without an occupant feed, friends coming and going are the player list', async () => {
@@ -159,5 +199,171 @@ describe('NexVR game session', () => {
         stop = startGameSession();
         await flush();
         expect(summary()).toEqual(['player-joined:a']);
+    });
+
+    test('waits for history restoration before deciding whether a location is new', async () => {
+        restorePlayerList.mockImplementation(async () => {
+            location.lastLocation = {
+                location: 'w1:i1~region(ca)',
+                date: Date.now() - 10000,
+                playerList: new Map([['me', { displayName: 'ME' }]])
+            };
+        });
+        realtime.friends = new Map([['me', presence('me', 'i1')]]);
+        stop = startGameSession();
+        await flush();
+        expect(restorePlayerList).toHaveBeenCalledOnce();
+        expect(entries).toEqual([]);
+    });
+
+    test.each(['game stops', 'location changes'])('discards restored history when the %s', async (change) => {
+        let finishRestore;
+        restorePlayerList.mockImplementationOnce(
+            () =>
+                new Promise((resolve) => {
+                    finishRestore = resolve;
+                })
+        );
+        realtime.friends = new Map([['me', presence('me', 'i1')]]);
+        stop = startGameSession();
+        await flush();
+        expect(restorePlayerList).toHaveBeenCalledOnce();
+        expect(entries).toEqual([]);
+
+        if (change === 'game stops') {
+            game.isGameRunning = false;
+            await flush();
+        } else {
+            await setFriends([presence('me', 'i2')]);
+        }
+        finishRestore();
+        await flush();
+
+        if (change === 'game stops') {
+            expect(entries).toEqual([]);
+            expect(realtime.watchedInstances).toEqual([]);
+            game.isGameRunning = true;
+            await flush();
+            expect(summary()).toEqual(['location:w1:i1~region(ca)', 'player-joined:me']);
+        } else {
+            expect(summary()).toEqual(['location:w1:i2~region(ca)', 'player-joined:me']);
+            expect(realtime.watchedInstances).toEqual(['i2']);
+        }
+    });
+
+    test.each(['before sync starts', 'during history restoration'])(
+        'stopping tracking %s cancels pending session work',
+        async (when) => {
+            let finishRestore;
+            const restoration = new Promise((resolve) => {
+                finishRestore = resolve;
+            });
+            restorePlayerList.mockReturnValueOnce(restoration);
+            realtime.friends = new Map([['me', presence('me', 'i1')]]);
+            stop = startGameSession();
+            let canRestore;
+            if (when === 'during history restoration') {
+                await flush();
+                expect(restorePlayerList).toHaveBeenCalledOnce();
+                canRestore = restorePlayerList.mock.calls[0][0];
+                expect(canRestore()).toBe(true);
+                // A presence frame queued before teardown must also be cancelled.
+                realtime.emit('friends', { snapshot: false, changed: [], removed: [] });
+            }
+            stop();
+            if (canRestore) expect(canRestore()).toBe(false);
+            finishRestore();
+            await flush();
+
+            expect(entries).toEqual([]);
+            expect(realtime.watchedInstances).toEqual([]);
+            // A fresh connection must still be able to initialize the same instance.
+            restorePlayerList.mockReset();
+            stop = startGameSession();
+            await flush();
+            expect(summary()).toEqual(['location:w1:i1~region(ca)', 'player-joined:me']);
+            expect(realtime.watchedInstances).toEqual(['i1']);
+        }
+    );
+
+    test('stopping tracking during a world lookup prevents stale entries and allows reconnecting', async () => {
+        let finishLookup;
+        const lookup = new Promise((resolve) => {
+            finishLookup = resolve;
+        });
+        getWorldName.mockReturnValueOnce(lookup);
+        realtime.friends = new Map([['me', presence('me', 'i1')]]);
+        stop = startGameSession();
+        await flush();
+        expect(getWorldName).toHaveBeenCalledOnce();
+        expect(entries).toEqual([]);
+
+        stop();
+        finishLookup('Club');
+        await flush();
+        expect(entries).toEqual([]);
+        expect(realtime.watchedInstances).toEqual([]);
+
+        stop = startGameSession();
+        await flush();
+        expect(summary()).toEqual(['location:w1:i1~region(ca)', 'player-joined:me']);
+        expect(realtime.watchedInstances).toEqual(['i1']);
+    });
+
+    test.each(['game stops', 'location changes'])('discards a world lookup when the %s', async (change) => {
+        let finishLookup;
+        getWorldName.mockReturnValueOnce(
+            new Promise((resolve) => {
+                finishLookup = resolve;
+            })
+        );
+        realtime.friends = new Map([['me', presence('me', 'i1')]]);
+        stop = startGameSession();
+        await flush();
+        expect(getWorldName).toHaveBeenCalledOnce();
+
+        if (change === 'game stops') {
+            game.isGameRunning = false;
+            await flush();
+        } else {
+            await setFriends([presence('me', 'i2')]);
+        }
+        finishLookup('Club');
+        await flush();
+
+        if (change === 'game stops') {
+            expect(entries).toEqual([]);
+            expect(realtime.watchedInstances).toEqual([]);
+            game.isGameRunning = true;
+            await flush();
+            expect(summary()).toEqual(['location:w1:i1~region(ca)', 'player-joined:me']);
+        } else {
+            expect(summary()).toEqual(['location:w1:i2~region(ca)', 'player-joined:me']);
+            await setFriends([presence('me', 'i1')]);
+            expect(summary().slice(2)).toEqual(['location:w1:i1~region(ca)', 'player-joined:me']);
+        }
+        expect(realtime.watchedInstances).toEqual(['i1']);
+    });
+
+    test('retries a failed history read before logging the location and its occupants', async () => {
+        const error = new Error('history read failed');
+        const syncError = vi.spyOn(console, 'error').mockImplementation(() => {});
+        restorePlayerList.mockRejectedValueOnce(error);
+        realtime.friends = new Map([['me', presence('me', 'i1')]]);
+        stop = startGameSession();
+        await flush();
+        expect(syncError).toHaveBeenCalledWith('NexVR session sync failed:', error);
+        expect(entries).toEqual([]);
+
+        realtime.emit('instanceModeration', {
+            instanceId: 'i1',
+            moderation: { occupants: [{ userId: 'stranger', displayName: 'Stranger' }] }
+        });
+        await flush();
+        expect(entries).toEqual([]);
+
+        await setFriends([presence('me', 'i1'), presence('a', 'i1')]);
+        expect(restorePlayerList).toHaveBeenCalledTimes(2);
+        expect(summary()).toEqual(['location:w1:i1~region(ca)', 'player-joined:me', 'player-joined:a']);
     });
 });

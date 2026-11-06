@@ -143,6 +143,9 @@ export async function runLastLocationResetFlow(gameLogDate) {
     const playerList = Array.from(locationStore.lastLocation.playerList.values());
     const dataBaseEntries = [];
     for (const ref of playerList) {
+        if (ref.userId === userStore.currentUser.id) {
+            continue;
+        }
         const entry = {
             created_at: dateTime,
             type: 'OnPlayerLeft',
