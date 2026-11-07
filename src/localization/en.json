@@ -725,8 +725,10 @@
             },
             "shortcuts": {
                 "header": "Shortcuts",
-                "nexvr_install": "NexVR Install",
-                "nexvr_install_description": "Open the NexVR installation folder",
+                "nexvr_launcher": "NexVR Install (Launcher)",
+                "nexvr_launcher_description": "Open the NexVR launcher install folder",
+                "nexvr_steam": "NexVR Install (Steam)",
+                "nexvr_steam_description": "Open the NexVR Steam install folder",
                 "nexvr_photos": "NexVR Photos",
                 "nexvr_photos_description": "Open your NexVR photos folder",
                 "nexvr_videos": "NexVR Videos",

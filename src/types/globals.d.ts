@@ -211,7 +211,10 @@ declare global {
         OpenUGCPhotosFolder(ugcPath?: string): Promise<boolean>;
         OpenVrcScreenshotsFolder(): Promise<boolean>;
         OpenCrashVrcCrashDumps(): Promise<boolean>;
-        OpenNexvrInstallFolder(): Promise<boolean>;
+        HasNexvrLauncherInstall(): Promise<boolean>;
+        HasNexvrSteamInstall(): Promise<boolean>;
+        OpenNexvrLauncherFolder(): Promise<boolean>;
+        OpenNexvrSteamFolder(): Promise<boolean>;
         OpenNexvrPhotosFolder(): Promise<boolean>;
         OpenNexvrVideosFolder(): Promise<boolean>;
         OpenShortcutFolder(): Promise<void>;

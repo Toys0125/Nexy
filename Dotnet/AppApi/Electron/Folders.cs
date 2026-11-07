@@ -299,21 +299,28 @@ namespace VRCX
             return true;
         }
 
-        /// <summary>
-        /// NexVR's own launcher keeps the client in %APPDATA%\nexvr-launcher\client;
-        /// the Steam build sits in steamapps\common\NexVR of any Steam library.
-        /// </summary>
-        private static string GetNexvrInstallLocation()
+        // A folder only counts as an install while it still holds the client,
+        // so an uninstall that leaves the folder behind is not offered.
+        private static bool IsNexvrInstall(string path)
         {
-            var launcherPath = Path.Join(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "nexvr-launcher", "client");
-            if (Directory.Exists(launcherPath))
-                return launcherPath;
+            return File.Exists(Path.Join(path, "NexVR.exe"));
+        }
 
+        /// <summary>NexVR's own launcher keeps the client in %APPDATA%\nexvr-launcher\client.</summary>
+        private static string GetNexvrLauncherLocation()
+        {
+            var path = Path.Join(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "nexvr-launcher", "client");
+            return IsNexvrInstall(path) ? path : string.Empty;
+        }
+
+        /// <summary>The Steam build sits in steamapps\common\NexVR of any Steam library.</summary>
+        private static string GetNexvrSteamLocation()
+        {
             foreach (var libraryPath in GetSteamLibraryPaths())
             {
-                var steamPath = Path.Join(libraryPath, "steamapps", "common", "NexVR");
-                if (Directory.Exists(steamPath))
-                    return steamPath;
+                var path = Path.Join(libraryPath, "steamapps", "common", "NexVR");
+                if (IsNexvrInstall(path))
+                    return path;
             }
 
             return string.Empty;
@@ -346,9 +353,29 @@ namespace VRCX
             return libraryPaths;
         }
 
-        public override bool OpenNexvrInstallFolder()
+        public override bool HasNexvrLauncherInstall()
         {
-            var path = GetNexvrInstallLocation();
+            return !string.IsNullOrEmpty(GetNexvrLauncherLocation());
+        }
+
+        public override bool HasNexvrSteamInstall()
+        {
+            return !string.IsNullOrEmpty(GetNexvrSteamLocation());
+        }
+
+        public override bool OpenNexvrLauncherFolder()
+        {
+            var path = GetNexvrLauncherLocation();
+            if (!Directory.Exists(path))
+                return false;
+
+            OpenFolderAndSelectItem(path, true);
+            return true;
+        }
+
+        public override bool OpenNexvrSteamFolder()
+        {
+            var path = GetNexvrSteamLocation();
             if (!Directory.Exists(path))
                 return false;
 
