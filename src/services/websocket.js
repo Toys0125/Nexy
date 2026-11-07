@@ -14,7 +14,8 @@ import { onGroupLeft, applyGroup, handleGroupMember } from '../coordinators/grou
 import { handleFriendAdd, handleFriendDelete } from '../coordinators/friendRelationshipCoordinator';
 import { debounce, parseLocation } from '../shared/utils';
 import { AppDebug } from './appConfig';
-import { presenceState, presenceToUser, toNexVRNotification } from './nexvr/mappers';
+import { presenceState, presenceToUser } from './nexvr/mappers';
+import { describeNotification } from './nexvr/shim';
 import { realtime } from './nexvr/realtime';
 import { startGameSession } from './nexvr/gameSession';
 import { startGroupInstances } from './nexvr/groupInstances';
@@ -244,29 +245,23 @@ function handleRealtimeFriends({ snapshot, changed, removed }) {
  *
  * @param {any[]} list
  */
-function handleRealtimeNotifications(list) {
-    const userStore = useUserStore();
-    const ids = new Set();
-    for (const notification of list) {
-        ids.add(notification.id);
-        if (knownNotificationIds.has(notification.id)) {
-            continue;
-        }
-        const json = toNexVRNotification(notification);
-        if (!json.senderUsername) {
-            json.senderUsername =
-                realtime.friends.get(json.senderUserId)?.displayName ??
-                userStore.cachedUsers.get(json.senderUserId)?.displayName ??
-                '';
-        }
-        emitPipeline('notification', json);
-    }
+async function handleRealtimeNotifications(list) {
+    const ids = new Set(list.map((notification) => notification.id));
+    const added = list.filter((notification) => !knownNotificationIds.has(notification.id));
     for (const id of knownNotificationIds) {
         if (!ids.has(id)) {
             emitPipeline('hide-notification', id);
         }
     }
     knownNotificationIds = ids;
+    // names and pictures are looked up first, so the notification arrives looking finished
+    const described = await Promise.all(added.map(describeNotification));
+    for (const json of described) {
+        // dismissed while it was being looked up
+        if (knownNotificationIds.has(json.id)) {
+            emitPipeline('notification', json);
+        }
+    }
 }
 
 /**
