@@ -415,12 +415,18 @@ async function notificationsList(query) {
     if (query.get('hidden') === 'true' || Number(query.get('offset') || 0) > 0) {
         return [];
     }
+    const session = getRequestSession();
     const list = await realtime.getNotifications();
+    const described = await Promise.all(list.map(describeNotification));
+    if (session !== getRequestSession()) {
+        // signed out while it loaded; never hand one account's list to the next
+        return [];
+    }
     notificationsById.clear();
     for (const notification of list) {
         notificationsById.set(notification.id, notification);
     }
-    return Promise.all(list.map(describeNotification));
+    return described;
 }
 
 /**
