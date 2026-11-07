@@ -38,6 +38,27 @@ describe('useToolAvailability', () => {
         expect(isToolNavKeyAvailable('tool-nexvr-steam')).toBe(true);
     });
 
+    test('keeps the latest refresh when an older one finishes last', async () => {
+        let resolveOld;
+        globalThis.AppApi = {
+            HasNexvrLauncherInstall: vi.fn().mockReturnValueOnce(
+                new Promise((resolve) => {
+                    resolveOld = resolve;
+                })
+            ),
+            HasNexvrSteamInstall: vi.fn().mockResolvedValue(false)
+        };
+        const { isToolNavKeyAvailable, refreshToolAvailability } = useToolAvailability();
+
+        const oldRefresh = refreshToolAvailability();
+        globalThis.AppApi.HasNexvrLauncherInstall.mockResolvedValue(false);
+        await refreshToolAvailability();
+        resolveOld(true);
+        await oldRefresh;
+
+        expect(isToolNavKeyAvailable('tool-nexvr-launcher')).toBe(false);
+    });
+
     test('always shows tools without a check', () => {
         const { isToolAvailable, isToolNavKeyAvailable } = useToolAvailability();
 
