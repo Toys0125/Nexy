@@ -6,7 +6,6 @@ const initialDialogState = () => ({
     blockedGroups: false,
     groupInvites: false,
     noteExport: false,
-    exportDiscordNames: false,
     exportFriendsList: false,
     exportAvatarsList: false,
     editInviteMessages: false,

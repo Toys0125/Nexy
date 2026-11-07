@@ -188,16 +188,6 @@ const allToolDefinitions = [
         action: { type: 'dialog', dialogKey: 'group-invites' }
     },
     {
-        key: 'discord-names',
-        category: 'user',
-        iconKey: 'users',
-        navIcon: 'ri-discord-line',
-        titleKey: 'view.tools.export.discord_names',
-        descriptionKey: 'view.tools.user.discord_names_description',
-        navEligible: true,
-        action: { type: 'dialog', dialogKey: 'export-discord-names' }
-    },
-    {
         key: 'export-notes',
         category: 'user',
         iconKey: 'file-text',

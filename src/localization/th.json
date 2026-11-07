@@ -485,7 +485,6 @@
         },
         "tools": {
             "export": {
-                "discord_names": "ชื่อ Discord",
                 "export_friend_list": "ส่งออกรายชื่อเพื่อน",
                 "export_own_avatars": "ส่งออกอวาตาร์ของตัวเอง",
                 "header": "ส่งออก",
@@ -512,8 +511,7 @@
                 "calendar_description": "ปฏิทินกิจกรรมกลุ่ม"
             },
             "user": {
-                "discord_names_description": "ค้นหาชื่อผู้ใช้ Discord ของเพื่อนใน VRChat",
-                "export_friend_list_description": "ส่งออกรายชื่อเพื่อนจาก VRChat",
+                "export_friend_list_description": "ส่งออกรายชื่อเพื่อนจาก NexVR",
                 "export_own_avatars_description": "ส่งออกข้อมูลอวาตาร์ส่วนตัวจาก VRChat"
             },
             "redirect_message": "ฟีเจอร์นี้พร้อมใช้งานแล้วบนหน้านี้",
@@ -1859,10 +1857,6 @@
         },
         "export_own_avatars": {
             "header": "ส่งออกอวาตาร์ของตัวเอง"
-        },
-        "discord_names": {
-            "header": "ชื่อ Discord",
-            "description": "คลิก 'โหลดรายการที่ขาดหายไป' ในแท็บรายชื่อเพื่อนเพื่อค้นหารายชื่อเพื่อนทั้งหมด"
         },
         "note_export": {
             "header": "ส่งออกโน้ต",
