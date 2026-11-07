@@ -132,14 +132,19 @@
 
     const { t } = useI18n();
     const userDialogTabs = computed(() => {
-        // Mutual friends, favorite worlds and avatars come from VRChat APIs
-        // NexVR doesn't offer, so those tabs are left out
+        // Mutual friends and favorite worlds come from VRChat APIs NexVR
+        // doesn't offer, so those tabs are left out. NexVR lists only the
+        // caller's own avatars, so Avatars shows on your own profile only.
         const tabs = [
             { value: 'Info', label: t('dialog.user.info.header') },
             { value: 'Groups', label: t('dialog.user.groups.header') },
             { value: 'Worlds', label: t('dialog.user.worlds.header') },
             { value: 'JSON', label: t('dialog.user.json.header') }
         ];
+        if (userDialog.value.id === currentUser.value.id) {
+            const worldsIdx = tabs.findIndex((tab) => tab.value === 'Worlds');
+            tabs.splice(worldsIdx + 1, 0, { value: 'Avatars', label: t('dialog.user.avatars.header') });
+        }
         // Insert Activity before JSON
         const jsonIdx = tabs.findIndex((tab) => tab.value === 'JSON');
         tabs.splice(jsonIdx, 0, { value: 'Activity', label: t('dialog.user.activity.header') });
@@ -218,14 +223,11 @@
 
     // Watching the id too: a cached user can load within one tick, so loading
     // flips true and back to false unseen and the open tab kept the last user
-    watch(
-        [() => userDialog.value.visible, () => userDialog.value.loading, () => userDialog.value.id],
-        () => {
-            if (userDialog.value.visible && !userDialog.value.loading) {
-                loadLastActiveTab();
-            }
+    watch([() => userDialog.value.visible, () => userDialog.value.loading, () => userDialog.value.id], () => {
+        if (userDialog.value.visible && !userDialog.value.loading) {
+            loadLastActiveTab();
         }
-    );
+    });
 
     // The dialog can finish loading before this mounts, so the watcher above
     // never fires for it
@@ -321,14 +323,15 @@
                 groupsTabRef.value?.getUserGroups(userId);
             }
         } else if (tabName === 'Avatars') {
+            if (userId !== currentUser.value.id) {
+                userDialog.value.activeTab = 'Info';
+                userDialog.value.lastActiveTab = 'Info';
+                return;
+            }
             avatarsTabRef.value?.setUserDialogAvatars(userId);
             if (props.previousIds.avatar !== userId) {
                 props.updatePreviousId('avatar', userId);
-                if (userId === currentUser.value.id) {
-                    refreshUserDialogAvatars();
-                } else {
-                    avatarsTabRef.value?.setUserDialogAvatarsRemote(userId);
-                }
+                refreshUserDialogAvatars();
             }
         } else if (tabName === 'Worlds') {
             worldsTabRef.value?.setUserDialogWorlds(userId);
