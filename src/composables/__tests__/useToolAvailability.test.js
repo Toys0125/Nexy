@@ -25,17 +25,22 @@ describe('useToolAvailability', () => {
         expect(isToolNavKeyAvailable('tool-nexvr-steam')).toBe(false);
     });
 
-    test('treats a failed check as not installed', async () => {
+    test('keeps the last known result when a check fails', async () => {
         globalThis.AppApi = {
-            HasNexvrLauncherInstall: vi.fn().mockRejectedValue(new Error('missing method')),
-            HasNexvrSteamInstall: vi.fn().mockResolvedValue(true)
+            HasNexvrLauncherInstall: vi.fn().mockResolvedValue(true),
+            HasNexvrSteamInstall: vi.fn().mockResolvedValue(false)
         };
         const { isToolNavKeyAvailable, refreshToolAvailability } = useToolAvailability();
-
         await refreshToolAvailability();
 
-        expect(isToolNavKeyAvailable('tool-nexvr-launcher')).toBe(false);
-        expect(isToolNavKeyAvailable('tool-nexvr-steam')).toBe(true);
+        globalThis.AppApi = {
+            HasNexvrLauncherInstall: vi.fn().mockRejectedValue(new Error('check failed')),
+            HasNexvrSteamInstall: vi.fn().mockRejectedValue(new Error('check failed'))
+        };
+        await refreshToolAvailability();
+
+        expect(isToolNavKeyAvailable('tool-nexvr-launcher')).toBe(true);
+        expect(isToolNavKeyAvailable('tool-nexvr-steam')).toBe(false);
     });
 
     test('keeps the latest refresh when an older one finishes last', async () => {
