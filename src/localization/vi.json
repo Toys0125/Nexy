@@ -75,8 +75,7 @@
             },
             "world": {
                 "header": "Thế giới",
-                "category": "Tìm kiếm lọc qua thể loại",
-                "community_lab": "Bao gồm community labs"
+                "category": "Tìm kiếm lọc qua thể loại"
             },
             "avatar": {
                 "header": "Avatar",

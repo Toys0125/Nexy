@@ -10,6 +10,7 @@ import {
     presenceState,
     presenceToUser,
     toNexvrEventBody,
+    toNexVRAvatar,
     toNexVRCalendarEvent,
     toNexVRCurrentUser,
     toNexVRGroup,
@@ -536,15 +537,43 @@ function searchPage(list, query) {
 }
 
 async function worldSearch(query) {
-    const user = query.get('userId') || (query.get('user') === 'me' ? realtime.userId : '');
+    const own = query.get('user') === 'me' || (realtime.userId && query.get('userId') === realtime.userId);
     const worlds = await nexvr('/worlds/', {
         query: {
             search: query.get('search'),
             tag: query.get('tag'),
-            creator: user || undefined
+            // by id NexVR lists only public worlds; 'me' includes the caller's private ones
+            creator: own ? 'me' : query.get('userId') || undefined
         }
     });
     return Promise.all(searchPage(worlds, query).map(async (w) => toNexVRWorld(w, await displayNameOf(w.owner))));
+}
+
+/**
+ * @param {any[]} avatars NexVR avatars
+ * @param {URLSearchParams} query
+ * @returns {Promise<object[]>} One page of VRChat-shaped avatars
+ */
+async function avatarPage(avatars, query) {
+    const status = query.get('releaseStatus');
+    const listed =
+        status === 'public' || status === 'private'
+            ? avatars.filter((a) => (a.publicity === 'public' ? 'public' : 'private') === status)
+            : avatars;
+    return Promise.all(searchPage(listed, query).map(async (a) => toNexVRAvatar(a, await displayNameOf(a.owner))));
+}
+
+/**
+ * NexVR only lists the caller's own avatars, so anyone else's list is empty.
+ *
+ * @param {URLSearchParams} query
+ */
+async function avatarSearch(query) {
+    const own = query.get('user') === 'me' || (realtime.userId && query.get('userId') === realtime.userId);
+    if (!own) {
+        return [];
+    }
+    return avatarPage(await nexvr('/avatars/own/list'), query);
 }
 
 /**
@@ -715,6 +744,40 @@ const routes = [
         async (m) => {
             await nexvr(`/friends/${encodeURIComponent(m[1])}`, { method: 'DELETE' });
             return { success: { message: 'Friend request cancelled', status_code: 200 } };
+        }
+    ],
+    ['GET', /^avatars$/, (m, q) => avatarSearch(q)],
+    // avatars shared with the caller stand in for licensed ones.
+    // Must sit above avatars/{id}, which would take 'licensed' for an id.
+    ['GET', /^avatars\/licensed$/, async (m, q) => avatarPage(await nexvr('/avatars/shared'), q)],
+    [
+        'GET',
+        /^avatars\/([^/]+)$/,
+        async (m) => {
+            const avatar = await nexvr(`/avatars/${encodeURIComponent(m[1])}`);
+            return toNexVRAvatar(avatar, await displayNameOf(avatar.owner));
+        }
+    ],
+    [
+        'PUT',
+        /^avatars\/([^/]+)$/,
+        async (m, q, body) => {
+            // only name, description and release status carry over; tags, styles and images don't
+            const patch = {};
+            if (body.name !== undefined) {
+                patch.name = body.name;
+            }
+            if (body.description !== undefined) {
+                patch.description = body.description;
+            }
+            if (body.releaseStatus === 'public' || body.releaseStatus === 'private') {
+                patch.publicity = body.releaseStatus;
+            }
+            if (!Object.keys(patch).length) {
+                throw new ShimError(501, NOT_AVAILABLE);
+            }
+            const avatar = await nexvr(`/avatars/own/${encodeURIComponent(m[1])}`, { method: 'PATCH', body: patch });
+            return toNexVRAvatar(avatar, await displayNameOf(avatar.owner));
         }
     ],
     ['GET', /^worlds$/, (m, q) => worldSearch(q)],

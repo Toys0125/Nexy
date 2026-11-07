@@ -129,8 +129,7 @@
             },
             "world": {
                 "header": "Świat",
-                "category": "Szukaj wg kategorii",
-                "community_lab": "Uwzględniaj Laboratoria Społeczności"
+                "category": "Szukaj wg kategorii"
             },
             "avatar": {
                 "header": "Awatar",

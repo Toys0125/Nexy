@@ -3,7 +3,14 @@
         <HoverCardTrigger as="div">
             <ContextMenu @update:open="handleContextMenuOpen">
                 <ContextMenuTrigger as="div">
-                    <div class="avatar-card-wrapper rounded-lg" @click="$emit('click')">
+                    <div
+                        class="avatar-card-wrapper rounded-lg outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50"
+                        role="button"
+                        tabindex="0"
+                        :aria-label="avatar.name"
+                        @click="$emit('click')"
+                        @keydown.enter.prevent="$emit('click')"
+                        @keydown.space.prevent="$emit('click')">
                         <Card
                             class="avatar-card x-hover-card flex flex-col gap-0 p-0 cursor-pointer overflow-hidden rounded-lg relative hover:bg-accent hover:shadow-sm"
                             :class="isActive ? 'x-highlight-ring' : 'border border-border/50'">
@@ -69,10 +76,6 @@
                         <Eye class="size-4" />
                         {{ t('dialog.avatar.actions.view_details') }}
                     </ContextMenuItem>
-                    <ContextMenuItem :disabled="isActive" @click="emit('context-action', 'wear', avatar)">
-                        <Check class="size-4" />
-                        {{ t('view.favorite.select_avatar_tooltip') }}
-                    </ContextMenuItem>
                     <ContextMenuSeparator />
                     <ContextMenuItem @click="emit('context-action', 'manageTags', avatar)">
                         <Tag class="size-4" />
@@ -101,22 +104,6 @@
                     <ContextMenuItem @click="emit('context-action', 'changeDescription', avatar)">
                         <Pencil class="size-4" />
                         {{ t('dialog.avatar.actions.change_description') }}
-                    </ContextMenuItem>
-                    <ContextMenuItem @click="emit('context-action', 'changeTags', avatar)">
-                        <Pencil class="size-4" />
-                        {{ t('dialog.avatar.actions.change_content_tags') }}
-                    </ContextMenuItem>
-                    <ContextMenuItem @click="emit('context-action', 'changeStyles', avatar)">
-                        <Pencil class="size-4" />
-                        {{ t('dialog.avatar.actions.change_styles_author_tags') }}
-                    </ContextMenuItem>
-                    <ContextMenuItem @click="emit('context-action', 'changeImage', avatar)">
-                        <ImageIcon class="size-4" />
-                        {{ t('dialog.avatar.actions.change_image') }}
-                    </ContextMenuItem>
-                    <ContextMenuItem @click="emit('context-action', 'createImpostor', avatar)">
-                        <RefreshCw class="size-4" />
-                        {{ t('dialog.avatar.actions.create_impostor') }}
                     </ContextMenuItem>
                 </ContextMenuContent>
             </ContextMenu>
@@ -221,13 +208,11 @@
 <script setup>
     import {
         Apple,
-        Check,
         ExternalLink,
         Eye,
         Image as ImageIcon,
         Monitor,
         Pencil,
-        RefreshCw,
         Smartphone,
         Tag,
         User

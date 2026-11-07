@@ -192,12 +192,6 @@
                         <Eye class="size-4" />
                         {{ t('dialog.avatar.actions.view_details') }}
                     </ContextMenuItem>
-                    <ContextMenuItem
-                        :disabled="row.original.id === currentAvatarId"
-                        @click="handleContextMenuAction('wear', row.original)">
-                        <Check class="size-4" />
-                        {{ t('view.favorite.select_avatar_tooltip') }}
-                    </ContextMenuItem>
                     <ContextMenuSeparator />
                     <ContextMenuItem @click="handleContextMenuAction('manageTags', row.original)">
                         <Tag class="size-4" />
@@ -225,22 +219,6 @@
                     <ContextMenuItem @click="handleContextMenuAction('changeDescription', row.original)">
                         <Pencil class="size-4" />
                         {{ t('dialog.avatar.actions.change_description') }}
-                    </ContextMenuItem>
-                    <ContextMenuItem @click="handleContextMenuAction('changeTags', row.original)">
-                        <Pencil class="size-4" />
-                        {{ t('dialog.avatar.actions.change_content_tags') }}
-                    </ContextMenuItem>
-                    <ContextMenuItem @click="handleContextMenuAction('changeStyles', row.original)">
-                        <Pencil class="size-4" />
-                        {{ t('dialog.avatar.actions.change_styles_author_tags') }}
-                    </ContextMenuItem>
-                    <ContextMenuItem @click="handleContextMenuAction('changeImage', row.original)">
-                        <ImageIcon class="size-4" />
-                        {{ t('dialog.avatar.actions.change_image') }}
-                    </ContextMenuItem>
-                    <ContextMenuItem @click="handleContextMenuAction('createImpostor', row.original)">
-                        <RefreshCw class="size-4" />
-                        {{ t('dialog.avatar.actions.create_impostor') }}
                     </ContextMenuItem>
                 </ContextMenuContent>
             </template>
@@ -272,7 +250,7 @@
                             :avatar="avatar"
                             :current-avatar-id="currentAvatarId"
                             :card-scale="cardScale"
-                            @click="handleWearAvatar(avatar.id)"
+                            @click="handleShowAvatarDialog(avatar.id)"
                             @context-action="handleContextMenuAction" />
                     </div>
                 </div>
@@ -282,19 +260,6 @@
             </div>
         </div>
 
-        <input
-            ref="imageUploadInput"
-            type="file"
-            accept="image/*"
-            style="display: none"
-            @change="onFileChangeAvatarImage" />
-        <ImageCropDialog
-            :open="cropDialogOpen"
-            :title="t('dialog.change_content_image.avatar')"
-            :aspect-ratio="4 / 3"
-            :file="cropDialogFile"
-            @update:open="cropDialogOpen = $event"
-            @confirm="onCropConfirmAvatar" />
         <ManageTagsDialog
             v-model:open="manageTagsOpen"
             :avatar-name="manageTagsAvatar?.name || ''"
@@ -306,9 +271,7 @@
 
 <script setup>
     import {
-        Check,
         Eye,
-        Image as ImageIcon,
         LayoutGrid,
         List,
         ListFilter,
@@ -329,19 +292,9 @@
     import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger } from '../../components/ui/dropdown-menu';
     import { Field, FieldContent, FieldLabel } from '../../components/ui/field';
     import { Popover, PopoverContent, PopoverTrigger } from '../../components/ui/popover';
-    import {
-        applyAvatar,
-        selectAvatarWithoutConfirmation,
-        showAvatarDialog
-    } from '../../coordinators/avatarCoordinator';
-    import {
-        handleImageUploadInput,
-        resizeImageToFitLimits,
-        uploadImageLegacy
-    } from '../../coordinators/imageUploadCoordinator';
+    import { applyAvatar, showAvatarDialog } from '../../coordinators/avatarCoordinator';
     import { DataTableEmpty, DataTableLayout } from '../../components/ui/data-table';
     import { ToggleGroup, ToggleGroupItem } from '../../components/ui/toggle-group';
-    import { readFileAsBase64, withUploadTimeout } from '../../shared/utils/imageUpload';
     import { Badge } from '../../components/ui/badge';
     import { Button } from '../../components/ui/button';
     import { Input } from '../../components/ui/input';
@@ -356,7 +309,6 @@
     import { useAvatarCardGrid } from './composables/useAvatarCardGrid';
     import { useVrcxVueTable } from '../../lib/table/useVrcxVueTable';
 
-    import ImageCropDialog from '../../components/dialogs/ImageCropDialog.vue';
     import ManageTagsDialog from './ManageTagsDialog.vue';
     import MyAvatarCard from './components/MyAvatarCard.vue';
     import configRepository from '../../services/config.js';
@@ -377,13 +329,9 @@
     const isLoading = ref(false);
     const avatars = ref([]);
     const avatarTagsMap = ref(new Map());
-    const imageUploadInput = ref(null);
     const viewMode = ref('grid');
     const gridScrollRef = ref(null);
     const gridContainerRefEl = ref(null);
-    const cropDialogOpen = ref(false);
-    const cropDialogFile = ref(null);
-    const changeImageAvatarRef = ref(null);
     const manageTagsOpen = ref(false);
     const manageTagsAvatar = ref(null);
 
@@ -473,27 +421,6 @@
     }
 
     /**
-     * @param avatarId
-     */
-    function handleWearAvatar(avatarId) {
-        if (currentUser.value.currentAvatar === avatarId) {
-            return;
-        }
-        const avatar = avatars.value.find((a) => a.id === avatarId);
-        const avatarName = avatar?.name || avatarId;
-        modalStore
-            .confirm({
-                title: t('confirm.title'),
-                description: `${t('confirm.select_avatar')}\n${avatarName}`
-            })
-            .then(({ ok }) => {
-                if (ok) {
-                    selectAvatarWithoutConfirmation(avatarId);
-                }
-            });
-    }
-
-    /**
      * @param command
      * @param labelKey
      * @param fn
@@ -519,9 +446,6 @@
         switch (action) {
             case 'details':
                 showAvatarDialog(avatarRef.id);
-                break;
-            case 'wear':
-                handleWearAvatar(avatarRef.id);
                 break;
             case 'makePrivate':
                 confirmAndRun(action, 'dialog.avatar.actions.make_private', () => {
@@ -585,24 +509,9 @@
                     })
                     .catch(() => {});
                 break;
-            case 'createImpostor':
-                confirmAndRun(action, 'dialog.avatar.actions.create_impostor', () => {
-                    avatarRequest.createImposter({ avatarId: avatarRef.id }).then(() => {
-                        toast.success(t('message.avatar.impostor_queued'));
-                    });
-                });
-                break;
-            case 'changeImage':
-                changeImageAvatarRef.value = avatarRef;
-                imageUploadInput.value?.click();
-                break;
             case 'manageTags':
                 manageTagsAvatar.value = avatarRef;
                 manageTagsOpen.value = true;
-                break;
-            case 'changeTags':
-            case 'changeStyles':
-                showAvatarDialog(avatarRef.id);
                 break;
         }
     }
@@ -638,62 +547,6 @@
         }
         avatarTagsMap.value.set(avatarId, newEntries);
         avatarTagsMap.value = new Map(avatarTagsMap.value);
-    }
-
-    /**
-     * @param e
-     */
-    function onFileChangeAvatarImage(e) {
-        const { file, clearInput } = handleImageUploadInput(e, {
-            inputSelector: imageUploadInput.value,
-            tooLargeMessage: () => t('message.file.too_large'),
-            invalidTypeMessage: () => t('message.file.not_image')
-        });
-        if (!file) {
-            return;
-        }
-        clearInput();
-        cropDialogFile.value = file;
-        cropDialogOpen.value = true;
-    }
-
-    /**
-     * @param {Blob} blob
-     */
-    async function onCropConfirmAvatar(blob) {
-        const avatarRef = changeImageAvatarRef.value;
-        if (!avatarRef) return;
-        try {
-            await withUploadTimeout(
-                (async () => {
-                    const base64Body = await readFileAsBase64(blob);
-                    const base64File = await resizeImageToFitLimits(base64Body);
-                    if (typeof LINUX !== 'undefined' && LINUX) {
-                        const args = await avatarRequest.uploadAvatarImage(base64File);
-                        const fileUrl = args.json.versions[args.json.versions.length - 1].file.url;
-                        await avatarRequest.saveAvatar({
-                            id: avatarRef.id,
-                            imageUrl: fileUrl
-                        });
-                    } else {
-                        await uploadImageLegacy('avatar', {
-                            entityId: avatarRef.id,
-                            imageUrl: avatarRef.imageUrl,
-                            base64File,
-                            blob
-                        });
-                    }
-                })()
-            );
-            toast.success(t('message.upload.success'));
-            refreshAvatars();
-        } catch (error) {
-            console.error('avatar image upload process failed:', error);
-            toast.error(t('message.upload.error'));
-        } finally {
-            cropDialogOpen.value = false;
-            changeImageAvatarRef.value = null;
-        }
     }
 
     const currentAvatarId = computed(() => currentUser.value?.currentAvatar);

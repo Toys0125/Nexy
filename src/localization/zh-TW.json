@@ -334,8 +334,7 @@
             },
             "world": {
                 "header": "世界",
-                "category": "依類別搜尋",
-                "community_lab": "包含社區實驗室"
+                "category": "依類別搜尋"
             },
             "avatar": {
                 "header": "角色",

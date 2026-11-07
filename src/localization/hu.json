@@ -334,8 +334,7 @@
             },
             "world": {
                 "header": "Világ",
-                "category": "Keresés kategória szerint",
-                "community_lab": "Tartalmazza a közösségi laborokat"
+                "category": "Keresés kategória szerint"
             },
             "avatar": {
                 "header": "Avatar",

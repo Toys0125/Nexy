@@ -99,8 +99,7 @@
             },
             "world": {
                 "header": "Мир",
-                "category": "Поиск по категории",
-                "community_lab": "Включая Community labs"
+                "category": "Поиск по категории"
             },
             "avatar": {
                 "header": "Аватар",
