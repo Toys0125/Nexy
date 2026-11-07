@@ -48,10 +48,18 @@ const responses = {
 /** @type {string[]} */
 let requested = [];
 
-const native = async ({ url }) => {
+/** @type {any[]} */
+let patches = [];
+
+const native = async ({ url, method, body }) => {
     const parsed = new URL(url);
     requested.push(`${parsed.pathname.replace(/^\/api/, '')}${parsed.search}`);
     const path = parsed.pathname.replace(/^\/api/, '');
+    if (method === 'PATCH') {
+        const patch = JSON.parse(body);
+        patches.push(patch);
+        return { status: 200, data: JSON.stringify({ ...avatar('a1', 'private'), ...patch }) };
+    }
     if (path in responses) {
         return { status: 200, data: JSON.stringify(responses[path]) };
     }
@@ -63,8 +71,17 @@ async function get(path) {
     return { status: res.status, json: JSON.parse(res.data) };
 }
 
+async function put(path, body) {
+    const res = await handleShimRequest(
+        { url: `https://nexvr.net/api/${path}`, method: 'PUT', body: JSON.stringify(body) },
+        native
+    );
+    return { status: res.status, json: JSON.parse(res.data) };
+}
+
 beforeEach(() => {
     requested = [];
+    patches = [];
     realtime.userId = 'me';
     realtime.friends = new Map([
         ['me', { userId: 'me', displayName: 'Nexy', status: PresenceStatus.ONLINE }],
@@ -114,6 +131,19 @@ describe('NexVR avatar routes', () => {
         const { json } = await get('avatars/a1');
         expect(json.id).toBe('a1');
         expect(requested).toEqual(['/avatars/a1']);
+    });
+
+    test('saving an avatar patches name, description and release status', async () => {
+        const { json } = await put('avatars/a1', { id: 'a1', name: 'New', releaseStatus: 'public' });
+        expect(requested).toEqual(['/avatars/own/a1']);
+        expect(patches).toEqual([{ name: 'New', publicity: 'public' }]);
+        expect(json).toMatchObject({ id: 'a1', name: 'New', releaseStatus: 'public' });
+    });
+
+    test('saving only fields NexVR lacks answers 501 without a request', async () => {
+        const { status } = await put('avatars/a1', { id: 'a1', tags: ['content_sex'] });
+        expect(status).toBe(501);
+        expect(requested).toEqual([]);
     });
 });
 
