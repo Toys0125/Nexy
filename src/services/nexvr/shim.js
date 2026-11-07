@@ -33,7 +33,7 @@ import { realtime } from './realtime';
 import { getRequestSession } from '../requestSession';
 
 const SNAPSHOT_TIMEOUT = 8000;
-const DISPLAY_NAME_TIMEOUT = 2000;
+const LOOKUP_TIMEOUT = 2000;
 const NOT_AVAILABLE = 'Not available on NexVR';
 
 class ShimError extends Error {
@@ -58,9 +58,9 @@ let native;
 let challenge = null;
 /** @type {Map<string, any>} realtime notification by id, for accept/hide */
 const notificationsById = new Map();
-/** @type {Map<string, Promise<string>>} */
-let displayNameCache = new Map();
-let displayNameContext = '';
+/** @type {Map<string, Promise<{ name: string; image: string }>>} users, groups and worlds by `kind:id` */
+let summaryCache = new Map();
+let summaryContext = '';
 /** @type {Map<string, string[]>} tags from full profiles, kept across presence-only refreshes */
 const profileTags = new Map();
 
@@ -166,57 +166,75 @@ function fetchUser(userId) {
     return pending;
 }
 
+/** @type {Record<string, (id: string) => Promise<{ name: string; image: string }>>} */
+const SUMMARY_LOOKUPS = {
+    user: (id) =>
+        nexvr(`/users/${id}`).then((user) => ({
+            name: user.displayName || user.username || '',
+            image: user.profileImageUrl || ''
+        })),
+    group: (id) => nexvr(`/groups/${id}`).then((group) => ({ name: group.name || '', image: group.iconUrl || '' })),
+    world: (id) =>
+        nexvr(`/worlds/${id}`).then((world) => ({ name: world.name || '', image: world.images?.primary || '' }))
+};
+
 /**
- * Resolve an optional display name within a finite budget and the current login/API context.
- * Missing or slow profiles fall back to an empty name so callers can display the user ID.
+ * Resolve an optional name and picture within a finite budget and the current login/API context.
+ * Missing or slow lookups fall back to empty strings so callers can display the ID.
  * Keep the native lookup cached until it settles, so a caller timeout cannot spawn duplicates.
  *
- * @param {string} userId
- * @returns {Promise<string>}
+ * @param {'user' | 'group' | 'world'} kind
+ * @param {string} id
+ * @returns {Promise<{ name: string; image: string }>}
  */
-function displayNameOf(userId) {
-    if (!userId) {
-        return Promise.resolve('');
+function summaryOf(kind, id) {
+    const none = { name: '', image: '' };
+    if (!id) {
+        return Promise.resolve(none);
     }
-    const friend = realtime.friends.get(userId);
+    const friend = kind === 'user' && realtime.friends.get(id);
     if (friend) {
-        return Promise.resolve(friend.displayName);
+        return Promise.resolve({ name: friend.displayName, image: friend.profileImageUrl || '' });
     }
     const session = getRequestSession();
     const endpoint = AppDebug.endpointDomain;
     const context = `${session}:${endpoint}`;
-    if (displayNameContext !== context) {
-        displayNameContext = context;
-        displayNameCache = new Map();
+    if (summaryContext !== context) {
+        summaryContext = context;
+        summaryCache = new Map();
     }
-    const cache = displayNameCache;
-    let pending = cache.get(userId);
+    const cache = summaryCache;
+    const key = `${kind}:${id}`;
+    let pending = cache.get(key);
     if (!pending) {
-        pending = nexvr(`/users/${encodeURIComponent(userId)}`)
-            .then((user) => user.displayName || user.username || '')
-            .then((name) => {
-                if (
-                    cache !== displayNameCache ||
-                    session !== getRequestSession() ||
-                    endpoint !== AppDebug.endpointDomain
-                )
-                    return '';
-                if (!name && cache.get(userId) === pending) cache.delete(userId);
-                return name;
+        pending = SUMMARY_LOOKUPS[kind](encodeURIComponent(id))
+            .then((summary) => {
+                if (cache !== summaryCache || session !== getRequestSession() || endpoint !== AppDebug.endpointDomain)
+                    return none;
+                if (!summary.name && !summary.image && cache.get(key) === pending) cache.delete(key);
+                return summary;
             })
             .catch(() => {
-                if (cache.get(userId) === pending) cache.delete(userId);
-                return '';
+                if (cache.get(key) === pending) cache.delete(key);
+                return none;
             });
-        cache.set(userId, pending);
+        cache.set(key, pending);
     }
     let timer;
     return Promise.race([
         pending,
         new Promise((resolve) => {
-            timer = setTimeout(() => resolve(''), DISPLAY_NAME_TIMEOUT);
+            timer = setTimeout(() => resolve(none), LOOKUP_TIMEOUT);
         })
     ]).finally(() => clearTimeout(timer));
+}
+
+/**
+ * @param {string} userId
+ * @returns {Promise<string>} Empty when the profile is missing or slow
+ */
+function displayNameOf(userId) {
+    return summaryOf('user', userId).then((summary) => summary.name);
 }
 
 /**
@@ -353,22 +371,62 @@ async function friendStatus(userId) {
     };
 }
 
+/**
+ * A realtime notification in VRChat's shape, with the sender's, world's and
+ * group's names and pictures looked up so the notification lists can show them.
+ *
+ * @param {any} notification Notification from the realtime socket
+ * @returns {Promise<object>} VRChat Notification (v1)
+ */
+export async function describeNotification(notification) {
+    const mapped = toNexVRNotification(notification);
+    const data = notification.data || {};
+    const details = mapped.details;
+    const [sender, world, group] = await Promise.all([
+        summaryOf('user', mapped.senderUserId),
+        summaryOf('world', data.worldId || data.world),
+        summaryOf('group', data.groupId || data.group)
+    ]);
+    mapped.senderUsername ||= sender.name;
+    if (sender.image) {
+        mapped.senderUserIcon = sender.image;
+    }
+    if (world.name && !details.worldName) {
+        details.worldName = world.name;
+    }
+    if (group.name && !details.groupName) {
+        details.groupName = group.name;
+    }
+    // a picture the notification carries wins, then the world's, then the group's
+    const image = details.imageUrl || world.image || group.image;
+    if (image) {
+        details.imageUrl = image;
+    }
+    return mapped;
+}
+
+/**
+ * NexVR has no paging or hidden list; the first page is every notification.
+ *
+ * @param {URLSearchParams} query
+ * @returns {Promise<object[]>} VRChat Notifications (v1)
+ */
 async function notificationsList(query) {
     if (query.get('hidden') === 'true' || Number(query.get('offset') || 0) > 0) {
         return [];
     }
+    const session = getRequestSession();
     const list = await realtime.getNotifications();
+    const described = await Promise.all(list.map(describeNotification));
+    if (session !== getRequestSession()) {
+        // signed out while it loaded; never hand one account's list to the next
+        return [];
+    }
     notificationsById.clear();
-    const result = [];
     for (const notification of list) {
         notificationsById.set(notification.id, notification);
-        const mapped = toNexVRNotification(notification);
-        if (!mapped.senderUsername) {
-            mapped.senderUsername = await displayNameOf(mapped.senderUserId);
-        }
-        result.push(mapped);
     }
-    return result;
+    return described;
 }
 
 /**
@@ -1062,8 +1120,8 @@ export async function handleShimRequest(options, executeNative) {
 export async function endSession() {
     challenge = null;
     notificationsById.clear();
-    displayNameCache = new Map();
-    displayNameContext = '';
+    summaryCache = new Map();
+    summaryContext = '';
     realtime.reset();
     await clearTokens();
 }

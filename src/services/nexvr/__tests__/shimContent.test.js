@@ -11,8 +11,9 @@ vi.mock('../../config', () => ({
 }));
 
 import { handleShimRequest } from '../shim';
-import { PresenceStatus } from '../realtimeSchema';
+import { NotificationType, PresenceStatus } from '../realtimeSchema';
 import { realtime } from '../realtime';
+import { watchState } from '../../watchState';
 
 const avatar = (id, publicity, versions = []) => ({
     id,
@@ -42,7 +43,10 @@ const responses = {
     ],
     '/avatars/shared': [{ ...avatar('s1', 'private'), owner: 'friend' }],
     '/avatars/a1': avatar('a1', 'public'),
-    '/worlds/': [{ _id: 'w1', name: 'Club', owner: 'me', visibility: 'public', stats: {} }]
+    '/worlds/': [{ _id: 'w1', name: 'Club', owner: 'me', visibility: 'public', stats: {} }],
+    '/worlds/w1': { _id: 'w1', name: 'Club', owner: 'me', images: { primary: 'https://cdn/w1.png' } },
+    '/users/stranger': { id: 'stranger', displayName: 'Stranger', profileImageUrl: 'https://cdn/stranger.png' },
+    '/groups/g1': { id: 'g1', name: 'Crew', iconUrl: 'https://cdn/g1.png' }
 };
 
 /** @type {string[]} */
@@ -51,10 +55,14 @@ let requested = [];
 /** @type {any[]} */
 let patches = [];
 
+/** @type {((path: string) => void) | null} */
+let onRequest = null;
+
 const native = async ({ url, method, body }) => {
     const parsed = new URL(url);
     requested.push(`${parsed.pathname.replace(/^\/api/, '')}${parsed.search}`);
     const path = parsed.pathname.replace(/^\/api/, '');
+    onRequest?.(path);
     if (method === 'PATCH') {
         const patch = JSON.parse(body);
         patches.push(patch);
@@ -159,5 +167,69 @@ describe('NexVR world search', () => {
         await get('worlds?n=50&offset=0&userId=u1');
         await get('worlds?n=50&offset=0&userId=friend');
         expect(requested).toEqual(['/worlds/?creator=me', '/worlds/?creator=friend']);
+    });
+});
+
+describe('NexVR notifications', () => {
+    const notification = (id, type, from, data = {}) => ({
+        id,
+        type,
+        from,
+        to: 'me',
+        title: '',
+        message: '',
+        data,
+        createdAt: '2026-11-01T00:00:00Z'
+    });
+
+    afterEach(() => {
+        realtime.notifications = [];
+        onRequest = null;
+    });
+
+    test("a stranger's friend request carries their name and picture", async () => {
+        realtime.notifications = [notification('n1', NotificationType.FRIEND_REQUEST, 'stranger')];
+        const { json } = await get('auth/user/notifications?n=100&offset=0');
+        expect(json[0]).toMatchObject({
+            type: 'friendRequest',
+            senderUsername: 'Stranger',
+            senderUserIcon: 'https://cdn/stranger.png'
+        });
+    });
+
+    test("an invite is filled in with the world's name and thumbnail", async () => {
+        realtime.notifications = [
+            notification('n2', NotificationType.INVITE, 'friend', { worldId: 'w1', instanceId: '123' })
+        ];
+        const { json } = await get('auth/user/notifications?n=100&offset=0');
+        expect(json[0].senderUsername).toBe('Friend');
+        expect(json[0].details).toMatchObject({ worldName: 'Club', imageUrl: 'https://cdn/w1.png' });
+    });
+
+    test("a group notification is filled in with the group's name and icon", async () => {
+        realtime.notifications = [notification('n3', NotificationType.GROUP_INVITE, 'friend', { groupId: 'g1' })];
+        const { json } = await get('auth/user/notifications?n=100&offset=0');
+        expect(json[0].details).toMatchObject({ groupName: 'Crew', imageUrl: 'https://cdn/g1.png' });
+    });
+
+    test('a picture the notification carries is kept', async () => {
+        realtime.notifications = [
+            notification('n4', NotificationType.GROUP_INVITE, 'friend', {
+                groupId: 'g1',
+                imageUrl: 'https://cdn/own.png'
+            })
+        ];
+        const { json } = await get('auth/user/notifications?n=100&offset=0');
+        expect(json[0].details.imageUrl).toBe('https://cdn/own.png');
+    });
+
+    test('a list that loads across a sign-out is dropped, not handed to the next account', async () => {
+        realtime.notifications = [notification('n5', NotificationType.FRIEND_REQUEST, 'someone')];
+        onRequest = () => {
+            onRequest = null;
+            watchState.isLoggedIn = !watchState.isLoggedIn;
+        };
+        const { json } = await get('auth/user/notifications?n=100&offset=0');
+        expect(json).toEqual([]);
     });
 });

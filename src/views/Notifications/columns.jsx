@@ -377,6 +377,17 @@ export const createColumns = ({
                     );
                 }
 
+                if (original.senderUserIcon && !isGroupId(original.senderUserId)) {
+                    return (
+                        <Avatar class="cursor-pointer size-7.5" onClick={() => showUserDialog(original.senderUserId)}>
+                            <AvatarImage src={getSmallThumbnailUrl(original.senderUserIcon)} class="object-cover" />
+                            <AvatarFallback>
+                                <Image class="size-4 text-muted-foreground" />
+                            </AvatarFallback>
+                        </Avatar>
+                    );
+                }
+
                 return null;
             }
         },
