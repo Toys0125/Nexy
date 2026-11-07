@@ -87,41 +87,25 @@
     import { TooltipWrapper } from '@/components/ui/tooltip';
     import ToolItem from './components/ToolItem.vue';
     import { useToolActions } from '../../composables/useToolActions';
+    import { useToolAvailability } from '../../composables/useToolAvailability';
     import { useToolNavPinning } from '../../composables/useToolNavPinning';
-    import { getToolsByCategory, toolCategories, toolDefinitions } from '../../shared/constants';
+    import { getToolsByCategory, toolCategories } from '../../shared/constants';
     import configRepository from '../../services/config.js';
 
     const { t } = useI18n();
     const { triggerTool } = useToolActions();
     const { pinToolToNav, pinnedToolKeys, refreshPinnedState, unpinToolFromNav } = useToolNavPinning();
+    const { isToolAvailable, refreshToolAvailability } = useToolAvailability();
     const toolsCategoryCollapsedConfigKey = 'VRCX_toolsCategoryCollapsed';
-
-    // keys of tools whose availabilityMethod confirmed them; the rest stay hidden
-    const availableToolKeys = ref(new Set());
 
     const categories = computed(() =>
         toolCategories
             .map((category) => ({
                 ...category,
-                tools: getToolsByCategory(category.key).filter(
-                    (tool) => !tool.availabilityMethod || availableToolKeys.value.has(tool.key)
-                )
+                tools: getToolsByCategory(category.key).filter(isToolAvailable)
             }))
             .filter((category) => category.tools.length > 0)
     );
-
-    async function checkToolAvailability() {
-        const checks = toolDefinitions
-            .filter((tool) => tool.availabilityMethod)
-            .map(async (tool) => {
-                try {
-                    return (await AppApi[tool.availabilityMethod]()) ? tool.key : null;
-                } catch {
-                    return null;
-                }
-            });
-        availableToolKeys.value = new Set((await Promise.all(checks)).filter(Boolean));
-    }
 
     const categoryCollapsed = ref({
         group: false,
@@ -138,7 +122,7 @@
     };
 
     onMounted(async () => {
-        checkToolAvailability();
+        refreshToolAvailability();
         await refreshPinnedState();
         const storedValue = await configRepository.getString(toolsCategoryCollapsedConfigKey, '{}');
         try {
