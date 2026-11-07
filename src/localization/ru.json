@@ -255,15 +255,13 @@
                 "calendar_description": "Календарь групповых мероприятий"
             },
             "user": {
-                "discord_names_description": "Найти имена пользователей Discord ваших друзей из VRChat",
-                "export_friend_list_description": "Экспорт списка друзей из VRChat",
+                "export_friend_list_description": "Экспорт списка друзей из NexVR",
                 "export_own_avatars_description": "Экспорт личных аватаров из VRChat"
             },
             "export": {
                 "header": "Экпорт",
                 "export_notes": "Экспорт заметок пользователя",
                 "export_notes_description": "Экспорт заметок пользователя Nexy в заметки VRChat",
-                "discord_names": "Имена Discord",
                 "export_friend_list": "Экспорт списка друзей",
                 "export_own_avatars": "Экспорт собственных аватаров"
             },
@@ -1127,10 +1125,6 @@
         },
         "export_own_avatars": {
             "header": "Экспортировать свои аватары"
-        },
-        "discord_names": {
-            "header": "Имена Discord",
-            "description": "Кликните загрузить отсутствующие записи во вкладке \"Список друзей\", чтобы найти список всех друзей"
         },
         "note_export": {
             "header": "Экспорт заметок",

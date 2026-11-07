@@ -151,7 +151,6 @@
         },
         "tools": {
             "export": {
-                "discord_names": "Discord Jména",
                 "export_friend_list": "Exportovat seznam přátel",
                 "export_own_avatars": "Exportovat vlastní avatary"
             }
@@ -1076,10 +1075,6 @@
         },
         "export_own_avatars": {
             "header": "Export Own Avatars"
-        },
-        "discord_names": {
-            "header": "Discord Names",
-            "description": "Click load missing entries in the Friends List tab to search entire friends list"
         },
         "note_export": {
             "header": "Note Export",

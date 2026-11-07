@@ -340,15 +340,13 @@
                 "calendar_description": "Kalendarz wydarzeń grup"
             },
             "user": {
-                "discord_names_description": "Znajdź nazwy Discord swoich znajomych VRChat",
-                "export_friend_list_description": "Eksportuj listę znajomych z VRChat",
+                "export_friend_list_description": "Eksportuj listę znajomych z NexVR",
                 "export_own_avatars_description": "Eksportuj osobiste awatary z VRChat"
             },
             "export": {
                 "header": "Eksportuj",
                 "export_notes": "Eksportuj notatki użytkowników",
                 "export_notes_description": "Eksportuj notatki Nexy użytkowników do notatek VRChat",
-                "discord_names": "Nazwy Discord",
                 "export_friend_list": "Eksportuj listę znajomych",
                 "export_own_avatars": "Eksportuj własne awatary"
             },
@@ -1403,10 +1401,6 @@
         },
         "export_own_avatars": {
             "header": "Eksportuj własne awatary"
-        },
-        "discord_names": {
-            "header": "Nazwy Discord",
-            "description": "Kliknij przycisk ładowania brakujących wpisów w zakładce Lista Znajomych, aby wyszukać całą listę znajomych"
         },
         "note_export": {
             "header": "Eksport notatki",

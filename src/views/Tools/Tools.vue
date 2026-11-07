@@ -80,13 +80,14 @@
 </template>
 
 <script setup>
-    import { onMounted, ref } from 'vue';
+    import { computed, onMounted, ref } from 'vue';
     import { useI18n } from 'vue-i18n';
 
     import { Button } from '@/components/ui/button';
     import { TooltipWrapper } from '@/components/ui/tooltip';
     import ToolItem from './components/ToolItem.vue';
     import { useToolActions } from '../../composables/useToolActions';
+    import { useToolAvailability } from '../../composables/useToolAvailability';
     import { useToolNavPinning } from '../../composables/useToolNavPinning';
     import { getToolsByCategory, toolCategories } from '../../shared/constants';
     import configRepository from '../../services/config.js';
@@ -94,12 +95,17 @@
     const { t } = useI18n();
     const { triggerTool } = useToolActions();
     const { pinToolToNav, pinnedToolKeys, refreshPinnedState, unpinToolFromNav } = useToolNavPinning();
+    const { isToolAvailable, refreshToolAvailability } = useToolAvailability();
     const toolsCategoryCollapsedConfigKey = 'VRCX_toolsCategoryCollapsed';
 
-    const categories = toolCategories.map((category) => ({
-        ...category,
-        tools: getToolsByCategory(category.key)
-    }));
+    const categories = computed(() =>
+        toolCategories
+            .map((category) => ({
+                ...category,
+                tools: getToolsByCategory(category.key).filter(isToolAvailable)
+            }))
+            .filter((category) => category.tools.length > 0)
+    );
 
     const categoryCollapsed = ref({
         group: false,
@@ -116,6 +122,7 @@
     };
 
     onMounted(async () => {
+        refreshToolAvailability();
         await refreshPinnedState();
         const storedValue = await configRepository.getString(toolsCategoryCollapsedConfigKey, '{}');
         try {

@@ -10,3 +10,4 @@ Nexy is a fork of VRCX. The fork lives at `valzzu/Nexy` (`origin`); `vrcx-team/V
 - The `upstream` push URL is deliberately disabled; do not re-enable it.
 - `gh` may resolve to `vrcx-team/VRCX` by default in this checkout. Always pass `-R valzzu/Nexy` to `gh` commands (PRs, runs, releases, issues, workflow dispatch).
 - Do not add CLAUDE as a contributor
+- Do not make a pr unless told to make one, so unfinished stuff dont get pushed

@@ -393,12 +393,10 @@
                 "calendar_description": "Groupe d'événement dans le calendrier"
             },
             "user": {
-                "discord_names_description": "Find the Discord usernames of your VRChat friends",
-                "export_friend_list_description": "Export your friends list from VRChat",
+                "export_friend_list_description": "Export your friends list from NexVR",
                 "export_own_avatars_description": "Export your personal avatars from VRChat"
             },
             "export": {
-                "discord_names": "Pseudonymes Discord",
                 "export_friend_list": "Exporter la liste d'amis",
                 "export_own_avatars": "Exporter ses propres avatars"
             }
@@ -1324,10 +1322,6 @@
         },
         "export_own_avatars": {
             "header": "Exporter ses propres avatars"
-        },
-        "discord_names": {
-            "header": "Noms Discord",
-            "description": "Cliquez sur charger les entrées manquantes dans l'onglet Liste d'amis pour effectuer une recherche dans l'ensemble de la liste d'amis."
         },
         "note_export": {
             "header": "Exporter les notes",

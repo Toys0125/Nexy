@@ -144,7 +144,6 @@
         },
         "tools": {
             "export": {
-                "discord_names": "Tên Discord",
                 "export_friend_list": "Xuất dữ liệu danh sách bạn bè",
                 "export_own_avatars": "Xuất dữ liệu avatar cá nhân"
             }
@@ -1005,10 +1004,6 @@
         },
         "export_own_avatars": {
             "header": "Xuất Avatar của bạn"
-        },
-        "discord_names": {
-            "header": "Tên Discord",
-            "description": "Bấm tải về thông tin thiếu trong danh sách bạn bè để tìm toàn bộ danh sách bạn bè"
         },
         "note_export": {
             "header": "Xuát ghi chú",
