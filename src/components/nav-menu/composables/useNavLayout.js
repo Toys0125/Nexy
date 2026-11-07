@@ -1,6 +1,7 @@
 import { useEventListener } from '@vueuse/core';
 import { computed, ref, watch } from 'vue';
 
+import { useToolAvailability } from '../../../composables/useToolAvailability';
 import configRepository from '../../../services/config';
 import { DASHBOARD_NAV_KEY_PREFIX, isToolNavKey, navDefinitions } from '../../../shared/constants';
 import { triggerNavEntryAction } from '../navActionUtils';
@@ -39,8 +40,15 @@ export function useNavLayout({ t, locale, router, dashboardStore, dashboards, di
 
     const createDefaultNavLayout = () => createBaseDefaultNavLayout(t);
 
+    const { isToolNavKeyAvailable, refreshToolAvailability } = useToolAvailability();
+
+    // Pinned tools whose install is gone are left out of the menu but kept in
+    // the saved layout, so they come back once it is installed again.
     const menuItems = computed(() => {
-        return buildMenuItems(navLayout.value, navDefinitionMap.value, t);
+        const visibleDefinitionMap = new Map(
+            [...navDefinitionMap.value].filter(([key]) => !isToolNavKey(key) || isToolNavKeyAvailable(key))
+        );
+        return buildMenuItems(navLayout.value, visibleDefinitionMap, t);
     });
 
     const getFirstNavEntryLocal = (layout) => {
@@ -169,6 +177,7 @@ export function useNavLayout({ t, locale, router, dashboardStore, dashboards, di
     };
 
     const loadNavMenuConfig = async () => {
+        refreshToolAvailability();
         let layoutData = null;
         let hiddenKeysData = [];
         try {
