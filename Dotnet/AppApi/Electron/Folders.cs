@@ -350,7 +350,22 @@ namespace VRCX
                 logger.Warn(e, "Failed to read Steam libraryfolders.vdf");
             }
 
-            return libraryPaths;
+            // Steam's registry SteamPath uses forward slashes, which explorer.exe
+            // does not accept, so normalize every library path
+            var normalizedPaths = new List<string>();
+            foreach (var path in libraryPaths)
+            {
+                try
+                {
+                    normalizedPaths.Add(Path.GetFullPath(path));
+                }
+                catch (Exception e)
+                {
+                    logger.Warn(e, "Skipping invalid Steam library path {path}", path);
+                }
+            }
+
+            return normalizedPaths;
         }
 
         public override bool HasNexvrLauncherInstall()
