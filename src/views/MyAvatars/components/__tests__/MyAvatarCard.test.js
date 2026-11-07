@@ -122,6 +122,17 @@ describe('MyAvatarCard.vue', () => {
         expect(wrapper.emitted('click')).toHaveLength(1);
     });
 
+    test('opens from the keyboard with Enter and Space', async () => {
+        const wrapper = mountCard();
+        const card = wrapper.find('.avatar-card-wrapper');
+
+        expect(card.attributes('tabindex')).toBe('0');
+        await card.trigger('keydown', { key: 'Enter' });
+        await card.trigger('keydown', { key: ' ' });
+
+        expect(wrapper.emitted('click')).toHaveLength(2);
+    });
+
     test('emits context action from menu item', async () => {
         const wrapper = mountCard();
         const detailsItem = wrapper
