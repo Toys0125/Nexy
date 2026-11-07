@@ -69,10 +69,6 @@
                         <Eye class="size-4" />
                         {{ t('dialog.avatar.actions.view_details') }}
                     </ContextMenuItem>
-                    <ContextMenuItem :disabled="isActive" @click="emit('context-action', 'wear', avatar)">
-                        <Check class="size-4" />
-                        {{ t('view.favorite.select_avatar_tooltip') }}
-                    </ContextMenuItem>
                     <ContextMenuSeparator />
                     <ContextMenuItem @click="emit('context-action', 'manageTags', avatar)">
                         <Tag class="size-4" />
@@ -101,22 +97,6 @@
                     <ContextMenuItem @click="emit('context-action', 'changeDescription', avatar)">
                         <Pencil class="size-4" />
                         {{ t('dialog.avatar.actions.change_description') }}
-                    </ContextMenuItem>
-                    <ContextMenuItem @click="emit('context-action', 'changeTags', avatar)">
-                        <Pencil class="size-4" />
-                        {{ t('dialog.avatar.actions.change_content_tags') }}
-                    </ContextMenuItem>
-                    <ContextMenuItem @click="emit('context-action', 'changeStyles', avatar)">
-                        <Pencil class="size-4" />
-                        {{ t('dialog.avatar.actions.change_styles_author_tags') }}
-                    </ContextMenuItem>
-                    <ContextMenuItem @click="emit('context-action', 'changeImage', avatar)">
-                        <ImageIcon class="size-4" />
-                        {{ t('dialog.avatar.actions.change_image') }}
-                    </ContextMenuItem>
-                    <ContextMenuItem @click="emit('context-action', 'createImpostor', avatar)">
-                        <RefreshCw class="size-4" />
-                        {{ t('dialog.avatar.actions.create_impostor') }}
                     </ContextMenuItem>
                 </ContextMenuContent>
             </ContextMenu>
@@ -221,13 +201,11 @@
 <script setup>
     import {
         Apple,
-        Check,
         ExternalLink,
         Eye,
         Image as ImageIcon,
         Monitor,
         Pencil,
-        RefreshCw,
         Smartphone,
         Tag,
         User

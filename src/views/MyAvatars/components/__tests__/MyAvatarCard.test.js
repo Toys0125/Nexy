@@ -135,12 +135,18 @@ describe('MyAvatarCard.vue', () => {
         expect(wrapper.emitted('context-action')[0]).toEqual(['details', expect.objectContaining({ id: 'avtr_1' })]);
     });
 
-    test('disables wear action when avatar is active', () => {
-        const wrapper = mountCard({ currentAvatarId: 'avtr_1' });
-        const wearItem = wrapper
-            .findAll('[data-testid="ctx-item"]')
-            .find((node) => node.text().includes('view.favorite.select_avatar_tooltip'));
+    test('offers no VRChat-only actions', () => {
+        const wrapper = mountCard();
+        const labels = wrapper.findAll('[data-testid="ctx-item"]').map((node) => node.text());
 
-        expect(wearItem.attributes('disabled')).toBeDefined();
+        for (const key of [
+            'view.favorite.select_avatar_tooltip',
+            'dialog.avatar.actions.change_content_tags',
+            'dialog.avatar.actions.change_styles_author_tags',
+            'dialog.avatar.actions.change_image',
+            'dialog.avatar.actions.create_impostor'
+        ]) {
+            expect(labels.some((label) => label.includes(key))).toBe(false);
+        }
     });
 });
