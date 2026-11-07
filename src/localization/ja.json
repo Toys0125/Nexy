@@ -655,15 +655,13 @@
                 "calendar_description": "グループのイベントカレンダー"
             },
             "user": {
-                "discord_names_description": "フレンドの Discord ユーザー名を取得",
-                "export_friend_list_description": "VRChat からフレンドリストをエクスポート",
+                "export_friend_list_description": "NexVR からフレンドリストをエクスポート",
                 "export_own_avatars_description": "VRChat から自分のアバターをエクスポート"
             },
             "export": {
                 "header": "エクスポート",
                 "export_notes": "ユーザーメモのエクスポート",
                 "export_notes_description": "Nexy のユーザーメモを VRChat のノートにエクスポート",
-                "discord_names": "Discord のユーザー名",
                 "export_friend_list": "フレンドリストをエクスポート",
                 "export_own_avatars": "自分のアバターをエクスポート"
             },
@@ -2047,10 +2045,6 @@
         },
         "export_own_avatars": {
             "header": "自分のアバター"
-        },
-        "discord_names": {
-            "header": "Discordの名前",
-            "description": "フレンドリストタブの「不足するエントリを読み込む」をクリックすると、フレンドリスト全体を検索することができます。"
         },
         "note_export": {
             "header": "ノートをエクスポート",

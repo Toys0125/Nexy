@@ -242,7 +242,6 @@
         },
         "tools": {
             "export": {
-                "discord_names": "Nombres de Discord",
                 "export_friend_list": "Exportar Lista de Amigos",
                 "export_own_avatars": "Exportar Avatares Propios"
             }
@@ -1183,10 +1182,6 @@
         },
         "export_own_avatars": {
             "header": "Exportar Avatares Propios"
-        },
-        "discord_names": {
-            "header": "Nombres de Discord",
-            "description": "Haz clic en cargar entradas faltantes en la pestaña Lista de Amigos para buscar en toda la lista de amigos"
         },
         "note_export": {
             "header": "Exportar Notas",

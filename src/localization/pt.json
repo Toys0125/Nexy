@@ -597,15 +597,13 @@
                 "calendar_description": "Calendário de Eventos do Grupo"
             },
             "user": {
-                "discord_names_description": "Encontre os nomes de usuário do Discord dos seus amigos do VRChat",
-                "export_friend_list_description": "Exporte sua lista de amigos do VRChat",
+                "export_friend_list_description": "Exporte sua lista de amigos do NexVR",
                 "export_own_avatars_description": "Exporte seus avatares pessoais do VRChat"
             },
             "export": {
                 "header": "Exportar",
                 "export_notes": "Exportar Memos de Usuário",
                 "export_notes_description": "Exportar memos de usuário do Nexy para notas do VRChat",
-                "discord_names": "Nomes do Discord",
                 "export_friend_list": "Exportar Lista de Amigos",
                 "export_own_avatars": "Exportar Próprios Avatares"
             },
@@ -1928,10 +1926,6 @@
         },
         "export_own_avatars": {
             "header": "Exportar Próprios Avatares"
-        },
-        "discord_names": {
-            "header": "Nomes do Discord",
-            "description": "Clique em carregar entradas ausentes na aba Lista de Amigos para pesquisar toda a lista de amigos"
         },
         "note_export": {
             "header": "Exportação de Notas",

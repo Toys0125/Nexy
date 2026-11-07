@@ -699,15 +699,13 @@
                 "group_invites_description": "Accept, decline or block pending group invites"
             },
             "user": {
-                "discord_names_description": "Find the Discord usernames of your VRChat friends",
-                "export_friend_list_description": "Export your friends list from VRChat",
+                "export_friend_list_description": "Export your friends list from NexVR",
                 "export_own_avatars_description": "Export your personal avatars from VRChat"
             },
             "export": {
                 "header": "Export",
                 "export_notes": "Export User Memos",
                 "export_notes_description": "Export Nexy user memos to VRChat notes",
-                "discord_names": "Discord Names",
                 "export_friend_list": "Export Friends List",
                 "export_own_avatars": "Export Own Avatars"
             },
@@ -2407,10 +2405,6 @@
         "export_own_avatars": {
             "header": "Export Own Avatars",
             "public_only": "Public avatars only"
-        },
-        "discord_names": {
-            "header": "Discord Names",
-            "description": "Click load missing entries in the Friends List tab to search entire friends list"
         },
         "note_export": {
             "header": "Note Export",
