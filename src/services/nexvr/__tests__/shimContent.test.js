@@ -13,6 +13,7 @@ vi.mock('../../config', () => ({
 import { handleShimRequest } from '../shim';
 import { NotificationType, PresenceStatus } from '../realtimeSchema';
 import { realtime } from '../realtime';
+import { watchState } from '../../watchState';
 
 const avatar = (id, publicity, versions = []) => ({
     id,
@@ -54,10 +55,14 @@ let requested = [];
 /** @type {any[]} */
 let patches = [];
 
+/** @type {((path: string) => void) | null} */
+let onRequest = null;
+
 const native = async ({ url, method, body }) => {
     const parsed = new URL(url);
     requested.push(`${parsed.pathname.replace(/^\/api/, '')}${parsed.search}`);
     const path = parsed.pathname.replace(/^\/api/, '');
+    onRequest?.(path);
     if (method === 'PATCH') {
         const patch = JSON.parse(body);
         patches.push(patch);
@@ -179,6 +184,7 @@ describe('NexVR notifications', () => {
 
     afterEach(() => {
         realtime.notifications = [];
+        onRequest = null;
     });
 
     test("a stranger's friend request carries their name and picture", async () => {
@@ -215,5 +221,15 @@ describe('NexVR notifications', () => {
         ];
         const { json } = await get('auth/user/notifications?n=100&offset=0');
         expect(json[0].details.imageUrl).toBe('https://cdn/own.png');
+    });
+
+    test('a list that loads across a sign-out is dropped, not handed to the next account', async () => {
+        realtime.notifications = [notification('n5', NotificationType.FRIEND_REQUEST, 'someone')];
+        onRequest = () => {
+            onRequest = null;
+            watchState.isLoggedIn = !watchState.isLoggedIn;
+        };
+        const { json } = await get('auth/user/notifications?n=100&offset=0');
+        expect(json).toEqual([]);
     });
 });
