@@ -758,6 +758,28 @@ const routes = [
             return toNexVRAvatar(avatar, await displayNameOf(avatar.owner));
         }
     ],
+    [
+        'PUT',
+        /^avatars\/([^/]+)$/,
+        async (m, q, body) => {
+            // only name, description and release status carry over; tags, styles and images don't
+            const patch = {};
+            if (body.name !== undefined) {
+                patch.name = body.name;
+            }
+            if (body.description !== undefined) {
+                patch.description = body.description;
+            }
+            if (body.releaseStatus === 'public' || body.releaseStatus === 'private') {
+                patch.publicity = body.releaseStatus;
+            }
+            if (!Object.keys(patch).length) {
+                throw new ShimError(501, NOT_AVAILABLE);
+            }
+            const avatar = await nexvr(`/avatars/own/${encodeURIComponent(m[1])}`, { method: 'PATCH', body: patch });
+            return toNexVRAvatar(avatar, await displayNameOf(avatar.owner));
+        }
+    ],
     ['GET', /^worlds$/, (m, q) => worldSearch(q)],
     [
         'GET',

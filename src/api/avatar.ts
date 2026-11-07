@@ -43,7 +43,7 @@ const avatarReq = {
         });
     },
 
-    // Not available on NexVR: the shim answers 501
+    // NexVR: name, description and releaseStatus only
     saveAvatar(params: UpdateAvatarRequest): Promise<{ json: Json<Avatar>; params: UpdateAvatarRequest }> {
         return request(`avatars/${params.id}`, {
             method: 'PUT',
