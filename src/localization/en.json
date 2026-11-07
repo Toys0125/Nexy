@@ -699,15 +699,13 @@
                 "group_invites_description": "Accept, decline or block pending group invites"
             },
             "user": {
-                "discord_names_description": "Find the Discord usernames of your VRChat friends",
-                "export_friend_list_description": "Export your friends list from VRChat",
+                "export_friend_list_description": "Export your friends list from NexVR",
                 "export_own_avatars_description": "Export your personal avatars from VRChat"
             },
             "export": {
                 "header": "Export",
                 "export_notes": "Export User Memos",
                 "export_notes_description": "Export Nexy user memos to VRChat notes",
-                "discord_names": "Discord Names",
                 "export_friend_list": "Export Friends List",
                 "export_own_avatars": "Export Own Avatars"
             },
@@ -727,6 +725,14 @@
             },
             "shortcuts": {
                 "header": "Shortcuts",
+                "nexvr_launcher": "NexVR Install (Launcher)",
+                "nexvr_launcher_description": "Open the NexVR launcher install folder",
+                "nexvr_steam": "NexVR Install (Steam)",
+                "nexvr_steam_description": "Open the NexVR Steam install folder",
+                "nexvr_photos": "NexVR Photos",
+                "nexvr_photos_description": "Open your NexVR photos folder",
+                "nexvr_videos": "NexVR Videos",
+                "nexvr_videos_description": "Open your NexVR videos folder",
                 "vrcx_data": "Nexy Data",
                 "vrcx_data_description": "Open the Nexy data folder",
                 "vrchat_data": "VRChat Data",
@@ -2407,10 +2413,6 @@
         "export_own_avatars": {
             "header": "Export Own Avatars",
             "public_only": "Public avatars only"
-        },
-        "discord_names": {
-            "header": "Discord Names",
-            "description": "Click load missing entries in the Friends List tab to search entire friends list"
         },
         "note_export": {
             "header": "Note Export",

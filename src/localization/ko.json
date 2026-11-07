@@ -155,7 +155,6 @@
         },
         "tools": {
             "export": {
-                "discord_names": "디스코드 아이디",
                 "export_friend_list": "친구 목록 내보내기",
                 "export_own_avatars": "내 아바타 목록 내보내기"
             }
@@ -1016,10 +1015,6 @@
         },
         "export_own_avatars": {
             "header": "내 아바타 목록 내보내기"
-        },
-        "discord_names": {
-            "header": "디스코드 아이디",
-            "description": "전체 친구 목록을 보려면 친구 목록 탭에서 누락된 친구 불러오기를 눌러주세요"
         },
         "note_export": {
             "header": "메모 내보내기",

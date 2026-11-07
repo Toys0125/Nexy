@@ -667,15 +667,13 @@
                 "calendar_description": "Csoportesemény-naptár"
             },
             "user": {
-                "discord_names_description": "VRChat barátaid Discord felhasználónevének megkeresése",
-                "export_friend_list_description": "Barátlista exportálása a VRChat-ből",
+                "export_friend_list_description": "Barátlista exportálása a NexVR-ből",
                 "export_own_avatars_description": "Saját avatarok exportálása a VRChat-ből"
             },
             "export": {
                 "header": "Exportálás",
                 "export_notes": "Felhasználói memók exportálása",
                 "export_notes_description": "Nexy felhasználói memók exportálása VRChat megjegyzésekbe",
-                "discord_names": "Discord nevek",
                 "export_friend_list": "Barátlista exportálása",
                 "export_own_avatars": "Saját avatarok exportálása"
             },
@@ -2240,10 +2238,6 @@
         },
         "export_own_avatars": {
             "header": "Saját avatarok exportálása"
-        },
-        "discord_names": {
-            "header": "Discord nevek",
-            "description": "Kattints a hiányzó bejegyzések betöltésére a Barátlista fülön a teljes kereséshez"
         },
         "note_export": {
             "header": "Megjegyzések exportálása",

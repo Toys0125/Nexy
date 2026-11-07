@@ -655,15 +655,13 @@
                 "calendar_description": "群組活動行事曆"
             },
             "user": {
-                "discord_names_description": "尋找你 VRChat 好友的 Discord 使用者名稱",
-                "export_friend_list_description": "匯出你的 VRChat 好友列表",
+                "export_friend_list_description": "匯出你的 NexVR 好友列表",
                 "export_own_avatars_description": "匯出你的個人 VRChat 化身"
             },
             "export": {
                 "header": "匯出",
                 "export_notes": "匯出使用者備註",
                 "export_notes_description": "將 Nexy 使用者備註匯出至 VRChat 備註",
-                "discord_names": "Discord 名稱",
                 "export_friend_list": "匯出好友列表",
                 "export_own_avatars": "匯出個人化身"
             },
@@ -2174,10 +2172,6 @@
         },
         "export_own_avatars": {
             "header": "匯出私有角色"
-        },
-        "discord_names": {
-            "header": "Discord 名稱",
-            "description": "點擊好友列表中的「讀取缺失的項目」來搜尋整個好友列表"
         },
         "note_export": {
             "header": "備註匯出",

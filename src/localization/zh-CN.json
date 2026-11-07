@@ -667,15 +667,13 @@
                 "calendar_description": "查看活动日历"
             },
             "user": {
-                "discord_names_description": "查找好友的 Discord 名称（如果他们有写上去的话）",
-                "export_friend_list_description": "从 VRChat 导出你的好友列表",
+                "export_friend_list_description": "从 NexVR 导出你的好友列表",
                 "export_own_avatars_description": "从 VRChat 中导出你创建的模型的 ID 列表"
             },
             "export": {
                 "header": "导出",
                 "export_notes": "导出备注",
                 "export_notes_description": "导出好友备注到文本文件",
-                "discord_names": "查找好友的 Discord 名称",
                 "export_friend_list": "导出好友列表",
                 "export_own_avatars": "导出自己创建的模型 ID 列表"
             },
@@ -2242,10 +2240,6 @@
         },
         "export_own_avatars": {
             "header": "导出自己创建的模型的 ID"
-        },
-        "discord_names": {
-            "header": "Discord 名称",
-            "description": "点击好友列表中的“读取缺失的项目”按钮以搜索整个好友列表，而不仅仅是现有缓存"
         },
         "note_export": {
             "header": "备注导出",

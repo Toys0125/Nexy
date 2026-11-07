@@ -299,6 +299,162 @@ namespace VRCX
             return true;
         }
 
+        // A folder only counts as an install while it still holds the client,
+        // so an uninstall that leaves the folder behind is not offered.
+        private static bool IsNexvrInstall(string path)
+        {
+            return File.Exists(Path.Join(path, "NexVR.exe"));
+        }
+
+        /// <summary>
+        /// The NexVR launcher keeps its data in %APPDATA%\nexvr-launcher on Windows and
+        /// ~/.local/share/nexvr-launcher on Linux. The client goes in its "client" folder
+        /// unless another one was picked, which settings.json stores as install_root.
+        /// </summary>
+        private static string GetNexvrLauncherLocation()
+        {
+            var dataFolder = OperatingSystem.IsWindows()
+                ? Environment.SpecialFolder.ApplicationData
+                : Environment.SpecialFolder.LocalApplicationData;
+            var launcherPath = Path.Join(Environment.GetFolderPath(dataFolder), "nexvr-launcher");
+
+            var candidates = new List<string>();
+            try
+            {
+                var settingsPath = Path.Join(launcherPath, "settings.json");
+                if (File.Exists(settingsPath))
+                {
+                    var installRoot = (string)JObject.Parse(File.ReadAllText(settingsPath))["install_root"];
+                    if (!string.IsNullOrWhiteSpace(installRoot))
+                        candidates.Add(Path.GetFullPath(installRoot));
+                }
+            }
+            catch (Exception e)
+            {
+                logger.Warn(e, "Failed to read the NexVR launcher settings");
+            }
+            candidates.Add(Path.Join(launcherPath, "client"));
+
+            foreach (var path in candidates)
+            {
+                if (IsNexvrInstall(path))
+                    return path;
+            }
+
+            return string.Empty;
+        }
+
+        /// <summary>The Steam build sits in steamapps\common\NexVR of any Steam library.</summary>
+        private static string GetNexvrSteamLocation()
+        {
+            foreach (var libraryPath in GetSteamLibraryPaths())
+            {
+                var path = Path.Join(libraryPath, "steamapps", "common", "NexVR");
+                if (IsNexvrInstall(path))
+                    return path;
+            }
+
+            return string.Empty;
+        }
+
+        private static List<string> GetSteamLibraryPaths()
+        {
+            var libraryPaths = new List<string>();
+            if (!string.IsNullOrEmpty(_steamPath))
+                libraryPaths.Add(_steamPath);
+
+            // Some Steam installs only keep the copy in steamapps
+            var libraryFoldersVdfPath = Path.Join(_steamPath, "config", "libraryfolders.vdf");
+            if (!File.Exists(libraryFoldersVdfPath))
+                libraryFoldersVdfPath = Path.Join(_steamPath, "steamapps", "libraryfolders.vdf");
+
+            try
+            {
+                if (File.Exists(libraryFoldersVdfPath))
+                {
+                    foreach (var line in File.ReadLines(libraryFoldersVdfPath))
+                    {
+                        // Current entries are "path" "<dir>"; older manifests list "<n>" "<dir>".
+                        // Numeric values are "<appid>" "<size>" pairs, not libraries.
+                        var match = Regex.Match(line, @"^\s*""(?:path|\d+)""\s+""([^""]+)""");
+                        if (match.Success && !Regex.IsMatch(match.Groups[1].Value, @"^\d+$"))
+                            libraryPaths.Add(match.Groups[1].Value.Replace(@"\\", @"\"));
+                    }
+                }
+            }
+            catch (Exception e)
+            {
+                logger.Warn(e, "Failed to read Steam libraryfolders.vdf");
+            }
+
+            // Steam's registry SteamPath uses forward slashes, which explorer.exe
+            // does not accept, so normalize every library path
+            var normalizedPaths = new List<string>();
+            foreach (var path in libraryPaths)
+            {
+                try
+                {
+                    normalizedPaths.Add(Path.GetFullPath(path));
+                }
+                catch (Exception e)
+                {
+                    logger.Warn(e, "Skipping invalid Steam library path {path}", path);
+                }
+            }
+
+            return normalizedPaths;
+        }
+
+        public override bool HasNexvrLauncherInstall()
+        {
+            return !string.IsNullOrEmpty(GetNexvrLauncherLocation());
+        }
+
+        public override bool HasNexvrSteamInstall()
+        {
+            return !string.IsNullOrEmpty(GetNexvrSteamLocation());
+        }
+
+        public override bool OpenNexvrLauncherFolder()
+        {
+            var path = GetNexvrLauncherLocation();
+            if (!Directory.Exists(path))
+                return false;
+
+            OpenFolderAndSelectItem(path, true);
+            return true;
+        }
+
+        public override bool OpenNexvrSteamFolder()
+        {
+            var path = GetNexvrSteamLocation();
+            if (!Directory.Exists(path))
+                return false;
+
+            OpenFolderAndSelectItem(path, true);
+            return true;
+        }
+
+        public override bool OpenNexvrPhotosFolder()
+        {
+            var path = Path.Join(Environment.GetFolderPath(Environment.SpecialFolder.MyPictures), "NexVR");
+            if (!Directory.Exists(path))
+                return false;
+
+            OpenFolderAndSelectItem(path, true);
+            return true;
+        }
+
+        public override bool OpenNexvrVideosFolder()
+        {
+            var path = Path.Join(Environment.GetFolderPath(Environment.SpecialFolder.MyVideos), "NexVR");
+            if (!Directory.Exists(path))
+                return false;
+
+            OpenFolderAndSelectItem(path, true);
+            return true;
+        }
+
         public override void OpenShortcutFolder()
         {
             var path = AutoAppLaunchManager.Instance.AppShortcutDirectory;
