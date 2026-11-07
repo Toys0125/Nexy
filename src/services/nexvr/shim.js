@@ -537,12 +537,13 @@ function searchPage(list, query) {
 }
 
 async function worldSearch(query) {
-    const user = query.get('userId') || (query.get('user') === 'me' ? realtime.userId : '');
+    const own = query.get('user') === 'me' || (realtime.userId && query.get('userId') === realtime.userId);
     const worlds = await nexvr('/worlds/', {
         query: {
             search: query.get('search'),
             tag: query.get('tag'),
-            creator: user || undefined
+            // by id NexVR lists only public worlds; 'me' includes the caller's private ones
+            creator: own ? 'me' : query.get('userId') || undefined
         }
     });
     return Promise.all(searchPage(worlds, query).map(async (w) => toNexVRWorld(w, await displayNameOf(w.owner))));

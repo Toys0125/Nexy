@@ -123,4 +123,11 @@ describe('NexVR world search', () => {
         expect(json.map((w) => w.id)).toEqual(['w1']);
         expect(requested).toEqual(['/worlds/?creator=me']);
     });
+
+    test('your own id asks for creator=me, so private worlds are included', async () => {
+        realtime.userId = 'u1';
+        await get('worlds?n=50&offset=0&userId=u1');
+        await get('worlds?n=50&offset=0&userId=friend');
+        expect(requested).toEqual(['/worlds/?creator=me', '/worlds/?creator=friend']);
+    });
 });
