@@ -306,11 +306,42 @@ namespace VRCX
             return File.Exists(Path.Join(path, "NexVR.exe"));
         }
 
-        /// <summary>NexVR's own launcher keeps the client in %APPDATA%\nexvr-launcher\client.</summary>
+        /// <summary>
+        /// The NexVR launcher keeps its data in %APPDATA%\nexvr-launcher on Windows and
+        /// ~/.local/share/nexvr-launcher on Linux. The client goes in its "client" folder
+        /// unless another one was picked, which settings.json stores as install_root.
+        /// </summary>
         private static string GetNexvrLauncherLocation()
         {
-            var path = Path.Join(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "nexvr-launcher", "client");
-            return IsNexvrInstall(path) ? path : string.Empty;
+            var dataFolder = OperatingSystem.IsWindows()
+                ? Environment.SpecialFolder.ApplicationData
+                : Environment.SpecialFolder.LocalApplicationData;
+            var launcherPath = Path.Join(Environment.GetFolderPath(dataFolder), "nexvr-launcher");
+
+            var candidates = new List<string>();
+            try
+            {
+                var settingsPath = Path.Join(launcherPath, "settings.json");
+                if (File.Exists(settingsPath))
+                {
+                    var installRoot = (string)JObject.Parse(File.ReadAllText(settingsPath))["install_root"];
+                    if (!string.IsNullOrWhiteSpace(installRoot))
+                        candidates.Add(Path.GetFullPath(installRoot));
+                }
+            }
+            catch (Exception e)
+            {
+                logger.Warn(e, "Failed to read the NexVR launcher settings");
+            }
+            candidates.Add(Path.Join(launcherPath, "client"));
+
+            foreach (var path in candidates)
+            {
+                if (IsNexvrInstall(path))
+                    return path;
+            }
+
+            return string.Empty;
         }
 
         /// <summary>The Steam build sits in steamapps\common\NexVR of any Steam library.</summary>
@@ -332,17 +363,23 @@ namespace VRCX
             if (!string.IsNullOrEmpty(_steamPath))
                 libraryPaths.Add(_steamPath);
 
+            // Some Steam installs only keep the copy in steamapps
             var libraryFoldersVdfPath = Path.Join(_steamPath, "config", "libraryfolders.vdf");
             if (!File.Exists(libraryFoldersVdfPath))
-                return libraryPaths;
+                libraryFoldersVdfPath = Path.Join(_steamPath, "steamapps", "libraryfolders.vdf");
 
             try
             {
-                foreach (var line in File.ReadLines(libraryFoldersVdfPath))
+                if (File.Exists(libraryFoldersVdfPath))
                 {
-                    var match = Regex.Match(line, @"""path""\s+""([^""]+)""");
-                    if (match.Success)
-                        libraryPaths.Add(match.Groups[1].Value.Replace(@"\\", @"\"));
+                    foreach (var line in File.ReadLines(libraryFoldersVdfPath))
+                    {
+                        // Current entries are "path" "<dir>"; older manifests list "<n>" "<dir>".
+                        // Numeric values are "<appid>" "<size>" pairs, not libraries.
+                        var match = Regex.Match(line, @"^\s*""(?:path|\d+)""\s+""([^""]+)""");
+                        if (match.Success && !Regex.IsMatch(match.Groups[1].Value, @"^\d+$"))
+                            libraryPaths.Add(match.Groups[1].Value.Replace(@"\\", @"\"));
+                    }
                 }
             }
             catch (Exception e)

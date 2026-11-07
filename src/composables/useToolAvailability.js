@@ -23,7 +23,12 @@ function isToolNavKeyAvailable(navKey) {
     return !tool || isToolAvailable(tool);
 }
 
+// The nav and the Tools page can refresh at the same time; only the latest
+// refresh may write, so a slower older one cannot overwrite it
+let latestRefresh = 0;
+
 async function refreshToolAvailability() {
+    const refresh = ++latestRefresh;
     const checks = toolDefinitions
         .filter((tool) => tool.availabilityMethod)
         .map(async (tool) => {
@@ -33,7 +38,10 @@ async function refreshToolAvailability() {
                 return null;
             }
         });
-    availableToolKeys.value = new Set((await Promise.all(checks)).filter(Boolean));
+    const keys = new Set((await Promise.all(checks)).filter(Boolean));
+    if (refresh === latestRefresh) {
+        availableToolKeys.value = keys;
+    }
 }
 
 export function useToolAvailability() {
