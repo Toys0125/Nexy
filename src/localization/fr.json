@@ -136,8 +136,7 @@
             },
             "world": {
                 "header": "Monde",
-                "category": "Rechercher par catégorie",
-                "community_lab": "Inclure les « Community labs »"
+                "category": "Rechercher par catégorie"
             },
             "avatar": {
                 "header": "Avatar",

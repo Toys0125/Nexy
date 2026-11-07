@@ -334,8 +334,7 @@
             },
             "world": {
                 "header": "世界",
-                "category": "按类别搜索",
-                "community_lab": "包含位于社区实验室的世界"
+                "category": "按类别搜索"
             },
             "avatar": {
                 "header": "模型",

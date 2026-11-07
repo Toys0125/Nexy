@@ -101,10 +101,6 @@
             <TabsContent value="world" class="flex flex-col min-h-0 flex-1">
                 <div class="flex flex-col min-h-0" style="flex: 9">
                     <div class="inline-flex justify-end mb-4 w-full shrink-0 gap-2">
-                        <label class="inline-flex items-center gap-2">
-                            <Checkbox v-model="searchWorldLabs" />
-                            <span>{{ t('view.search.world.community_lab') }}</span>
-                        </label>
                         <Select
                             :model-value="searchWorldCategoryIndex"
                             @update:modelValue="handleSearchWorldCategorySelect"
@@ -402,7 +398,6 @@
     } = useSearchAvatar();
 
     const {
-        searchWorldLabs,
         searchWorldParams,
         searchWorldCategoryIndex,
         searchWorldResults,

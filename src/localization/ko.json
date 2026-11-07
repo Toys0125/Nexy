@@ -75,8 +75,7 @@
             },
             "world": {
                 "header": "월드",
-                "category": "카테고리별 검색",
-                "community_lab": "커뮤니티 랩스 포함"
+                "category": "카테고리별 검색"
             },
             "avatar": {
                 "header": "아바타",

@@ -8,11 +8,10 @@
 export const NEXVR_HIDDEN_NAV_KEYS = new Set([
     // VRChat's mutual-friends API
     'charts-mutual',
-    // favorites, avatars and VRChat IDs/URLs are not mapped to NexVR yet
+    // favorites and VRChat IDs/URLs are not mapped to NexVR yet
     'favorite-friends',
     'favorite-worlds',
     'favorite-avatars',
-    'my-avatars',
     'direct-access'
 ]);
 
@@ -48,7 +47,6 @@ export const NEXVR_HIDDEN_ROUTE_NAMES = new Set([
     'favorite-friends',
     'favorite-worlds',
     'favorite-avatars',
-    'my-avatars',
     'gallery',
     'screenshot-metadata'
 ]);
