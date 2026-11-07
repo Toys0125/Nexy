@@ -106,7 +106,8 @@ export function request(endpoint, options) {
         url.pathname = url.pathname.split('~')[0];
         cacheUrl = url.toString();
     }
-    const requestKey = instanceSession === null ? cacheUrl : `${instanceSession}:${cacheUrl}`;
+    // a request from a previous login is never shared with the next one
+    const requestKey = `${getRequestSession()}:${cacheUrl}`;
     if (instanceSession !== null && instanceSession !== instanceFailureSession) {
         for (const failedEndpoint of failedGetRequests.keys()) {
             if (failedEndpoint.startsWith('instances/')) failedGetRequests.delete(failedEndpoint);
