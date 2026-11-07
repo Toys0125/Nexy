@@ -725,6 +725,12 @@
             },
             "shortcuts": {
                 "header": "Shortcuts",
+                "nexvr_install": "NexVR Install",
+                "nexvr_install_description": "Open the NexVR installation folder",
+                "nexvr_photos": "NexVR Photos",
+                "nexvr_photos_description": "Open your NexVR photos folder",
+                "nexvr_videos": "NexVR Videos",
+                "nexvr_videos_description": "Open your NexVR videos folder",
                 "vrcx_data": "Nexy Data",
                 "vrcx_data_description": "Open the Nexy data folder",
                 "vrchat_data": "VRChat Data",

@@ -39,6 +39,9 @@ namespace VRCX
         public abstract bool OpenUGCPhotosFolder(string ugcPath = "");
         public abstract bool OpenVrcScreenshotsFolder();
         public abstract bool OpenCrashVrcCrashDumps();
+        public abstract bool OpenNexvrInstallFolder();
+        public abstract bool OpenNexvrPhotosFolder();
+        public abstract bool OpenNexvrVideosFolder();
         public abstract void OpenShortcutFolder();
         public abstract void OpenFolderAndSelectItem(string path, bool isFolder = false);
         public abstract Task<string> OpenFolderSelectorDialog(string defaultPath = "");

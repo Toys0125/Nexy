@@ -299,6 +299,83 @@ namespace VRCX
             return true;
         }
 
+        /// <summary>
+        /// NexVR's own launcher keeps the client in %APPDATA%\nexvr-launcher\client;
+        /// the Steam build sits in steamapps\common\NexVR of any Steam library.
+        /// </summary>
+        private static string GetNexvrInstallLocation()
+        {
+            var launcherPath = Path.Join(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "nexvr-launcher", "client");
+            if (Directory.Exists(launcherPath))
+                return launcherPath;
+
+            foreach (var libraryPath in GetSteamLibraryPaths())
+            {
+                var steamPath = Path.Join(libraryPath, "steamapps", "common", "NexVR");
+                if (Directory.Exists(steamPath))
+                    return steamPath;
+            }
+
+            return string.Empty;
+        }
+
+        private static List<string> GetSteamLibraryPaths()
+        {
+            var libraryPaths = new List<string>();
+            if (!string.IsNullOrEmpty(_steamPath))
+                libraryPaths.Add(_steamPath);
+
+            var libraryFoldersVdfPath = Path.Join(_steamPath, "config", "libraryfolders.vdf");
+            if (!File.Exists(libraryFoldersVdfPath))
+                return libraryPaths;
+
+            try
+            {
+                foreach (var line in File.ReadLines(libraryFoldersVdfPath))
+                {
+                    var match = Regex.Match(line, @"""path""\s+""([^""]+)""");
+                    if (match.Success)
+                        libraryPaths.Add(match.Groups[1].Value.Replace(@"\\", @"\"));
+                }
+            }
+            catch (Exception e)
+            {
+                logger.Warn(e, "Failed to read Steam libraryfolders.vdf");
+            }
+
+            return libraryPaths;
+        }
+
+        public override bool OpenNexvrInstallFolder()
+        {
+            var path = GetNexvrInstallLocation();
+            if (!Directory.Exists(path))
+                return false;
+
+            OpenFolderAndSelectItem(path, true);
+            return true;
+        }
+
+        public override bool OpenNexvrPhotosFolder()
+        {
+            var path = Path.Join(Environment.GetFolderPath(Environment.SpecialFolder.MyPictures), "NexVR");
+            if (!Directory.Exists(path))
+                return false;
+
+            OpenFolderAndSelectItem(path, true);
+            return true;
+        }
+
+        public override bool OpenNexvrVideosFolder()
+        {
+            var path = Path.Join(Environment.GetFolderPath(Environment.SpecialFolder.MyVideos), "NexVR");
+            if (!Directory.Exists(path))
+                return false;
+
+            OpenFolderAndSelectItem(path, true);
+            return true;
+        }
+
         public override void OpenShortcutFolder()
         {
             var path = AutoAppLaunchManager.Instance.AppShortcutDirectory;
