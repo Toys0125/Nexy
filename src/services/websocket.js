@@ -31,6 +31,8 @@ import * as workerTimers from 'worker-timers';
 const PING_INTERVAL = 120000; // NexVR shows users offline after 5 minutes unseen
 
 let realtimeAttached = false;
+/** Bumped on every detach, so lookups that outlive their socket are dropped */
+let realtimeGeneration = 0;
 /** @type {(() => void)[]} */
 let detachRealtime = [];
 /** @type {Set<string>} */
@@ -146,6 +148,7 @@ function detachRealtimeListeners() {
     }
     detachRealtime = [];
     realtimeAttached = false;
+    realtimeGeneration++;
 }
 
 function startPing() {
@@ -255,10 +258,22 @@ async function handleRealtimeNotifications(list) {
     }
     knownNotificationIds = ids;
     // names and pictures are looked up first, so the notification arrives looking finished
-    const described = await Promise.all(added.map(describeNotification));
+    const generation = realtimeGeneration;
+    const described = await Promise.all(
+        added.map((notification) =>
+            describeNotification(notification).catch((err) => {
+                console.error('Failed to describe notification', err);
+                return null;
+            })
+        )
+    );
+    if (generation !== realtimeGeneration) {
+        // signed out or reconnected meanwhile; that session loads its own list
+        return;
+    }
     for (const json of described) {
         // dismissed while it was being looked up
-        if (knownNotificationIds.has(json.id)) {
+        if (json && knownNotificationIds.has(json.id)) {
             emitPipeline('notification', json);
         }
     }

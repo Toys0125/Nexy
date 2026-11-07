@@ -211,7 +211,7 @@ function summaryOf(kind, id) {
             .then((summary) => {
                 if (cache !== summaryCache || session !== getRequestSession() || endpoint !== AppDebug.endpointDomain)
                     return none;
-                if (!summary.name && cache.get(key) === pending) cache.delete(key);
+                if (!summary.name && !summary.image && cache.get(key) === pending) cache.delete(key);
                 return summary;
             })
             .catch(() => {
@@ -405,6 +405,12 @@ export async function describeNotification(notification) {
     return mapped;
 }
 
+/**
+ * NexVR has no paging or hidden list; the first page is every notification.
+ *
+ * @param {URLSearchParams} query
+ * @returns {Promise<object[]>} VRChat Notifications (v1)
+ */
 async function notificationsList(query) {
     if (query.get('hidden') === 'true' || Number(query.get('offset') || 0) > 0) {
         return [];
