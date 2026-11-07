@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, test, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 import { ref } from 'vue';
 import { flushPromises, mount } from '@vue/test-utils';
 
@@ -83,7 +83,13 @@ function findCategoryHeaderByTitle(wrapper, titleKey) {
     return wrapper.findAll('div.cursor-pointer').find((node) => node.text().includes(titleKey));
 }
 
+const defaultAppApi = globalThis.AppApi;
+
 describe('Tools.vue', () => {
+    afterEach(() => {
+        globalThis.AppApi = defaultAppApi;
+    });
+
     beforeEach(() => {
         vi.clearAllMocks();
         routeName = 'not-tools';
@@ -97,6 +103,32 @@ describe('Tools.vue', () => {
         expect(findToolItemByTitle(wrapper, 'view.tools.pictures.screenshot')).toBeFalsy();
         expect(findToolItemByTitle(wrapper, 'view.tools.pictures.gallery')).toBeFalsy();
         expect(findCategoryHeaderByTitle(wrapper, 'view.tools.pictures.header')).toBeFalsy();
+    });
+
+    test('lists only the NexVR installs that are found', async () => {
+        globalThis.AppApi = {
+            HasNexvrLauncherInstall: vi.fn().mockResolvedValue(true),
+            HasNexvrSteamInstall: vi.fn().mockResolvedValue(false)
+        };
+
+        const wrapper = mount(Tools);
+        await flushPromises();
+
+        expect(findToolItemByTitle(wrapper, 'view.tools.shortcuts.nexvr_launcher')).toBeTruthy();
+        expect(findToolItemByTitle(wrapper, 'view.tools.shortcuts.nexvr_steam')).toBeFalsy();
+    });
+
+    test('lists both NexVR installs when both are found', async () => {
+        globalThis.AppApi = {
+            HasNexvrLauncherInstall: vi.fn().mockResolvedValue(true),
+            HasNexvrSteamInstall: vi.fn().mockResolvedValue(true)
+        };
+
+        const wrapper = mount(Tools);
+        await flushPromises();
+
+        expect(findToolItemByTitle(wrapper, 'view.tools.shortcuts.nexvr_launcher')).toBeTruthy();
+        expect(findToolItemByTitle(wrapper, 'view.tools.shortcuts.nexvr_steam')).toBeTruthy();
     });
 
     test('toggle category persists collapsed state', async () => {

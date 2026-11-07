@@ -61,16 +61,35 @@ const allToolDefinitions = [
         }
     },
     {
-        key: 'nexvr-install',
+        key: 'nexvr-launcher',
         category: 'shortcuts',
         iconKey: 'folder-cog',
         navIcon: 'ri-folder-download-line',
-        titleKey: 'view.tools.shortcuts.nexvr_install',
-        descriptionKey: 'view.tools.shortcuts.nexvr_install_description',
+        titleKey: 'view.tools.shortcuts.nexvr_launcher',
+        descriptionKey: 'view.tools.shortcuts.nexvr_launcher_description',
         navEligible: true,
+        // only listed when this install is found
+        availabilityMethod: 'HasNexvrLauncherInstall',
         action: {
             type: 'app-api',
-            method: 'OpenNexvrInstallFolder',
+            method: 'OpenNexvrLauncherFolder',
+            successMessageKey: 'message.file.folder_opened',
+            errorMessageKey: 'message.file.folder_missing'
+        }
+    },
+    {
+        key: 'nexvr-steam',
+        category: 'shortcuts',
+        iconKey: 'folder-cog',
+        navIcon: 'ri-steam-line',
+        titleKey: 'view.tools.shortcuts.nexvr_steam',
+        descriptionKey: 'view.tools.shortcuts.nexvr_steam_description',
+        navEligible: true,
+        // only listed when this install is found
+        availabilityMethod: 'HasNexvrSteamInstall',
+        action: {
+            type: 'app-api',
+            method: 'OpenNexvrSteamFolder',
             successMessageKey: 'message.file.folder_opened',
             errorMessageKey: 'message.file.folder_missing'
         }
