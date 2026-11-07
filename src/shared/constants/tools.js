@@ -61,6 +61,51 @@ const allToolDefinitions = [
         }
     },
     {
+        key: 'nexvr-install',
+        category: 'shortcuts',
+        iconKey: 'folder-cog',
+        navIcon: 'ri-folder-download-line',
+        titleKey: 'view.tools.shortcuts.nexvr_install',
+        descriptionKey: 'view.tools.shortcuts.nexvr_install_description',
+        navEligible: true,
+        action: {
+            type: 'app-api',
+            method: 'OpenNexvrInstallFolder',
+            successMessageKey: 'message.file.folder_opened',
+            errorMessageKey: 'message.file.folder_missing'
+        }
+    },
+    {
+        key: 'nexvr-photos',
+        category: 'shortcuts',
+        iconKey: 'folder-image',
+        navIcon: 'ri-folder-image-line',
+        titleKey: 'view.tools.shortcuts.nexvr_photos',
+        descriptionKey: 'view.tools.shortcuts.nexvr_photos_description',
+        navEligible: true,
+        action: {
+            type: 'app-api',
+            method: 'OpenNexvrPhotosFolder',
+            successMessageKey: 'message.file.folder_opened',
+            errorMessageKey: 'message.file.folder_missing'
+        }
+    },
+    {
+        key: 'nexvr-videos',
+        category: 'shortcuts',
+        iconKey: 'folder-video',
+        navIcon: 'ri-folder-video-line',
+        titleKey: 'view.tools.shortcuts.nexvr_videos',
+        descriptionKey: 'view.tools.shortcuts.nexvr_videos_description',
+        navEligible: true,
+        action: {
+            type: 'app-api',
+            method: 'OpenNexvrVideosFolder',
+            successMessageKey: 'message.file.folder_opened',
+            errorMessageKey: 'message.file.folder_missing'
+        }
+    },
+    {
         key: 'vrcx-data',
         category: 'shortcuts',
         iconKey: 'folder-cog',

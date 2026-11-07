@@ -211,6 +211,9 @@ declare global {
         OpenUGCPhotosFolder(ugcPath?: string): Promise<boolean>;
         OpenVrcScreenshotsFolder(): Promise<boolean>;
         OpenCrashVrcCrashDumps(): Promise<boolean>;
+        OpenNexvrInstallFolder(): Promise<boolean>;
+        OpenNexvrPhotosFolder(): Promise<boolean>;
+        OpenNexvrVideosFolder(): Promise<boolean>;
         OpenShortcutFolder(): Promise<void>;
         OpenFolderAndSelectItem(path: string, isFolder?: boolean): Promise<void>;
         OpenFolderSelectorDialog(defaultPath?: string): Promise<string>;
