@@ -35,7 +35,8 @@ async function refreshToolAvailability() {
             try {
                 return (await AppApi[tool.availabilityMethod]()) ? tool.key : null;
             } catch {
-                return null;
+                // a failed check is not "not installed": keep the last known result
+                return availableToolKeys.value.has(tool.key) ? tool.key : null;
             }
         });
     const keys = new Set((await Promise.all(checks)).filter(Boolean));
