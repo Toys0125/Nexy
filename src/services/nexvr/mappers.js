@@ -414,6 +414,13 @@ export function toNexVRWorld(world, authorName = '') {
     const latest = versions.find((v) => v.versionNumber === world.currentVersion) || versions[versions.length - 1];
     const stats = world.stats || {};
     const image = world.images?.primary || '';
+    const createdAt = versions.reduce((first, version) => {
+        const uploadedAt = version.package?.uploadedAt;
+        if (!uploadedAt || !Number.isFinite(Date.parse(uploadedAt))) {
+            return first;
+        }
+        return !first || Date.parse(uploadedAt) < Date.parse(first) ? uploadedAt : first;
+    }, '');
     const updatedAt = latest?.package?.uploadedAt || '';
     return {
         id: world._id,
@@ -433,9 +440,9 @@ export function toNexVRWorld(world, authorName = '') {
         heat: 0,
         favorites: 0,
         visits: stats.uniqueVisitors || 0,
-        tags: world.tags || [],
+        tags: (world.tags || []).map((tag) => `author_tag_${tag}`),
         releaseStatus: world.visibility === 'public' ? 'public' : 'private',
-        created_at: updatedAt,
+        created_at: createdAt,
         updated_at: updatedAt,
         publicationDate: '',
         labsPublicationDate: '',

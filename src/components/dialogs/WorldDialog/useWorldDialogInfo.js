@@ -1,6 +1,14 @@
 import { computed } from 'vue';
-import { commaNumber, compareUnityVersion, formatDateFilter, timeToText } from '../../../shared/utils';
+import { commaNumber, formatDateFilter } from '../../../shared/utils';
 import { database } from '../../../services/database';
+
+const PLATFORM_LABELS = {
+    standalonewindows: 'PC',
+    android: 'Android',
+    ios: 'iOS',
+    standalonelinux: 'Linux',
+    standaloneosx: 'macOS'
+};
 
 /**
  * Composable for WorldDialogInfoTab computed properties and actions.
@@ -11,27 +19,10 @@ import { database } from '../../../services/database';
  * @param {object} deps.toast - Toast notification functions
  * @param {Function} deps.toast.success - Toast success notification function
  * @param {Function} deps.toast.error - Toast error notification function
- * @param {string} [deps.sdkUnityVersion]
  * @returns {object} Info composable API
  */
-export function useWorldDialogInfo(worldDialog, { t, toast, sdkUnityVersion }) {
+export function useWorldDialogInfo(worldDialog, { t, toast }) {
     const { memo, onWorldMemoChange } = useWorldMemo(worldDialog);
-
-    const isTimeInLabVisible = computed(() => {
-        return (
-            worldDialog.value.ref.publicationDate &&
-            worldDialog.value.ref.publicationDate !== 'none' &&
-            worldDialog.value.ref.labsPublicationDate &&
-            worldDialog.value.ref.labsPublicationDate !== 'none'
-        );
-    });
-
-    const timeInLab = computed(() => {
-        return timeToText(
-            new Date(worldDialog.value.ref.publicationDate).getTime() -
-                new Date(worldDialog.value.ref.labsPublicationDate).getTime()
-        );
-    });
 
     const favoriteRate = computed(() => {
         return (
@@ -46,32 +37,25 @@ export function useWorldDialogInfo(worldDialog, { t, toast, sdkUnityVersion }) {
 
     const worldTags = computed(() => {
         return worldDialog.value.ref?.tags
-            ?.filter((tag) => tag.startsWith('author_tag'))
-            .map((tag) => tag.replace('author_tag_', ''))
+            ?.filter((tag) => tag.startsWith('author_tag_'))
+            .map((tag) => tag.slice('author_tag_'.length))
             .join(', ');
     });
 
     const worldDialogPlatform = computed(() => {
-        const { ref } = worldDialog.value;
         const platforms = [];
-        if (ref.unityPackages) {
-            for (const unityPackage of ref.unityPackages) {
-                if (!compareUnityVersion(unityPackage.unitySortNumber, sdkUnityVersion)) {
-                    continue;
-                }
-                let platform = 'PC';
-                if (unityPackage.platform === 'standalonewindows') {
-                    platform = 'PC';
-                } else if (unityPackage.platform === 'android') {
-                    platform = 'Android';
-                } else if (unityPackage.platform) {
-                    platform = unityPackage.platform;
-                }
-                const platformWithVersion = `${platform}/${unityPackage.unityVersion}`;
-                if (platforms.includes(platformWithVersion)) {
-                    continue;
-                }
-                platforms.unshift(platformWithVersion);
+        for (const pkg of worldDialog.value.ref?.unityPackages || []) {
+            if (pkg.variant && pkg.variant !== 'standard' && pkg.variant !== 'security') {
+                continue;
+            }
+            if (!pkg.platform) {
+                continue;
+            }
+            const label = PLATFORM_LABELS[pkg.platform] || pkg.platform;
+            // NexVR reports platforms without a VRChat SDK or Unity version.
+            const display = pkg.unityVersion ? `${label}/${pkg.unityVersion}` : label;
+            if (!platforms.includes(display)) {
+                platforms.push(display);
             }
         }
         return platforms.join('\n');
@@ -134,8 +118,6 @@ export function useWorldDialogInfo(worldDialog, { t, toast, sdkUnityVersion }) {
 
     return {
         memo,
-        isTimeInLabVisible,
-        timeInLab,
         favoriteRate,
         worldTags,
         worldDialogPlatform,

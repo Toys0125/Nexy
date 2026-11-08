@@ -1,12 +1,12 @@
 import { describe, expect, test, vi, beforeEach } from 'vitest';
 import { ref } from 'vue';
 import { useWorldDialogInfo } from '../useWorldDialogInfo';
+import { toNexVRWorld } from '../../../../services/nexvr/mappers';
+import { getAvailablePlatforms } from '../../../../shared/utils/platformUtils';
 
 vi.mock('../../../../shared/utils', () => ({
     commaNumber: vi.fn((n) => n?.toLocaleString()),
-    compareUnityVersion: vi.fn(() => true),
-    formatDateFilter: vi.fn((d) => d),
-    timeToText: vi.fn((ms) => `${Math.floor(ms / 1000)}s`)
+    formatDateFilter: vi.fn((d) => d)
 }));
 
 vi.mock('../../../../services/database', () => ({
@@ -17,7 +17,6 @@ vi.mock('../../../../services/database', () => ({
 }));
 
 const { database } = await import('../../../../services/database');
-const { compareUnityVersion } = await import('../../../../shared/utils');
 
 /**
  * @param overrides
@@ -30,8 +29,6 @@ function createWorldDialog(overrides = {}) {
         ref: {
             name: 'Test World',
             description: 'A test world',
-            publicationDate: '2024-06-01T00:00:00Z',
-            labsPublicationDate: '2024-05-01T00:00:00Z',
             favorites: 100,
             visits: 500,
             tags: ['author_tag_fun', 'author_tag_social', 'content_horror'],
@@ -58,7 +55,7 @@ function createWorldDialog(overrides = {}) {
 
 /**
  * @param {Object} overrides
- * @returns {{ t: Function; toast: { success: Function; error: Function }; sdkUnityVersion?: string }}
+ * @returns {{ t: Function; toast: { success: Function; error: Function } }}
  */
 function createDeps(overrides = {}) {
     return {
@@ -67,7 +64,6 @@ function createDeps(overrides = {}) {
             success: vi.fn(),
             error: vi.fn()
         },
-        sdkUnityVersion: '0',
         ...overrides
     };
 }
@@ -75,7 +71,6 @@ function createDeps(overrides = {}) {
 describe('useWorldDialogInfo', () => {
     beforeEach(() => {
         vi.clearAllMocks();
-        compareUnityVersion.mockReturnValue(true);
     });
 
     describe('memo computed', () => {
@@ -92,41 +87,6 @@ describe('useWorldDialogInfo', () => {
 
             memo.value = 'new memo';
             expect(worldDialog.value.memo).toBe('new memo');
-        });
-    });
-
-    describe('isTimeInLabVisible', () => {
-        test('returns true when both dates exist and are not "none"', () => {
-            const worldDialog = createWorldDialog();
-            const { isTimeInLabVisible } = useWorldDialogInfo(worldDialog, createDeps());
-
-            expect(isTimeInLabVisible.value).toBe(true);
-        });
-
-        test('returns false when publicationDate is "none"', () => {
-            const worldDialog = createWorldDialog();
-            worldDialog.value.ref.publicationDate = 'none';
-            const { isTimeInLabVisible } = useWorldDialogInfo(worldDialog, createDeps());
-
-            expect(isTimeInLabVisible.value).toBe(false);
-        });
-
-        test('returns false when labsPublicationDate is falsy', () => {
-            const worldDialog = createWorldDialog();
-            worldDialog.value.ref.labsPublicationDate = '';
-            const { isTimeInLabVisible } = useWorldDialogInfo(worldDialog, createDeps());
-
-            expect(isTimeInLabVisible.value).toBeFalsy();
-        });
-    });
-
-    describe('timeInLab', () => {
-        test('computes time difference between publication and labs dates', () => {
-            const worldDialog = createWorldDialog();
-            const { timeInLab } = useWorldDialogInfo(worldDialog, createDeps());
-
-            // Should call timeToText with the ms difference
-            expect(timeInLab.value).toBeDefined();
         });
     });
 
@@ -167,26 +127,65 @@ describe('useWorldDialogInfo', () => {
             expect(worldDialogPlatform.value).toContain('Android/2022.3.6f1');
         });
 
-        test('skips packages filtered by compareUnityVersion', () => {
-            compareUnityVersion.mockReturnValue(false);
-            const worldDialog = createWorldDialog();
-            const { worldDialogPlatform } = useWorldDialogInfo(worldDialog, createDeps());
-
-            expect(worldDialogPlatform.value).toBe('');
-        });
-
         test('uses platform name directly for unknown platforms', () => {
             const worldDialog = createWorldDialog();
             worldDialog.value.ref.unityPackages = [
                 {
-                    platform: 'ios',
+                    platform: 'Generic',
                     unityVersion: '2022.3.6f1',
                     unitySortNumber: 20220306
                 }
             ];
             const { worldDialogPlatform } = useWorldDialogInfo(worldDialog, createDeps());
 
-            expect(worldDialogPlatform.value).toBe('ios/2022.3.6f1');
+            expect(worldDialogPlatform.value).toBe('Generic/2022.3.6f1');
+        });
+
+        test('shows NexVR platforms and author tags without SDK or Unity versions', () => {
+            const world = toNexVRWorld({
+                _id: 'world',
+                tags: ['bar', 'music'],
+                platforms: ['pc', 'android', 'linux', 'mac']
+            });
+            const { worldDialogPlatform, worldTags } = useWorldDialogInfo(
+                createWorldDialog({ ref: world }),
+                createDeps()
+            );
+
+            expect(worldDialogPlatform.value).toBe('PC\nAndroid\nLinux\nmacOS');
+            expect(worldTags.value).toBe('bar, music');
+            expect(getAvailablePlatforms(world.unityPackages)).toEqual({ isPC: true, isQuest: true, isIos: false });
+        });
+
+        test('updates metadata when selecting a different world, including an empty world', () => {
+            const dialog = createWorldDialog({ ref: toNexVRWorld({ tags: ['debug'], platforms: ['linux'] }) });
+            const { worldDialogPlatform, worldTags } = useWorldDialogInfo(dialog, createDeps());
+            expect(worldDialogPlatform.value).toBe('Linux');
+            expect(worldTags.value).toBe('debug');
+
+            dialog.value.ref = toNexVRWorld({ platforms: ['pc'] });
+            expect(worldDialogPlatform.value).toBe('PC');
+            expect(worldTags.value).toBe('');
+
+            dialog.value.ref = toNexVRWorld({});
+            expect(worldDialogPlatform.value).toBe('');
+            expect(worldTags.value).toBe('');
+        });
+
+        test('deduplicates packages and skips missing platforms and unsupported variants', () => {
+            const dialog = createWorldDialog({
+                ref: {
+                    unityPackages: [
+                        { platform: 'standalonewindows', variant: 'standard' },
+                        { platform: 'standalonewindows', variant: 'security' },
+                        { platform: 'android', variant: 'custom' },
+                        { platform: 'ios' },
+                        { unityVersion: '2022.3.6f1' }
+                    ]
+                }
+            });
+            const { worldDialogPlatform } = useWorldDialogInfo(dialog, createDeps());
+            expect(worldDialogPlatform.value).toBe('PC\niOS');
         });
     });
 
