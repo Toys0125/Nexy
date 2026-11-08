@@ -428,7 +428,7 @@ export function toNexVRWorld(world, authorName = '') {
         heat: 0,
         favorites: 0,
         visits: stats.uniqueVisitors || 0,
-        tags: world.tags || [],
+        tags: (world.tags || []).map((tag) => `author_tag_${tag}`),
         releaseStatus: world.visibility === 'public' ? 'public' : 'private',
         created_at: updatedAt,
         updated_at: updatedAt,
