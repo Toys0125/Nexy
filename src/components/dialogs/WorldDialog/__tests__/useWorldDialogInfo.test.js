@@ -6,8 +6,7 @@ import { getAvailablePlatforms } from '../../../../shared/utils/platformUtils';
 
 vi.mock('../../../../shared/utils', () => ({
     commaNumber: vi.fn((n) => n?.toLocaleString()),
-    formatDateFilter: vi.fn((d) => d),
-    timeToText: vi.fn((ms) => `${Math.floor(ms / 1000)}s`)
+    formatDateFilter: vi.fn((d) => d)
 }));
 
 vi.mock('../../../../services/database', () => ({
@@ -30,8 +29,6 @@ function createWorldDialog(overrides = {}) {
         ref: {
             name: 'Test World',
             description: 'A test world',
-            publicationDate: '2024-06-01T00:00:00Z',
-            labsPublicationDate: '2024-05-01T00:00:00Z',
             favorites: 100,
             visits: 500,
             tags: ['author_tag_fun', 'author_tag_social', 'content_horror'],
@@ -90,41 +87,6 @@ describe('useWorldDialogInfo', () => {
 
             memo.value = 'new memo';
             expect(worldDialog.value.memo).toBe('new memo');
-        });
-    });
-
-    describe('isTimeInLabVisible', () => {
-        test('returns true when both dates exist and are not "none"', () => {
-            const worldDialog = createWorldDialog();
-            const { isTimeInLabVisible } = useWorldDialogInfo(worldDialog, createDeps());
-
-            expect(isTimeInLabVisible.value).toBe(true);
-        });
-
-        test('returns false when publicationDate is "none"', () => {
-            const worldDialog = createWorldDialog();
-            worldDialog.value.ref.publicationDate = 'none';
-            const { isTimeInLabVisible } = useWorldDialogInfo(worldDialog, createDeps());
-
-            expect(isTimeInLabVisible.value).toBe(false);
-        });
-
-        test('returns false when labsPublicationDate is falsy', () => {
-            const worldDialog = createWorldDialog();
-            worldDialog.value.ref.labsPublicationDate = '';
-            const { isTimeInLabVisible } = useWorldDialogInfo(worldDialog, createDeps());
-
-            expect(isTimeInLabVisible.value).toBeFalsy();
-        });
-    });
-
-    describe('timeInLab', () => {
-        test('computes time difference between publication and labs dates', () => {
-            const worldDialog = createWorldDialog();
-            const { timeInLab } = useWorldDialogInfo(worldDialog, createDeps());
-
-            // Should call timeToText with the ms difference
-            expect(timeInLab.value).toBeDefined();
         });
     });
 

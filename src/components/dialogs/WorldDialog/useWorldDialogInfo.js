@@ -1,5 +1,5 @@
 import { computed } from 'vue';
-import { commaNumber, formatDateFilter, timeToText } from '../../../shared/utils';
+import { commaNumber, formatDateFilter } from '../../../shared/utils';
 import { database } from '../../../services/database';
 
 const PLATFORM_LABELS = {
@@ -23,22 +23,6 @@ const PLATFORM_LABELS = {
  */
 export function useWorldDialogInfo(worldDialog, { t, toast }) {
     const { memo, onWorldMemoChange } = useWorldMemo(worldDialog);
-
-    const isTimeInLabVisible = computed(() => {
-        return (
-            worldDialog.value.ref.publicationDate &&
-            worldDialog.value.ref.publicationDate !== 'none' &&
-            worldDialog.value.ref.labsPublicationDate &&
-            worldDialog.value.ref.labsPublicationDate !== 'none'
-        );
-    });
-
-    const timeInLab = computed(() => {
-        return timeToText(
-            new Date(worldDialog.value.ref.publicationDate).getTime() -
-                new Date(worldDialog.value.ref.labsPublicationDate).getTime()
-        );
-    });
 
     const favoriteRate = computed(() => {
         return (
@@ -134,8 +118,6 @@ export function useWorldDialogInfo(worldDialog, { t, toast }) {
 
     return {
         memo,
-        isTimeInLabVisible,
-        timeInLab,
         favoriteRate,
         worldTags,
         worldDialogPlatform,
