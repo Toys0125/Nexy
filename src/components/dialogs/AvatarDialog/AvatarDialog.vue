@@ -52,7 +52,7 @@
                                     <Badge class="text-platform-pc border-platform-pc! mr-1.5 mt-1.5" variant="outline"
                                         ><Monitor class="h-4 w-4 text-platform-pc" />
                                         <span
-                                            v-if="avatarDialog.platformInfo.pc"
+                                            v-if="avatarDialog.platformInfo.pc?.performanceRating"
                                             class="x-grey text-platform-pc border-l-[0.8px] border-solid ml-1.5 pl-1.5"
                                             >{{
                                                 t(
@@ -73,7 +73,7 @@
                                         variant="outline"
                                         ><Smartphone class="h-4 w-4 text-platform-quest" />
                                         <span
-                                            v-if="avatarDialog.platformInfo.android"
+                                            v-if="avatarDialog.platformInfo.android?.performanceRating"
                                             class="x-grey text-platform-quest border-l-[0.8px] border-solid ml-1.5 pl-1.5"
                                             >{{
                                                 t(
@@ -92,7 +92,7 @@
                                     <Badge class="text-platform-ios border-platform-ios mr-1.5 mt-1.5" variant="outline"
                                         ><Apple class="h-4 w-4 text-platform-ios" />
                                         <span
-                                            v-if="avatarDialog.platformInfo.ios"
+                                            v-if="avatarDialog.platformInfo.ios?.performanceRating"
                                             class="x-grey text-platform-ios border-platform-ios border-l-[0.8px] border-solid ml-1.5 pl-1.5"
                                             >{{
                                                 t(
@@ -698,7 +698,6 @@
     import { useI18n } from 'vue-i18n';
 
     import {
-        useAuthStore,
         useAvatarStore,
         useFavoriteStore,
         useGalleryStore,
@@ -709,7 +708,6 @@
     } from '../../../stores';
     import {
         commaNumber,
-        compareUnityVersion,
         copyToClipboard,
         formatDateFilter,
         openFolderGeneric,
@@ -739,6 +737,7 @@
         selectAvatarWithoutConfirmation
     } from '../../../coordinators/avatarCoordinator';
     import { useAvatarDialogCommands } from './useAvatarDialogCommands';
+    import { useAvatarDialogInfo } from './useAvatarDialogInfo';
 
     import DialogJsonTab from '../DialogJsonTab.vue';
     import ImageCropDialog from '../ImageCropDialog.vue';
@@ -758,7 +757,6 @@
     const { showFavoriteDialog } = useFavoriteStore();
     const { isGameRunning } = storeToRefs(useGameStore());
     const { showFullscreenImageDialog } = useGalleryStore();
-    const authStore = useAuthStore();
     const modalStore = useModalStore();
     const uiStore = useUiStore();
 
@@ -862,46 +860,7 @@
         authorTags: ''
     });
 
-    const avatarDialogPlatform = computed(() => {
-        const { ref } = avatarDialog.value;
-        const platforms = [];
-        if (ref.unityPackages) {
-            for (const unityPackage of ref.unityPackages) {
-                if (
-                    unityPackage.variant &&
-                    unityPackage.variant !== 'standard' &&
-                    unityPackage.variant !== 'security'
-                ) {
-                    // skip imposters
-                    continue;
-                }
-                if (!compareUnityVersion(unityPackage.unitySortNumber, authStore.cachedConfig.sdkUnityVersion)) {
-                    continue;
-                }
-                let platform = 'PC';
-                if (unityPackage.platform === 'standalonewindows') {
-                    platform = 'PC';
-                } else if (unityPackage.platform === 'android') {
-                    platform = 'Android';
-                } else if (unityPackage.platform) {
-                    platform = unityPackage.platform;
-                }
-                const platformWithVersion = `${platform}/${unityPackage.unityVersion}`;
-                if (platforms.includes(platformWithVersion)) {
-                    continue;
-                }
-                platforms.unshift(platformWithVersion);
-            }
-        }
-        return platforms.join('\n');
-    });
-
-    const avatarTags = computed(() => {
-        return avatarDialog.value.ref?.tags
-            ?.filter((tag) => tag.startsWith('author_tag_'))
-            .map((tag) => tag.replace('author_tag_', ''))
-            .join(', ');
-    });
+    const { avatarDialogPlatform, avatarTags } = useAvatarDialogInfo(avatarDialog);
 
     watch(
         () => avatarDialog.value.loading,
