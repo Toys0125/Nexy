@@ -201,14 +201,13 @@
     import { ref } from 'vue';
     import { useI18n } from 'vue-i18n';
 
-    import { useAuthStore, useInstanceStore, useWorldStore } from '../../../stores';
+    import { useInstanceStore, useWorldStore } from '../../../stores';
     import { copyToClipboard, openExternalLink, timeAgo, timeToText } from '../../../shared/utils';
     import { useWorldDialogInfo } from './useWorldDialogInfo';
 
     const { t } = useI18n();
 
     const { worldDialog } = storeToRefs(useWorldStore());
-    const authStore = useAuthStore();
     const { showPreviousInstancesListDialog: openPreviousInstancesListDialog } = useInstanceStore();
 
     const {
@@ -220,7 +219,7 @@
         worldDialogPlatformCreatedAt,
         commaNumber,
         formatDateFilter
-    } = useWorldDialogInfo(worldDialog, { t, toast, sdkUnityVersion: authStore.cachedConfig.sdkUnityVersion });
+    } = useWorldDialogInfo(worldDialog, { t, toast });
 
     /**
      * @param worldRef
