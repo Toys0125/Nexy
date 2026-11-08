@@ -1759,6 +1759,7 @@
                 "popularity": "Popularity",
                 "created": "Created",
                 "last_updated": "Last Updated",
+                "first_uploaded": "First Uploaded",
                 "publication_date": "Publication Date",
                 "labs_publication_date": "Labs Publication Date",
                 "time_in_labs": "Time In Labs:",

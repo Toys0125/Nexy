@@ -63,7 +63,7 @@
                     :content="formatDateFilter(worldDialog.ref.created_at, 'long')"
                     :disabled="!worldDialog.ref.created_at">
                     <div class="flex items-start justify-between gap-2 text-xs">
-                        <span class="text-muted-foreground shrink-0">{{ t('dialog.world.info.created') }}</span>
+                        <span class="text-muted-foreground shrink-0">{{ t('dialog.world.info.first_uploaded') }}</span>
                         <span class="truncate text-right text-muted-foreground">
                             {{ timeAgo(worldDialog.ref.created_at) }}
                         </span>
@@ -124,35 +124,6 @@
                         </template>
                     </span>
                 </div>
-                <TooltipWrapper
-                    v-if="worldDialog.ref.labsPublicationDate !== 'none'"
-                    side="right"
-                    :content="formatDateFilter(worldDialog.ref.labsPublicationDate, 'long')">
-                    <div class="flex items-start justify-between gap-2 text-xs">
-                        <span class="text-muted-foreground shrink-0">
-                            {{ t('dialog.world.info.labs_publication_date') }}
-                        </span>
-                        <span class="truncate text-right text-muted-foreground">
-                            {{ timeAgo(worldDialog.ref.labsPublicationDate) }}
-                        </span>
-                    </div>
-                </TooltipWrapper>
-                <div
-                    v-if="worldDialog.ref.publicationDate !== 'none'"
-                    class="flex items-start justify-between gap-2 text-xs">
-                    <span class="inline-flex items-center text-muted-foreground shrink-0">
-                        {{ t('dialog.world.info.publication_date') }}
-                        <TooltipWrapper v-if="isTimeInLabVisible" side="right">
-                            <template #content> {{ t('dialog.world.info.time_in_labs') }} {{ timeInLab }} </template>
-                            <ChevronDown class="size-3" />
-                        </TooltipWrapper>
-                    </span>
-                    <TooltipWrapper side="right" :content="formatDateFilter(worldDialog.ref.publicationDate, 'long')">
-                        <span class="truncate text-right text-muted-foreground">
-                            {{ timeAgo(worldDialog.ref.publicationDate) }}
-                        </span>
-                    </TooltipWrapper>
-                </div>
                 <div class="flex items-start justify-between gap-2 text-xs">
                     <span class="text-muted-foreground shrink-0">{{ t('dialog.world.info.heat') }}</span>
                     <span class="truncate text-right text-muted-foreground">
@@ -211,8 +182,6 @@
     const { showPreviousInstancesListDialog: openPreviousInstancesListDialog } = useInstanceStore();
 
     const {
-        isTimeInLabVisible,
-        timeInLab,
         favoriteRate,
         worldTags,
         worldDialogPlatform,
