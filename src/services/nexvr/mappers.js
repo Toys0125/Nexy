@@ -36,7 +36,12 @@ const PLATFORMS = {
     pc: 'standalonewindows',
     android: 'android',
     linux: 'standalonelinux',
-    mac: 'standaloneosx'
+    mac: 'standaloneosx',
+    StandaloneWindows64: 'standalonewindows',
+    Android: 'android',
+    StandaloneLinux64: 'standalonelinux',
+    StandaloneOSX: 'standaloneosx',
+    iOS: 'ios'
 };
 
 /**
@@ -468,7 +473,7 @@ export function toNexVRAvatar(avatar, authorName = '') {
         imageUrl: image,
         thumbnailImageUrl: image,
         releaseStatus: avatar.publicity === 'public' ? 'public' : 'private',
-        tags: avatar.system_tags || [],
+        tags: [...(avatar.system_tags || []), ...(avatar.contentTags || []).map((tag) => `author_tag_${tag}`)],
         created_at: createdAt,
         updated_at: updatedAt,
         version: versions.length,
