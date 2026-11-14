@@ -11,6 +11,7 @@ vi.mock('../../config', () => ({
 }));
 
 import { handleShimRequest } from '../shim';
+import { setTokens } from '../session';
 import { PresenceStatus } from '../realtimeSchema';
 import { realtime } from '../realtime';
 
@@ -76,11 +77,23 @@ const responses = {
         }
     ],
     '/groups/g2': { id: 'g2', name: 'Other', owner: 'x', roles: [], joinPolicy: { baseSetting: 'request-join' } },
-    '/groups/g2/members': []
+    '/groups/g2/members': [],
+    '/groups/g3': { id: 'g3', name: 'Wrapped', owner: 'x', roles: [], joinPolicy: { baseSetting: 'free-join' } },
+    '/groups/g3/membership': { status: 'active', isOwner: false, roles: [], permissions: [] },
+    '/groups/g3/members': {
+        members: [{ user: user('me', 'Nexy'), roles: [], status: 'active', joinedAt: '2026-01-01T00:00:00Z' }]
+    },
+    '/groups/g4': { id: 'g4', name: 'Odd', owner: 'x', roles: [], joinPolicy: { baseSetting: 'free-join' } },
+    '/groups/g4/membership': { status: 'active', isOwner: false, roles: [], permissions: [] },
+    '/groups/g4/members': { total: 0 }
 };
 
 const native = async ({ url }) => {
     const path = new URL(url).pathname.replace(/^\/api/, '');
+    if (path === '/groups/g5/members' || path === '/auth/refresh') {
+        // an expired session whose refresh token is rejected
+        return { status: 401, data: JSON.stringify({ message: 'Unauthorized' }) };
+    }
     if (path in responses) {
         return { status: 200, data: JSON.stringify(responses[path]) };
     }
@@ -150,6 +163,24 @@ describe('NexVR group routes', () => {
 
         expect((await get('groups/g1/members/a')).json.user.displayName).toBe('Alpha');
         expect((await get('groups/g1/members/nobody')).status).toBe(404);
+    });
+
+    test('a member list wrapped in an object still loads; an unknown shape reads as empty', async () => {
+        const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+        expect((await get('groups/g3/members/me')).json.user.displayName).toBe('Nexy');
+        const mine = await get('groups/g4/members/me');
+        expect(mine.status).toBe(200);
+        expect(mine.json.membershipStatus).toBe('member');
+        expect((await get('groups/g4/members?n=100&offset=0')).json).toEqual([]);
+        warn.mockRestore();
+    });
+
+    test('a lost session on the caller member lookup stays a 401, not a 404', async () => {
+        try {
+            expect((await get('groups/g5/members/me')).status).toBe(401);
+        } finally {
+            await setTokens({ accessToken: 'access', refreshToken: 'refresh' });
+        }
     });
 
     test('member search is not mistaken for a user id', async () => {

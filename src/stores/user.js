@@ -883,15 +883,15 @@ export const useUserStore = defineStore('User', () => {
             D.statusDescription = ref.statusDescription;
             D.pronouns = ref.pronouns;
             D.bio = ref.bio;
-            D.bioLinks = ref.bioLinks.slice();
+            D.bioLinks = Array.isArray(ref.bioLinks) ? ref.bioLinks.slice() : [];
             D.bannerColor = ref.bannerColor;
             D.bannerUrl = ref.bannerUrl;
             D.bannerType = ref.bannerType || 'color';
             D.userIcon = ref.userIcon;
 
-            D.themes = ref.themes;
+            D.themes = Array.isArray(ref.themes) ? ref.themes : [];
             D.themeId = ref.themeId;
-            const selectedTheme = ref.themes.find((theme) => theme.id === ref.themeId);
+            const selectedTheme = D.themes.find((theme) => theme.id === D.themeId);
             D.themeName = selectedTheme?.name ?? '';
             D.themeButtonColor = ref.themeButtonColor;
             D.themeIconColor = ref.themeIconColor;

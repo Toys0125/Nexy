@@ -463,6 +463,30 @@ function groupMembership(groupId) {
 }
 
 /**
+ * The member array out of a /groups/{id}/members body. Usually a bare array,
+ * but some groups answer with an object, which used to crash every caller.
+ *
+ * @param {string} groupId
+ * @param {any} res
+ * @returns {any[]}
+ */
+function memberListOf(groupId, res) {
+    if (Array.isArray(res)) {
+        return res;
+    }
+    for (const key of ['members', 'items', 'data', 'results']) {
+        if (Array.isArray(res?.[key])) {
+            return res[key];
+        }
+    }
+    console.warn(
+        `[NexVR] unexpected member list for group ${groupId}:`,
+        res && typeof res === 'object' ? Object.keys(res) : res
+    );
+    return [];
+}
+
+/**
  * NexVR returns a group's whole member list at once; VRCX asks for it a page
  * at a time, so the list is fetched once and paged from here.
  *
@@ -476,8 +500,10 @@ function groupMembers(groupId) {
     }
     const members = nexvr(`/groups/${encodeURIComponent(groupId)}/members`)
         // pending requests and outstanding invites aren't members yet
-        .then((list) =>
-            list.filter((member) => member.status === 'active').map((member) => toNexVRGroupMember(groupId, member))
+        .then((res) =>
+            memberListOf(groupId, res)
+                .filter((member) => member?.status === 'active')
+                .map((member) => toNexVRGroupMember(groupId, member))
         )
         .catch((err) => {
             memberLists.delete(groupId);
@@ -964,8 +990,17 @@ const routes = [
         /^groups\/([^/]+)\/members\/([^/]+)$/,
         async (m) => {
             const [groupId, userId] = [m[1], m[2]];
-            const listed = (await groupMembers(groupId)).find((member) => member.userId === userId);
-            if (userId === realtime.userId) {
+            const isSelf = userId === realtime.userId;
+            // the caller's own entry can come from /membership alone, but a
+            // lost session must still surface as 401 rather than a 404
+            const list = await groupMembers(groupId).catch((err) => {
+                if (isSelf && err?.status !== 401) {
+                    return [];
+                }
+                throw err;
+            });
+            const listed = list.find((member) => member.userId === userId);
+            if (isSelf) {
                 const membership = await groupMembership(groupId);
                 const mine = toNexVRMyMember(groupId, userId, membership, listed);
                 if (mine) {
