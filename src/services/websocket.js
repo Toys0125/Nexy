@@ -109,12 +109,16 @@ async function connectWebSocket(token) {
     ];
     const ok = await realtime.connect(token, userStore.currentUser.id);
     if (!ok) {
+        if (realtime.authFailed || !realtime.ws) {
+            // getCurrentUser refreshes an expired token before the retry asks
+            // for it again; without this the socket retries the same rejected
+            // token every few seconds until some other request happens to 401
+            getCurrentUser().catch(() => {});
+        }
         if (!realtime.ws) {
-            // rejected before the close listener could fire; getCurrentUser
-            // refreshes an expired token before the retry asks for it again
+            // rejected before the close listener could fire
             detachRealtimeListeners();
             webSocketClosedGracefully = false;
-            getCurrentUser().catch(() => {});
             scheduleReconnect();
         }
         return;
