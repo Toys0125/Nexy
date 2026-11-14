@@ -11,6 +11,7 @@ vi.mock('../../config', () => ({
 }));
 
 import { handleShimRequest } from '../shim';
+import { setTokens } from '../session';
 import { PresenceStatus } from '../realtimeSchema';
 import { realtime } from '../realtime';
 
@@ -89,6 +90,10 @@ const responses = {
 
 const native = async ({ url }) => {
     const path = new URL(url).pathname.replace(/^\/api/, '');
+    if (path === '/groups/g5/members' || path === '/auth/refresh') {
+        // an expired session whose refresh token is rejected
+        return { status: 401, data: JSON.stringify({ message: 'Unauthorized' }) };
+    }
     if (path in responses) {
         return { status: 200, data: JSON.stringify(responses[path]) };
     }
@@ -168,6 +173,14 @@ describe('NexVR group routes', () => {
         expect(mine.json.membershipStatus).toBe('member');
         expect((await get('groups/g4/members?n=100&offset=0')).json).toEqual([]);
         warn.mockRestore();
+    });
+
+    test('a lost session on the caller member lookup stays a 401, not a 404', async () => {
+        try {
+            expect((await get('groups/g5/members/me')).status).toBe(401);
+        } finally {
+            await setTokens({ accessToken: 'access', refreshToken: 'refresh' });
+        }
     });
 
     test('member search is not mistaken for a user id', async () => {

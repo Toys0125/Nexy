@@ -991,9 +991,10 @@ const routes = [
         async (m) => {
             const [groupId, userId] = [m[1], m[2]];
             const isSelf = userId === realtime.userId;
-            // the caller's own entry can come from /membership alone
+            // the caller's own entry can come from /membership alone, but a
+            // lost session must still surface as 401 rather than a 404
             const list = await groupMembers(groupId).catch((err) => {
-                if (isSelf) {
+                if (isSelf && err?.status !== 401) {
                     return [];
                 }
                 throw err;
