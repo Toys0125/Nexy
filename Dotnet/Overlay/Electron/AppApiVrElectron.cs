@@ -1,7 +1,9 @@
 using System;
+using System.Buffers;
 using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
+using System.Runtime.InteropServices;
 
 namespace VRCX
 {
@@ -9,7 +11,18 @@ namespace VRCX
     {
         public void SubmitOverlayFrame(Memory<byte> frame)
         {
-            OverlayFrames.Submit(frame.Span);
+            // The Node bridge wraps each bitmap in a MemoryManager holding a
+            // strong JS reference. Release it after the synchronous copy rather
+            // than waiting for .NET GC, which cannot see the 6 MiB JS allocation.
+            MemoryMarshal.TryGetMemoryManager<byte, MemoryManager<byte>>(frame, out var owner);
+            try
+            {
+                OverlayFrames.Submit(frame.Span);
+            }
+            finally
+            {
+                ((IDisposable)owner)?.Dispose();
+            }
         }
 
         public string[] GetOverlayInputEvents() => ((VRCXVRElectron)Program.VRCXVRInstance).GetOverlayInputEvents();

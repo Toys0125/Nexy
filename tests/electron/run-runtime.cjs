@@ -2,7 +2,7 @@ const { spawnSync } = require('node:child_process');
 const path = require('node:path');
 const env = { ...process.env };
 delete env.ELECTRON_RUN_AS_NODE;
-const result = spawnSync(require('electron'), [path.join(__dirname, 'runtime-smoke.cjs')], {
+const result = spawnSync(require('electron'), ['--js-flags=--expose-gc', path.join(__dirname, 'runtime-smoke.cjs')], {
     env,
     stdio: 'inherit',
     windowsHide: true,
