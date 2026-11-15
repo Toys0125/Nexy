@@ -58,6 +58,23 @@ const rendererIpc = createRendererSecurity(ipcMain);
 
 app.whenReady()
     .then(async () => {
+        // Collect only V8, leaving .NET idle: submitted bitmaps must not wait
+        // for an unrelated managed collection to release their JS references.
+        assert.equal(typeof global.gc, 'function');
+        const submittedFrames = [];
+        function submitFrame() {
+            const frame = Buffer.alloc(1024 * 1536 * 4);
+            vr.SubmitOverlayFrame(frame);
+            return new WeakRef(frame);
+        }
+        for (let i = 0; i < 16; i++) submittedFrames.push(submitFrame());
+        await new Promise((resolve) => setImmediate(resolve));
+        global.gc();
+        assert.equal(
+            submittedFrames.filter((frame) => frame.deref() !== undefined).length,
+            0,
+            'Managed overlay bridge retained submitted JS bitmaps'
+        );
         assert.equal(app.isHardwareAccelerationEnabled(), false);
         window = new BrowserWindow({
             show: false,

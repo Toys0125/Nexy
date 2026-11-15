@@ -16,6 +16,7 @@ if (args.Length > 0 && args[0] == "--helper")
 }
 
 OverlayRegionTests.Run();
+OverlayFrameOwnershipTests.Run();
 NexvrLaunchTests.Run();
 GameLaunchTests.Run();
 
