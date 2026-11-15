@@ -24,7 +24,7 @@
                         <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                        <SelectItem value="false">{{ 'VRChat' }}</SelectItem>
+                        <SelectItem value="false">{{ 'NexVR' }}</SelectItem>
                         <SelectItem value="true">{{ 'SteamVR' }}</SelectItem>
                     </SelectContent>
                 </Select>
