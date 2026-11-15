@@ -9,6 +9,7 @@ const { execFileSync } = require('node:child_process');
 const { createDesktopApi } = require('../../src-electron/desktop-api');
 const { createRendererSecurity } = require('../../src-electron/renderer-security');
 const { applyGpuPreferences } = require('../../src-electron/gpu-preferences');
+const { loadManagedBridge } = require('../../src-electron/managed-bridge');
 
 const root = path.resolve(__dirname, '../..');
 const profileDirectory = fs.mkdtempSync(path.join(os.tmpdir(), 'Nexy Electron Smoke '));
@@ -34,8 +35,7 @@ const profile =
 console.log('Smoke profile requested:', profile, 'canonical:', fs.realpathSync.native(profile));
 app.setPath('userData', profile);
 const rid = `${process.platform === 'win32' ? 'win' : process.platform === 'darwin' ? 'osx' : 'linux'}-${process.arch}`;
-require(path.join(root, 'build/Electron', rid, 'VRCX-Electron.cjs'));
-const dotnet = require('node-api-dotnet/net10.0');
+const dotnet = loadManagedBridge(path.join(root, 'build/Electron', rid));
 const program = new dotnet.VRCX.ProgramElectron();
 program.PreInit('Nexy Smoke Test', [`--config=${profile}`]);
 fs.writeFileSync(path.join(profile, 'Nexy.json'), JSON.stringify({ VRCX_DisableGpuAcceleration: 'true' }));

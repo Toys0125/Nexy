@@ -24,6 +24,7 @@ const { pathToFileURL } = require('node:url');
 const rendererIpc = createRendererSecurity(ipcMain);
 const { applyGpuPreferences } = require('./gpu-preferences');
 const { getDevVersion } = require('./dev-version');
+const { loadManagedBridge } = require('./managed-bridge');
 
 function dotnetSetup() {
     const bundledDotNetPath = path.join(process.resourcesPath, 'dotnet-runtime');
@@ -125,10 +126,10 @@ if (app.isPackaged) {
     // The managed bridge is placed in extraResources (outside app.asar).
     // Requiring app.asar/build/Electron here fails because that entry is not
     // part of the asar header, even though the DLLs exist on disk.
-    require(path.join(process.resourcesPath, 'app.asar.unpacked', 'build', 'Electron', 'VRCX-Electron.cjs'));
+    loadManagedBridge(path.join(process.resourcesPath, 'app.asar.unpacked', 'build', 'Electron'));
 } else {
     const rid = getRid();
-    require(path.join(rootDir, `build/Electron/${rid}/VRCX-Electron.cjs`));
+    loadManagedBridge(path.join(rootDir, 'build', 'Electron', rid));
 }
 
 const InteropApi = require('./InteropApi');
