@@ -55,6 +55,8 @@ jobs:
         run: dotnet build Dotnet/VRCX-Electron.csproj -p:Configuration=Release -p:Platform=x64 --runtime win-x64
       - name: Validate overlay frames and shared Direct3D textures
         run: npm run test:overlay
+      - name: Validate background Direct3D assembly loading through NodeApi
+        run: npm run test:overlay:loading
       - name: Smoke-test Electron preload, native bridge and offscreen rendering
         run: npm run test:electron:runtime
       - name: Build frontend
