@@ -1,6 +1,7 @@
 import { flushPromises, mount } from '@vue/test-utils';
 
 import { i18n } from '@/plugins/i18n';
+import { Select } from '@/components/ui/select';
 import { copyToClipboard } from '@/shared/utils/appActions';
 import AvatarFileDetailsDialog from '../AvatarFileDetailsDialog.vue';
 
@@ -19,7 +20,8 @@ test('shows the active version and lets owners reveal and copy the file details'
                     { versionNumber: 'opaque-v2', url, decryptionKey: key, uploadedAt: '2026-11-20T15:30:00' },
                     { versionNumber: 'opaque-v3', url: 'https://example.com/v3.bee', uploadedAt: '2026-11-20T16:30:00' }
                 ]
-            }
+            },
+            impactRatings: [{ versionNumber: 'opaque-v2', platform: 'PC', rulesetVersion: 1, level: 'moderate' }]
         },
         global: { plugins: [i18n] },
         attachTo: document.body
@@ -38,6 +40,7 @@ test('shows the active version and lets owners reveal and copy the file details'
         await flushPromises();
 
         expect(document.querySelector('[role="combobox"]').textContent).toBe('2026-11-20 15:30:00');
+        expect(document.querySelector('[role="dialog"]').textContent).toContain('Avatar Impact · Moderate · PC');
         expect(document.querySelector('input[type="password"]').value).toBe(key);
         await click('[aria-label="Copy download URL"]');
         await click('[aria-label="Copy decryption key"]');
@@ -58,6 +61,11 @@ test('shows the active version and lets owners reveal and copy the file details'
         await wrapper.get('button').trigger('click');
         await flushPromises();
         expect(document.querySelector('input[type="password"]').value).toBe(key);
+
+        wrapper.getComponent(Select).vm.$emit('update:modelValue', 'opaque-v3');
+        await flushPromises();
+        expect(document.querySelector('[role="combobox"]').textContent).toBe('2026-11-20 16:30:00');
+        expect(document.querySelector('[role="dialog"]').textContent).toContain('No local rating yet');
     } finally {
         wrapper.unmount();
     }

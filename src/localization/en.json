@@ -1866,6 +1866,14 @@
                 "decryption_key": "Decryption Key",
                 "copy_download_url": "Copy download URL",
                 "copy_decryption_key": "Copy decryption key"
+            },
+            "impact": {
+                "badge": "Avatar Impact · {level} · {platform}",
+                "unavailable": "No local rating yet",
+                "low": "Low",
+                "moderate": "Moderate",
+                "high": "High",
+                "severe": "Severe"
             }
         },
         "group_edit": {

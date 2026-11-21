@@ -8,11 +8,18 @@
     import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
     import { formatDateFilter } from '@/coordinators/dateCoordinator';
     import { copyToClipboard } from '@/shared/utils/appActions';
+    import AvatarImpactBadge from './AvatarImpactBadge.vue';
 
     const props = defineProps({
         details: {
             type: Object,
             required: true
+        },
+        impactRatings: {
+            type: /** @type {import('vue').PropType<import('./useAvatarImpact').AvatarImpactRating[] | null>} */ (
+                Array
+            ),
+            default: null
         }
     });
 
@@ -30,6 +37,9 @@
             versions.at(-1)
         );
     });
+    const fileImpact = computed(
+        () => props.impactRatings?.filter((rating) => rating.versionNumber === file.value.versionNumber) ?? null
+    );
 
     function formatUploadDate(uploadedAt) {
         const date = formatDateFilter(uploadedAt, 'long');
@@ -62,6 +72,7 @@
                     </SelectContent>
                 </Select>
             </div>
+            <AvatarImpactBadge :ratings="fileImpact" />
             <div class="grid gap-1.5">
                 <label :for="urlId" class="text-sm font-medium">{{ t('dialog.avatar.json.download_url') }}</label>
                 <InputGroupAction :id="urlId" :model-value="file.url" readonly input-class="font-mono">

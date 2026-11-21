@@ -107,6 +107,10 @@
                                         >
                                     </Badge>
                                 </TooltipWrapper>
+                                <AvatarImpactBadge
+                                    v-if="currentAvatarImpact"
+                                    class="mr-1.5 mt-1.5"
+                                    :ratings="currentAvatarImpact" />
                                 <Badge
                                     v-if="avatarDialog.inCache"
                                     variant="outline"
@@ -636,7 +640,8 @@
                                 <AvatarFileDetailsDialog
                                     v-if="avatarFileDetails && avatarDialog.lastActiveTab === 'JSON'"
                                     :key="avatarDialog.id"
-                                    :details="avatarFileDetails" />
+                                    :details="avatarFileDetails"
+                                    :impact-ratings="avatarImpact" />
                             </template>
                         </DialogJsonTab>
                     </template>
@@ -745,8 +750,10 @@
     } from '../../../coordinators/avatarCoordinator';
     import { useAvatarDialogCommands } from './useAvatarDialogCommands';
     import { useAvatarDialogInfo } from './useAvatarDialogInfo';
+    import { useAvatarImpact } from './useAvatarImpact';
 
     import AvatarFileDetailsDialog from './AvatarFileDetailsDialog.vue';
+    import AvatarImpactBadge from './AvatarImpactBadge.vue';
     import DialogJsonTab from '../DialogJsonTab.vue';
     import ImageCropDialog from '../ImageCropDialog.vue';
     import { showUserDialog } from '../../../coordinators/userCoordinator';
@@ -831,10 +838,20 @@
         { value: 'JSON', label: t('dialog.avatar.json.header') }
     ]);
 
-    const avatarJson = computed(() => {
-        const { id, loading } = avatarDialog.value;
-        return id && !loading ? (getRawResponse(`/avatars/${encodeURIComponent(id)}`) ?? null) : null;
+    const avatarResponse = computed(() => {
+        const { id, loading, visible } = avatarDialog.value;
+        return id && visible && !loading ? (getRawResponse(`/avatars/${encodeURIComponent(id)}`) ?? null) : null;
     });
+    const avatarImpact = useAvatarImpact(avatarResponse);
+    const currentAvatarImpact = computed(() => {
+        const version = avatarResponse.value?.currentVersion;
+        return version ? (avatarImpact.value?.filter((rating) => rating.versionNumber === version) ?? null) : null;
+    });
+    const avatarJson = computed(() =>
+        avatarResponse.value && avatarImpact.value?.length
+            ? { ...avatarResponse.value, localAvatarImpact: avatarImpact.value }
+            : avatarResponse.value
+    );
     const avatarFileDetails = computed(() => {
         const { id, loading, visible } = avatarDialog.value;
         if (id && visible && !loading && isAvatarOwner.value) {

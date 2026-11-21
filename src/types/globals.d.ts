@@ -201,6 +201,7 @@ declare global {
 
         // Folders
         GetVRChatAppDataLocation(): Promise<string>;
+        GetNexVRAvatarImpact(versionNumbers: string[]): Promise<string>;
         GetVRChatPhotosLocation(): Promise<string>;
         GetUGCPhotoLocation(path?: string): Promise<string>;
         GetVRChatScreenshotsLocation(): Promise<string>;
