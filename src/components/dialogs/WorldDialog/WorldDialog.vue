@@ -341,12 +341,12 @@
                 <template #JSON>
                     <DialogJsonTab
                         class="rounded-xl bg-(--profile-card) p-2"
-                        :tree-data="treeData"
-                        :tree-data-key="treeData?.id"
+                        :tree-data="worldJson ?? {}"
+                        :tree-data-key="worldDialog.id"
                         :dialog-id="worldDialog.id"
-                        :dialog-ref="worldDialog.ref"
+                        :dialog-ref="worldJson"
                         :file-analysis="worldDialog.fileAnalysis"
-                        @refresh="refreshWorldDialogTreeData()" />
+                        @refresh="worldDialogCommand('Refresh')" />
                 </template>
             </TabsUnderline>
         </div>
@@ -433,7 +433,7 @@
     } from '../../ui/dropdown-menu';
     import { deleteVRChatCache, openFolderGeneric } from '../../../shared/utils';
     import { Badge } from '../../ui/badge';
-    import { formatJsonVars } from '../../../shared/utils/base/ui';
+    import { getRawResponse } from '../../../services/nexvr/rawResponses';
     import { runNewInstanceSelfInviteFlow as newInstanceSelfInvite } from '../../../coordinators/inviteCoordinator';
     import { useWorldDialogCommands } from './useWorldDialogCommands';
 
@@ -504,8 +504,10 @@
         { value: 'JSON', label: t('dialog.world.json.header') }
     ]);
 
-    /** @type {import('vue').Ref<any>} */
-    const treeData = ref({});
+    const worldJson = computed(() => {
+        const { id, loading } = worldDialog.value;
+        return id && !loading ? (getRawResponse(`/worlds/${encodeURIComponent(id)}`) ?? null) : null;
+    });
     const storeTabRef = ref(null);
     const imageError = ref(false);
 
@@ -528,9 +530,8 @@
     watch(
         () => worldDialog.value.loading,
         () => {
-            if (worldDialog.value.visible) {
-                handleDialogOpen();
-                !worldDialog.value.loading && loadLastActiveTab();
+            if (worldDialog.value.visible && !worldDialog.value.loading) {
+                loadLastActiveTab();
             }
         }
     );
@@ -542,8 +543,6 @@
         worldDialog.value.lastActiveTab = tabName;
         if (tabName === 'Store') {
             storeTabRef.value?.getWorldListings();
-        } else if (tabName === 'JSON') {
-            refreshWorldDialogTreeData();
         }
     }
 
@@ -559,20 +558,8 @@
      * @param tabName
      */
     function worldDialogTabClick(tabName) {
-        if (tabName === worldDialog.value.lastActiveTab) {
-            if (tabName === 'JSON') {
-                refreshWorldDialogTreeData();
-            }
-            return;
+        if (tabName !== worldDialog.value.lastActiveTab) {
+            handleWorldDialogTab(tabName);
         }
-        handleWorldDialogTab(tabName);
-    }
-
-    function handleDialogOpen() {
-        treeData.value = {};
-    }
-
-    function refreshWorldDialogTreeData() {
-        treeData.value = formatJsonVars(worldDialog.value.ref);
     }
 </script>

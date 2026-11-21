@@ -1,16 +1,15 @@
 import { beforeEach, describe, expect, test, vi } from 'vitest';
 import { createTestingPinia } from '@pinia/testing';
 import { mount } from '@vue/test-utils';
-import { ref } from 'vue';
 
 const { mockDownloadAndSaveJson } = vi.hoisted(() => ({
     mockDownloadAndSaveJson: vi.fn()
 }));
-vi.mock('../../../shared/utils', async (importOriginal) => {
-    const actual = await importOriginal();
+vi.mock('../../../shared/utils', () => ({ downloadAndSaveJson: mockDownloadAndSaveJson }));
+vi.mock('../../../stores', async () => {
+    const { defineStore } = await import('pinia');
     return {
-        ...actual,
-        downloadAndSaveJson: mockDownloadAndSaveJson
+        useAppearanceSettingsStore: defineStore('AppearanceSettings', { state: () => ({ isDarkMode: false }) })
     };
 });
 
@@ -20,66 +19,6 @@ vi.mock('vue-json-pretty', () => ({
         template: '<div class="vjp-stub" />',
         props: ['data', 'deep', 'theme', 'showIcon']
     }
-}));
-
-vi.mock('../../../views/Feed/Feed.vue', () => ({
-    default: { template: '<div />' }
-}));
-vi.mock('../../../views/Feed/columns.jsx', () => ({ columns: [] }));
-vi.mock('../../../plugins/router', () => ({
-    router: {
-        beforeEach: vi.fn(),
-        push: vi.fn(),
-        replace: vi.fn(),
-        currentRoute: ref({ path: '/', name: '', meta: {} }),
-        isReady: vi.fn().mockResolvedValue(true)
-    },
-    initRouter: vi.fn()
-}));
-vi.mock('vue-router', async (importOriginal) => {
-    const actual = await importOriginal();
-    return {
-        ...actual,
-        useRouter: vi.fn(() => ({
-            push: vi.fn(),
-            replace: vi.fn(),
-            currentRoute: ref({ path: '/', name: '', meta: {} })
-        }))
-    };
-});
-vi.mock('../../../plugins/interopApi', () => ({ initInteropApi: vi.fn() }));
-vi.mock('../../../services/database', () => ({
-    database: new Proxy(
-        {},
-        {
-            get: (_target, prop) => {
-                if (prop === '__esModule') return false;
-                return vi.fn().mockResolvedValue(null);
-            }
-        }
-    )
-}));
-vi.mock('../../../services/config', () => ({
-    default: {
-        init: vi.fn(),
-        getString: vi.fn().mockImplementation((_k, d) => d ?? '{}'),
-        setString: vi.fn(),
-        getBool: vi.fn().mockImplementation((_k, d) => d ?? false),
-        setBool: vi.fn(),
-        getInt: vi.fn().mockImplementation((_k, d) => d ?? 0),
-        setInt: vi.fn(),
-        getFloat: vi.fn().mockImplementation((_k, d) => d ?? 0),
-        setFloat: vi.fn(),
-        getObject: vi.fn().mockReturnValue(null),
-        setObject: vi.fn(),
-        getArray: vi.fn().mockReturnValue([]),
-        setArray: vi.fn(),
-        remove: vi.fn()
-    }
-}));
-vi.mock('../../../services/jsonStorage', () => ({ default: vi.fn() }));
-vi.mock('../../../services/watchState', () => ({
-    watchState: { isLoggedIn: false }
 }));
 
 import DialogJsonTab from '../DialogJsonTab.vue';
@@ -218,6 +157,14 @@ describe('DialogJsonTab.vue', () => {
             // Second button is download
             await buttons[1].trigger('click');
             expect(mockDownloadAndSaveJson).toHaveBeenCalledWith('usr_test123', dialogRef);
+        });
+
+        test('disables download while the response is unavailable', async () => {
+            const wrapper = mountComponent({ dialogRef: null });
+            const download = wrapper.findAll('button')[1];
+            expect(download.attributes('disabled')).toBeDefined();
+            await download.trigger('click');
+            expect(mockDownloadAndSaveJson).not.toHaveBeenCalled();
         });
     });
 });
