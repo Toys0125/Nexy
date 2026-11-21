@@ -6,6 +6,7 @@
     import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
     import { InputGroupAction, InputGroupButton } from '@/components/ui/input-group';
     import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+    import { formatDateFilter } from '@/coordinators/dateCoordinator';
     import { copyToClipboard } from '@/shared/utils/appActions';
 
     const props = defineProps({
@@ -20,7 +21,7 @@
     const selectedVersion = ref('');
     const urlId = useId();
     const keyId = useId();
-    const versionLabelId = useId();
+    const uploadDateLabelId = useId();
     const file = computed(() => {
         const { currentVersion, versions } = props.details;
         return (
@@ -29,6 +30,11 @@
             versions.at(-1)
         );
     });
+
+    function formatUploadDate(uploadedAt) {
+        const date = formatDateFilter(uploadedAt, 'long');
+        return date === '-' ? t('dialog.avatar.json.upload_date_unavailable') : date;
+    }
 </script>
 
 <template>
@@ -41,15 +47,17 @@
                 <DialogTitle>{{ t('dialog.avatar.json.file_details') }}</DialogTitle>
             </DialogHeader>
             <div v-if="details.versions.length > 1" class="grid gap-1.5">
-                <span :id="versionLabelId" class="text-sm font-medium">{{ t('dialog.avatar.info.version') }}</span>
+                <span :id="uploadDateLabelId" class="text-sm font-medium">{{
+                    t('dialog.avatar.json.upload_date')
+                }}</span>
                 <Select :model-value="file.versionNumber" @update:model-value="selectedVersion = $event">
-                    <SelectTrigger :aria-labelledby="versionLabelId"><SelectValue /></SelectTrigger>
+                    <SelectTrigger :aria-labelledby="uploadDateLabelId"><SelectValue /></SelectTrigger>
                     <SelectContent>
                         <SelectItem
                             v-for="version in details.versions"
                             :key="version.versionNumber"
                             :value="version.versionNumber">
-                            {{ version.versionNumber }}
+                            {{ formatUploadDate(version.uploadedAt) }}
                         </SelectItem>
                     </SelectContent>
                 </Select>

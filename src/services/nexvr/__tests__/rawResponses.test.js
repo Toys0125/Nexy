@@ -37,6 +37,7 @@ const avatar = {
             package: {
                 url: 'https://nexvr.net/api/files/avatars/a1/2?t=example',
                 decryptionKey: 'avatar-owner-key',
+                uploadedAt: '2026-11-20T15:30:00Z',
                 platforms: ['pc']
             }
         }
@@ -75,10 +76,11 @@ describe('raw NexVR responses for the JSON tabs', () => {
         expect(JSON.parse(response.data)).toHaveProperty('unityPackages');
         const rawAvatar = getRawResponse('/avatars/a1');
         expect(rawAvatar).not.toHaveProperty('unityPackages');
-        expect(rawAvatar.versions[0].package).toEqual({ url: avatar.versions[0].package.url, platforms: ['pc'] });
+        const { url, uploadedAt } = avatar.versions[0].package;
+        expect(rawAvatar.versions[0].package).toEqual({ url, uploadedAt, platforms: ['pc'] });
         expect(getAvatarFileDetails('a1', 'u1')).toMatchObject({
             currentVersion: '2',
-            versions: [{ versionNumber: '2', url: avatar.versions[0].package.url, decryptionKey: 'avatar-owner-key' }]
+            versions: [{ versionNumber: '2', url, uploadedAt, decryptionKey: 'avatar-owner-key' }]
         });
         expect(getAvatarFileDetails('a1', 'u2')).toBeUndefined();
 

@@ -5,6 +5,7 @@ import { copyToClipboard } from '@/shared/utils/appActions';
 import AvatarFileDetailsDialog from '../AvatarFileDetailsDialog.vue';
 
 vi.mock('@/shared/utils/appActions', () => ({ copyToClipboard: vi.fn() }));
+vi.mock('@/stores', () => ({ useAppearanceSettingsStore: () => ({ dtIsoFormat: true }) }));
 vi.mock('@/stores/settings/general', () => ({ useGeneralSettingsStore: () => ({}) }));
 
 test('shows the active version and lets owners reveal and copy the file details', async () => {
@@ -13,10 +14,10 @@ test('shows the active version and lets owners reveal and copy the file details'
     const wrapper = mount(AvatarFileDetailsDialog, {
         props: {
             details: {
-                currentVersion: '2',
+                currentVersion: 'opaque-v2',
                 versions: [
-                    { versionNumber: '2', url, decryptionKey: key },
-                    { versionNumber: '3', url: 'https://example.com/v3.bee' }
+                    { versionNumber: 'opaque-v2', url, decryptionKey: key, uploadedAt: '2026-11-20T15:30:00' },
+                    { versionNumber: 'opaque-v3', url: 'https://example.com/v3.bee', uploadedAt: '2026-11-20T16:30:00' }
                 ]
             }
         },
@@ -36,6 +37,7 @@ test('shows the active version and lets owners reveal and copy the file details'
         await wrapper.get('button').trigger('click');
         await flushPromises();
 
+        expect(document.querySelector('[role="combobox"]').textContent).toBe('2026-11-20 15:30:00');
         expect(document.querySelector('input[type="password"]').value).toBe(key);
         await click('[aria-label="Copy download URL"]');
         await click('[aria-label="Copy decryption key"]');

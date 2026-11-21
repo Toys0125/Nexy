@@ -58,10 +58,11 @@ export function keepRawResponse(path, data, userId) {
                   currentVersion: data.currentVersion,
                   versions: data.versions
                       .filter((version) => version?.package?.url)
-                      .map(({ versionNumber, package: { url, decryptionKey } }) => ({
+                      .map(({ versionNumber, package: { url, decryptionKey, uploadedAt } }) => ({
                           versionNumber,
                           url,
-                          decryptionKey
+                          decryptionKey,
+                          uploadedAt
                       }))
               }
             : undefined;
