@@ -24,7 +24,7 @@
             required: true
         },
         dialogRef: {
-            type: Object,
+            type: [Object, null],
             required: true
         },
         fileAnalysis: {
@@ -57,10 +57,12 @@
                 class="rounded-full"
                 size="icon-sm"
                 variant="ghost"
+                :disabled="dialogRef === null"
                 @click="downloadAndSaveJson(dialogId, dialogRef)"
                 :ariaLabel="t('dialog.vrcx_updater.download')">
                 <Download />
             </Button>
+            <slot name="actions" />
         </div>
 
         <div class="min-h-0 flex-1 overflow-auto">

@@ -1858,7 +1858,12 @@
                 "gallery_delete": "Delete Image"
             },
             "json": {
-                "header": "JSON"
+                "header": "JSON",
+                "file_details": "File Details",
+                "download_url": "Download URL",
+                "decryption_key": "Decryption Key",
+                "copy_download_url": "Copy download URL",
+                "copy_decryption_key": "Copy decryption key"
             }
         },
         "group_edit": {
