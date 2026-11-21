@@ -107,6 +107,10 @@
                                         >
                                     </Badge>
                                 </TooltipWrapper>
+                                <AvatarImpactBadge
+                                    v-if="currentAvatarImpact"
+                                    class="mr-1.5 mt-1.5"
+                                    :ratings="currentAvatarImpact" />
                                 <Badge
                                     v-if="avatarDialog.inCache"
                                     variant="outline"
@@ -442,7 +446,7 @@
                     :items="avatarDialogTabs"
                     :unmount-on-hide="false"
                     fill
-                    @update:modelValue="avatarDialogTabClick">
+                    @update:modelValue="avatarDialog.lastActiveTab = $event">
                     <template #Info>
                         <div>
                             <div
@@ -626,12 +630,20 @@
                     <template #JSON>
                         <DialogJsonTab
                             class="rounded-xl bg-(--profile-card) p-2"
-                            :tree-data="treeData"
+                            :tree-data="avatarJson ?? {}"
                             :tree-data-key="avatarDialog.id"
                             :dialog-id="avatarDialog.id"
-                            :dialog-ref="avatarDialog.ref"
+                            :dialog-ref="avatarJson"
                             :file-analysis="avatarDialog.fileAnalysis"
-                            @refresh="refreshAvatarDialogTreeData()" />
+                            @refresh="avatarDialogCommand('Refresh')">
+                            <template #actions>
+                                <AvatarFileDetailsDialog
+                                    v-if="avatarFileDetails && avatarDialog.lastActiveTab === 'JSON'"
+                                    :key="avatarDialog.id"
+                                    :details="avatarFileDetails"
+                                    :impact-ratings="avatarImpact" />
+                            </template>
+                        </DialogJsonTab>
                     </template>
                 </TabsUnderline>
             </div>
@@ -727,7 +739,7 @@
     import { Badge } from '../../ui/badge';
     import { avatarRequest, marketplaceRequest, miscRequest } from '../../../api';
     import { database } from '../../../services/database';
-    import { formatJsonVars } from '../../../shared/utils/base/ui';
+    import { getAvatarFileDetails, getRawResponse } from '../../../services/nexvr/rawResponses';
     import { handleImageUploadInput, resizeImageToFitLimits } from '../../../coordinators/imageUploadCoordinator';
     import { readFileAsBase64 } from '../../../shared/utils/imageUpload';
     import { runDeleteVRChatCacheFlow as deleteVRChatCache } from '../../../coordinators/gameCoordinator';
@@ -738,7 +750,10 @@
     } from '../../../coordinators/avatarCoordinator';
     import { useAvatarDialogCommands } from './useAvatarDialogCommands';
     import { useAvatarDialogInfo } from './useAvatarDialogInfo';
+    import { useAvatarImpact } from './useAvatarImpact';
 
+    import AvatarFileDetailsDialog from './AvatarFileDetailsDialog.vue';
+    import AvatarImpactBadge from './AvatarImpactBadge.vue';
     import DialogJsonTab from '../DialogJsonTab.vue';
     import ImageCropDialog from '../ImageCropDialog.vue';
     import { showUserDialog } from '../../../coordinators/userCoordinator';
@@ -823,7 +838,26 @@
         { value: 'JSON', label: t('dialog.avatar.json.header') }
     ]);
 
-    const treeData = ref({});
+    const avatarResponse = computed(() => {
+        const { id, loading, visible } = avatarDialog.value;
+        return id && visible && !loading ? (getRawResponse(`/avatars/${encodeURIComponent(id)}`) ?? null) : null;
+    });
+    const avatarImpact = useAvatarImpact(avatarResponse);
+    const currentAvatarImpact = computed(() => {
+        const version = avatarResponse.value?.currentVersion;
+        return version ? (avatarImpact.value?.filter((rating) => rating.versionNumber === version) ?? null) : null;
+    });
+    const avatarJson = computed(() =>
+        avatarResponse.value && avatarImpact.value?.length
+            ? { ...avatarResponse.value, localAvatarImpact: avatarImpact.value }
+            : avatarResponse.value
+    );
+    const avatarFileDetails = computed(() => {
+        const { id, loading, visible } = avatarDialog.value;
+        if (id && visible && !loading && isAvatarOwner.value) {
+            return getAvatarFileDetails(id, currentUser.value.id);
+        }
+    });
     const memo = ref('');
     const imageError = ref(false);
 
@@ -867,37 +901,9 @@
         () => {
             if (avatarDialog.value.visible) {
                 handleDialogOpen();
-                !avatarDialog.value.loading && loadLastActiveTab();
             }
         }
     );
-
-    /**
-     * @param tabName
-     */
-    function handleAvatarDialogTab(tabName) {
-        avatarDialog.value.lastActiveTab = tabName;
-        if (tabName === 'JSON') {
-            refreshAvatarDialogTreeData();
-        }
-    }
-
-    function loadLastActiveTab() {
-        handleAvatarDialogTab(avatarDialog.value.lastActiveTab);
-    }
-
-    /**
-     * @param tabName
-     */
-    function avatarDialogTabClick(tabName) {
-        if (tabName === avatarDialog.value.lastActiveTab) {
-            if (tabName === 'JSON') {
-                refreshAvatarDialogTreeData();
-            }
-            return;
-        }
-        handleAvatarDialogTab(tabName);
-    }
 
     /**
      * @param imageId
@@ -910,7 +916,6 @@
         setAvatarTagsDialog.value.visible = false;
         avatarDialog.value.timeSpent = 0;
         memo.value = '';
-        treeData.value = {};
         getAvatarTimeSpent();
         getAvatarMemo();
     }
@@ -973,10 +978,6 @@
      */
     function copyAvatarId(id) {
         copyToClipboard(id);
-    }
-
-    function refreshAvatarDialogTreeData() {
-        treeData.value = formatJsonVars(avatarDialog.value.ref);
     }
 
     /**

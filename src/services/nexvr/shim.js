@@ -28,7 +28,7 @@ import {
 } from './mappers';
 import { clearTokens, getAccessToken, refreshTokens, setTokens } from './session';
 import { AppDebug } from '../appConfig';
-import { keepRawResponse } from './rawResponses';
+import { clearAvatarResponses, keepRawResponse } from './rawResponses';
 import { realtime } from './realtime';
 import { getRequestSession } from '../requestSession';
 
@@ -79,6 +79,8 @@ function rememberTags(user) {
  * @returns {Promise<any>}
  */
 async function nexvr(path, { method = 'GET', body, query, auth = true } = {}) {
+    const isAvatarRequest = path.startsWith('/avatars/');
+    const avatarSession = isAvatarRequest ? getRequestSession() : null;
     const url = new URL(`${AppDebug.endpointDomain}${path}`);
     for (const [key, value] of Object.entries(query || {})) {
         if (value !== undefined && value !== null && value !== '') {
@@ -126,15 +128,19 @@ async function nexvr(path, { method = 'GET', body, query, auth = true } = {}) {
                 ? { username: body.username, redacted: true }
                 : body;
         const { accessToken, refreshToken, clientKeypair, ...rest } = data && typeof data === 'object' ? data : {};
-        const shownData = accessToken || refreshToken || clientKeypair ? { ...rest, tokens: '[redacted]' } : data;
+        const shownData = isAvatarRequest
+            ? '[avatar response omitted]'
+            : accessToken || refreshToken || clientKeypair
+              ? { ...rest, tokens: '[redacted]' }
+              : data;
         console.log(`[NexVR ${method}] ${url.pathname}${url.search} (${res.status})`, shown ?? '', shownData);
     }
     if (res.status < 200 || res.status >= 300) {
         const message = data?.message || data?.error || `HTTP ${res.status}`;
         throw new ShimError(res.status, typeof message === 'string' ? message : JSON.stringify(message));
     }
-    if (method === 'GET') {
-        keepRawResponse(path, data);
+    if (method === 'GET' && (!isAvatarRequest || avatarSession === getRequestSession())) {
+        keepRawResponse(path, data, isAvatarRequest ? realtime.userId : undefined);
     }
     return data;
 }
@@ -1157,6 +1163,7 @@ export async function endSession() {
     notificationsById.clear();
     summaryCache = new Map();
     summaryContext = '';
+    clearAvatarResponses();
     realtime.reset();
     await clearTokens();
 }
