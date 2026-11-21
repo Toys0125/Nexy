@@ -1,6 +1,6 @@
 // The last raw NexVR response for each API path, for the dialogs' JSON tabs.
 // Everything else in the app sees Nexy's VRChat-shaped copies; these are what
-// the server actually sent, with account email masked and avatar package keys omitted.
+// the server actually sent, with account email masked and avatar and world package keys omitted.
 
 import { toJson } from '@bufbuild/protobuf';
 import { shallowReactive, watch } from 'vue';
@@ -66,7 +66,7 @@ export function keepRawResponse(path, data, userId) {
                       }))
               }
             : undefined;
-    if (isAvatar && Array.isArray(data?.versions)) {
+    if ((isAvatar || /^\/worlds\/[^/]+$/.test(path)) && Array.isArray(data?.versions)) {
         data = {
             ...data,
             versions: data.versions.map((version) => {

@@ -44,6 +44,30 @@ const avatar = {
     ]
 };
 
+const world = {
+    _id: 'w1',
+    name: 'Example World',
+    owner: 'u1',
+    visibility: 'public',
+    platforms: ['pc', 'android'],
+    currentVersion: '2',
+    versions: [
+        {
+            versionNumber: '2',
+            label: '',
+            package: {
+                url: 'https://cdn.example.com/worlds/w1/v2.BEE',
+                decryptionKey: 'creator-only-key',
+                size: 123456,
+                platforms: ['pc', 'android'],
+                uploadedAt: '2026-11-01T00:00:00Z',
+                uploadedBy: 'u1',
+                buildInfo: null
+            }
+        }
+    ]
+};
+
 const native = async ({ url, method }) => {
     const path = new URL(url).pathname.replace(/^\/api/, '');
     if (path === '/users/u1') {
@@ -51,6 +75,9 @@ const native = async ({ url, method }) => {
     }
     if (path === '/avatars/a1') {
         return { status: 200, data: JSON.stringify(avatar) };
+    }
+    if (path === '/worlds/w1') {
+        return { status: 200, data: JSON.stringify(world) };
     }
     if (path === '/auth/login' && method === 'POST') {
         return {
@@ -109,6 +136,31 @@ describe('raw NexVR responses for the JSON tabs', () => {
         await request;
         expect(getRawResponse('/avatars/a1')).toBeUndefined();
         expect(getAvatarFileDetails('a1', 'u1')).toBeUndefined();
+    });
+
+    test('world JSON keeps the NexVR BEE location and omits the decryption key', async () => {
+        const response = await handleShimRequest({ url: 'https://nexvr.net/api/worlds/w1', method: 'GET' }, native);
+
+        const mappedWorld = JSON.parse(response.data);
+        expect(mappedWorld.unityPackages).toMatchObject([
+            { platform: 'standalonewindows', assetUrl: '' },
+            { platform: 'android', assetUrl: '' }
+        ]);
+
+        const rawWorld = getRawResponse('/worlds/w1');
+        expect(rawWorld).toMatchObject({
+            _id: 'w1',
+            currentVersion: '2',
+            versions: [{ versionNumber: '2', package: { url: world.versions[0].package.url } }]
+        });
+        expect(rawWorld).not.toHaveProperty('unityPackages');
+        expect(rawWorld.versions[0].package).not.toHaveProperty('decryptionKey');
+    });
+
+    test('world details without versions are kept as received', () => {
+        const details = { _id: 'w2', platforms: ['pc'] };
+        keepRawResponse('/worlds/w2', details);
+        expect(getRawResponse('/worlds/w2')).toEqual(details);
     });
 
     test('responses carrying session tokens are never kept', () => {
