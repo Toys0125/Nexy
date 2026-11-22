@@ -1,4 +1,5 @@
 import { create, fromBinary, toBinary } from '@bufbuild/protobuf';
+import { watch } from 'vue';
 
 import {
     ClientMessageSchema,
@@ -8,6 +9,7 @@ import {
 } from './realtimeSchema';
 import { AppDebug } from '../appConfig';
 import { toNexVRRealtimeInstance } from './mappers';
+import { getTokenSession } from './tokenSession';
 
 const AUTH_TIMEOUT = 10000;
 const REQUEST_TIMEOUT = 10000;
@@ -190,6 +192,8 @@ class RealtimeClient {
                 // already closed
             }
         }
+        for (const resolvePending of this.pending.values()) resolvePending(null);
+        this.pending.clear();
         this.releaseSnapshotWaiters();
         this.clearGroupInstances();
     }
@@ -198,13 +202,13 @@ class RealtimeClient {
      * Disconnects and forgets everything learned for the signed-in user.
      */
     reset() {
+        this.notifications = [];
         this.disconnect();
         this.watchedInstances = [];
         this.watchedGroups = [];
         this.userId = '';
         this.hasSnapshot = false;
         this.friends.clear();
-        this.notifications = [];
     }
 
     /**
@@ -439,6 +443,9 @@ class RealtimeClient {
 }
 
 export const realtime = new RealtimeClient();
+// Explicit credential changes invalidate the socket and its cached account data.
+// Refreshing the same login does not change the token session.
+watch(getTokenSession, () => realtime.reset(), { flush: 'sync' });
 
 // console access next to $debug, e.g. [...$nexvr.realtime.friends.values()]
 /** @type {any} */ (window).$nexvr = { realtime };

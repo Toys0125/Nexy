@@ -1,7 +1,5 @@
-import { ref } from 'vue';
-
 import configRepository from '../config';
-import { StaleRequestError } from '../requestSession';
+import { advanceTokenSession, assertTokenSession, getTokenSession } from './tokenSession';
 
 const STORAGE_KEY = 'NexVR_session';
 
@@ -12,20 +10,8 @@ const STORAGE_KEY = 'NexVR_session';
 /** @type {NexvrTokens | null} */
 let tokens = null;
 let loaded = false;
-const tokenSession = ref(0);
 /** @type {{ session: number; promise: Promise<boolean> } | null} */
 let refreshing = null;
-
-export function getTokenSession() {
-    return tokenSession.value;
-}
-
-/** @param {number} expected */
-export function assertTokenSession(expected) {
-    if (expected !== tokenSession.value) {
-        throw new StaleRequestError('NexVR request belongs to a previous login session.');
-    }
-}
 
 /**
  * Loads the persisted session once, so a restart keeps the user signed in the
@@ -74,7 +60,7 @@ export async function getAccessToken() {
  */
 export async function setTokens(next) {
     const saved = updateTokens(next);
-    tokenSession.value++;
+    advanceTokenSession();
     await saved;
 }
 

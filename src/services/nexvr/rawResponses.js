@@ -8,7 +8,7 @@ import { shallowReactive, watch } from 'vue';
 import { FriendPresenceSchema } from './realtimeSchema';
 import { maskEmail } from './mappers';
 import { realtime } from './realtime';
-import { getTokenSession } from './session';
+import { getTokenSession } from './tokenSession';
 import { watchState } from '../watchState';
 
 const MAX_ENTRIES = 300;

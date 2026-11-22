@@ -27,13 +27,12 @@ import {
     toNexVRUser,
     toNexVRWorld
 } from './mappers';
-import { assertTokenSession, clearTokens, getAccessToken, getTokenSession, refreshTokens, setTokens } from './session';
+import { clearTokens, getAccessToken, refreshTokens, setTokens } from './session';
+import { assertTokenSession, getTokenSession } from './tokenSession';
 import { AppDebug } from '../appConfig';
 import { clearRawResponses, keepRawResponse } from './rawResponses';
 import { realtime } from './realtime';
-import { NotificationType } from './realtimeSchema';
 import { nexvrNotificationText } from './notificationText';
-import { i18n } from '../../plugins/i18n';
 import { assertRequestSession, getRequestSession } from '../requestSession';
 
 const SNAPSHOT_TIMEOUT = 8000;
@@ -60,8 +59,6 @@ let native;
 
 /** Pending 2FA challenge from /auth/login */
 let challenge = null;
-/** @type {Map<string, any>} realtime notification by id, for accept/hide */
-const notificationsById = new Map();
 /** @type {Map<string, Promise<{ name: string; image: string; worldId?: string }>>} by `kind:id` */
 let summaryCache = new Map();
 let summaryContext = '';
@@ -452,27 +449,6 @@ export async function describeNotification(notification) {
     if (image) {
         details.imageUrl = image;
     }
-    const payload = notification.payload;
-    const { t } = i18n.global;
-    if (payload?.case === 'groupInvite' && payload.value.groupId) {
-        mapped.responses = [
-            { type: 'nexvr.accept', icon: 'check', text: t('view.notification.actions.accept'), data: '' },
-            { type: 'nexvr.decline', icon: 'cancel', text: t('view.notification.actions.decline'), data: '' }
-        ];
-    } else if (payload?.case === 'groupJoinRequest' && payload.value.groupId && mapped.senderUserId) {
-        mapped.responses = [
-            { type: 'nexvr.accept', icon: 'check', text: nexvrNotificationText('approve'), data: '' },
-            { type: 'nexvr.decline', icon: 'cancel', text: t('view.notification.actions.decline'), data: '' }
-        ];
-    }
-    if (payload?.case && mapped.type !== 'message' && notification.type >= NotificationType.FRIEND_REQUEST_RESPONSE) {
-        (mapped.responses ??= []).push({
-            type: 'nexvr.dismiss',
-            icon: 'bell-slash',
-            text: nexvrNotificationText('dismiss'),
-            data: ''
-        });
-    }
     return mapped;
 }
 
@@ -508,6 +484,8 @@ async function respondToNexVRNotification(id, response) {
             const assertSession = captureLoginGuard();
             // The web client declines through /leave as well. A stale invitation
             // must not cause a member to leave their group.
+            // The gateway does not expose an atomic decline endpoint, so a
+            // membership change by another client after this read can still race.
             const membership = await nexvr(`${groupPath}/membership`);
             assertSession();
             if (membership?.status !== 'invited') {
@@ -539,17 +517,12 @@ async function notificationsList(query) {
         return [];
     }
     const session = getRequestSession();
+    const tokenSession = getTokenSession();
+    const isCurrent = () => session === getRequestSession() && tokenSession === getTokenSession();
     const list = await realtime.getNotifications();
+    if (!isCurrent()) return [];
     const described = await Promise.all(list.map(describeNotification));
-    if (session !== getRequestSession()) {
-        // signed out while it loaded; never hand one account's list to the next
-        return [];
-    }
-    notificationsById.clear();
-    for (const notification of list) {
-        notificationsById.set(notification.id, notification);
-    }
-    return described;
+    return isCurrent() ? described : [];
 }
 
 /**
@@ -557,7 +530,7 @@ async function notificationsList(query) {
  * @param {boolean} accept
  */
 async function answerNotification(id, accept) {
-    const notification = notificationsById.get(id) ?? realtime.notifications.find((n) => n.id === id);
+    const notification = realtime.notifications.find((n) => n.id === id);
     const mapped = notification && toNexVRNotification(notification);
     if (mapped?.type === 'friendRequest') {
         await nexvr(`/friends/${encodeURIComponent(mapped.senderUserId)}/${accept ? 'accept' : 'decline'}`, {
@@ -567,7 +540,6 @@ async function answerNotification(id, accept) {
     if (!accept || mapped?.type !== 'friendRequest') {
         await nexvr(`/notifications/${encodeURIComponent(id)}`, { method: 'DELETE' }).catch(() => {});
     }
-    notificationsById.delete(id);
     return { success: { message: accept ? 'Accepted' : 'Dismissed', status_code: 200 } };
 }
 
@@ -1285,7 +1257,6 @@ export async function handleShimRequest(options, executeNative) {
  */
 export async function endSession() {
     challenge = null;
-    notificationsById.clear();
     summaryCache = new Map();
     summaryContext = '';
     clearRawResponses();

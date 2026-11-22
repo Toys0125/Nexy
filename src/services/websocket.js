@@ -24,6 +24,8 @@ import { request } from './request';
 import { runUpdateFriendFlow } from '../coordinators/friendPresenceCoordinator';
 import { runSetCurrentUserLocationFlow } from '../coordinators/locationCoordinator';
 import { watchState } from './watchState';
+import { getRequestSession } from './requestSession';
+import { getTokenSession } from './nexvr/tokenSession';
 import { createWebSocketMessageRate } from './websocketMetrics';
 
 import * as workerTimers from 'worker-timers';
@@ -263,6 +265,8 @@ async function handleRealtimeNotifications(list) {
     knownNotificationIds = ids;
     // names and pictures are looked up first, so the notification arrives looking finished
     const generation = realtimeGeneration;
+    const session = getRequestSession();
+    const tokenSession = getTokenSession();
     const described = await Promise.all(
         added.map((notification) =>
             describeNotification(notification).catch((err) => {
@@ -271,7 +275,7 @@ async function handleRealtimeNotifications(list) {
             })
         )
     );
-    if (generation !== realtimeGeneration) {
+    if (generation !== realtimeGeneration || session !== getRequestSession() || tokenSession !== getTokenSession()) {
         // signed out or reconnected meanwhile; that session loads its own list
         return;
     }

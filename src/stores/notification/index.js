@@ -37,6 +37,8 @@ import { database, dbVars } from '../../services/database';
 import { getNotificationCategory, getNotificationTs } from '../../shared/utils/notificationCategory';
 import { AppDebug } from '../../services/appConfig';
 import { getRequestSession } from '../../services/requestSession';
+import { realtime } from '../../services/nexvr/realtime';
+import { toNexVRNotification } from '../../services/nexvr/mappers';
 import { createOverlayDispatch } from './overlayDispatch';
 import { useAdvancedSettingsStore } from '../settings/advanced';
 import { useFavoriteStore } from '../favorite';
@@ -60,7 +62,7 @@ import { watchState } from '../../services/watchState';
 import configRepository from '../../services/config';
 
 export const useNotificationStore = defineStore('Notification', () => {
-    const { t } = useI18n();
+    const { t, locale } = useI18n();
     const generalSettingsStore = useGeneralSettingsStore();
     const locationStore = useLocationStore();
     const favoriteStore = useFavoriteStore();
@@ -147,6 +149,20 @@ export const useNotificationStore = defineStore('Notification', () => {
     const hasUnseenNotifications = computed(() => unseenNotifications.value.length > 0);
 
     const notyMap = {};
+
+    watch(
+        () => locale?.value,
+        () => {
+            const active = new Map(realtime.notifications.map((notification) => [notification.id, notification]));
+            for (const row of notificationTable.value.data) {
+                const source = active.get(row.id);
+                if (!row.$nexvrType || !source?.payload?.case) continue;
+                const { message, responses } = sanitizeNotificationJson(toNexVRNotification(source));
+                row.message = message;
+                if (responses) row.responses = responses;
+            }
+        }
+    );
 
     watch(
         () => watchState.isLoggedIn,

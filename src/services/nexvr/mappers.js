@@ -4,6 +4,7 @@
 
 import { NotificationType, PresenceStatus, SocialRank } from './realtimeSchema';
 import { nexvrNotificationText as text } from './notificationText';
+import { i18n } from '../../plugins/i18n';
 
 const PRESENCE_STATUS = {
     [PresenceStatus.ONLINE]: 'active',
@@ -954,7 +955,7 @@ export function toNexVRNotification(notification) {
         .map((part) => part?.trim())
         .filter(Boolean)
         .join(': ');
-    return {
+    const mapped = {
         id: notification.id,
         type:
             notification.type === NotificationType.MODERATION_NOTICE && details.groupId
@@ -969,6 +970,28 @@ export function toNexVRNotification(notification) {
         created_at: notification.createdAt || new Date().toISOString(),
         $nexvrType: notification.type
     };
+    const { t } = i18n.global;
+    const responses = [];
+    if (payload?.case === 'groupInvite' && payload.value.groupId) {
+        responses.push(
+            { type: 'nexvr.accept', icon: 'check', text: t('view.notification.actions.accept'), data: '' },
+            { type: 'nexvr.decline', icon: 'cancel', text: t('view.notification.actions.decline'), data: '' }
+        );
+    } else if (payload?.case === 'groupJoinRequest' && payload.value.groupId && mapped.senderUserId) {
+        responses.push(
+            { type: 'nexvr.accept', icon: 'check', text: text('approve'), data: '' },
+            { type: 'nexvr.decline', icon: 'cancel', text: t('view.notification.actions.decline'), data: '' }
+        );
+    }
+    if (payload?.case && mapped.type !== 'message' && notification.type >= NotificationType.FRIEND_REQUEST_RESPONSE) {
+        responses.push({
+            type: 'nexvr.dismiss',
+            icon: 'bell-slash',
+            text: text('dismiss'),
+            data: ''
+        });
+    }
+    return responses.length ? { ...mapped, responses } : mapped;
 }
 
 /**

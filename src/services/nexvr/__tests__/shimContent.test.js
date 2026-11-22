@@ -346,6 +346,7 @@ describe('NexVR notifications', () => {
             const first = { accessToken: 'access', refreshToken: 'refresh' };
             const second = { accessToken: 'new-account', refreshToken: 'new-refresh' };
             await setTokens(first);
+            realtime.userId = 'me';
             const action = typed('group', NotificationType.GROUP_INVITE, 'groupInvite', { groupId: 'g1' });
             realtime.notifications = [action];
             const requests = [];
@@ -418,5 +419,30 @@ describe('NexVR notifications', () => {
         };
         const { json } = await get('auth/user/notifications?n=100&offset=0');
         expect(json).toEqual([]);
+    });
+
+    test('a token-only switch drops a pending notification list and clears the old realtime snapshot', async () => {
+        const original = { accessToken: 'access', refreshToken: 'refresh' };
+        await setTokens(original);
+        realtime.userId = 'me';
+        const old = [notification('old-account', NotificationType.FRIEND_REQUEST, 'someone')];
+        realtime.notifications = old;
+        const pending = Promise.withResolvers();
+        const fetchList = vi.spyOn(realtime, 'getNotifications').mockReturnValueOnce(pending.promise);
+        try {
+            const loginState = watchState.isLoggedIn;
+            const request = get('auth/user/notifications');
+            expect(fetchList).toHaveBeenCalledOnce();
+            await setTokens({ accessToken: 'new-account', refreshToken: 'new-refresh' });
+            expect(watchState.isLoggedIn).toBe(loginState);
+            expect(realtime.notifications).toEqual([]);
+            pending.resolve(old);
+            expect((await request).json).toEqual([]);
+            expect(requested).toEqual([]);
+            expect((await get('auth/user/notifications')).json).toEqual([]);
+        } finally {
+            fetchList.mockRestore();
+            await setTokens(original);
+        }
     });
 });
