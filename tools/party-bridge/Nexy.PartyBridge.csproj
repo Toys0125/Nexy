@@ -1,0 +1,18 @@
+<Project Sdk="Microsoft.NET.Sdk">
+    <PropertyGroup>
+        <TargetFramework>net10.0</TargetFramework>
+        <Nullable>enable</Nullable>
+        <ImplicitUsings>enable</ImplicitUsings>
+        <NexVRManaged>$(NexVRPath)/Managed</NexVRManaged>
+    </PropertyGroup>
+    <ItemGroup>
+        <Reference Include="BasisMenuRestore.Contracts" HintPath="$(NexVRManaged)/BasisMenuRestore.Contracts.dll" Private="false" />
+        <Reference Include="NexVR.ReactiveUI" HintPath="$(NexVRManaged)/NexVR.ReactiveUI.dll" Private="false" />
+        <Reference Include="NexVR.Services" HintPath="$(NexVRManaged)/NexVR.Services.dll" Private="false" />
+        <Reference Include="NexVR.Platform.Api" HintPath="$(NexVRManaged)/NexVR.Platform.Api.dll" Private="false" />
+        <Reference Include="NexVR.Platform.Session" HintPath="$(NexVRManaged)/NexVR.Platform.Session.dll" Private="false" />
+    </ItemGroup>
+    <Target Name="CheckNexVRPath" BeforeTargets="ResolveReferences">
+        <Error Condition="!Exists('$(NexVRManaged)/NexVR.ReactiveUI.dll')" Text="Set -p:NexVRPath to the installed NexVR CoreCLR client directory." />
+    </Target>
+</Project>

@@ -75,6 +75,12 @@ namespace VRCX
 
         private static string? GetNexVRAvatarImpactCachePath()
         {
+            var data = GetNexVRPlayerDataPath();
+            return data == null ? null : Path.Join(data, "nexvr-avatar-impact", "verdicts.txt");
+        }
+
+        private static string? GetNexVRPlayerDataPath()
+        {
             string localLow;
             if (OperatingSystem.IsWindows())
             {
@@ -92,7 +98,7 @@ namespace VRCX
                 return null;
             }
 
-            return Path.Join(localLow, "NexVR", "NexVR", "nexvr-avatar-impact", "verdicts.txt");
+            return Path.Join(localLow, "NexVR", "NexVR");
         }
     }
 }

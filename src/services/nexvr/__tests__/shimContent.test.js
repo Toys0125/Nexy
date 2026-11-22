@@ -51,6 +51,13 @@ const responses = {
     '/groups/g1': { id: 'g1', name: 'Crew', iconUrl: 'https://cdn/g1.png' }
 };
 
+const groupActions = new Set([
+    '/groups/g1/accept',
+    '/groups/g1/leave',
+    '/groups/g1/members/stranger/approve',
+    '/groups/g1/members/stranger/decline'
+]);
+
 /** @type {string[]} */
 let requested = [];
 
@@ -72,6 +79,9 @@ const native = async ({ url, method, body }) => {
     }
     if (path in responses) {
         return { status: 200, data: JSON.stringify(responses[path]) };
+    }
+    if ((method === 'POST' && groupActions.has(path)) || (method === 'DELETE' && path === '/notifications/group')) {
+        return { status: 204, data: '' };
     }
     return { status: 404, data: JSON.stringify({ message: 'Not found' }) };
 };
@@ -184,6 +194,23 @@ describe('NexVR notifications', () => {
         createdAt: '2026-11-01T00:00:00Z'
     });
 
+    const typed = (id, type, kind, value) => ({
+        ...notification(id, type, 'friend'),
+        payload: { case: kind, value }
+    });
+
+    async function respond(id, responseType) {
+        const result = await handleShimRequest(
+            {
+                url: `https://nexvr.net/api/notifications/${id}/respond`,
+                method: 'POST',
+                body: JSON.stringify({ responseType, responseData: 'untrusted' })
+            },
+            native
+        );
+        return { status: result.status, json: JSON.parse(result.data) };
+    }
+
     afterEach(() => {
         realtime.notifications = [];
         onRequest = null;
@@ -236,6 +263,60 @@ describe('NexVR notifications', () => {
 
         const { json } = await get('auth/user/notifications?n=100&offset=0');
         expect(json[0]).toMatchObject({ type: 'requestInvite', message: 'Invite request: Can I join?' });
+    });
+
+    test('dedicated notification types preserve event, moderation, and gift details', async () => {
+        realtime.notifications = [
+            typed('event', NotificationType.CALENDAR_EVENT_UPDATED, 'calendarEventUpdated', {
+                eventTitle: 'Game Night'
+            }),
+            typed('notice', NotificationType.MODERATION_NOTICE, 'moderationNotice', {
+                kind: { case: 'contentRemoved', value: { targetName: 'Example avatar', reason: 'Test reason' } }
+            }),
+            typed('gift', NotificationType.GIFT_RECEIVED, 'giftReceived', { tierName: 'Plus', months: 3 }),
+            typed('cashout', NotificationType.CASHOUT_RESOLVED, 'cashoutResolved', {
+                outcome: 'paid',
+                note: 'Payment sent'
+            })
+        ];
+        const { json } = await get('auth/user/notifications');
+        expect(json).toMatchObject([
+            { type: 'calendarEventUpdated', message: 'Updated “Game Night”.' },
+            { type: 'moderationNotice', message: 'Moderators removed your Example avatar. Reason: Test reason' },
+            { type: 'giftReceived', message: 'Sent you a gift of Plus (3 months).' },
+            { type: 'cashoutResolved', message: 'Your cashout was paid. Payment sent' }
+        ]);
+    });
+
+    test.each([
+        ['groupInvite', 'nexvr.accept', '/groups/g1/accept'],
+        ['groupInvite', 'nexvr.decline', '/groups/g1/leave'],
+        ['groupJoinRequest', 'nexvr.accept', '/groups/g1/members/stranger/approve'],
+        ['groupJoinRequest', 'nexvr.decline', '/groups/g1/members/stranger/decline'],
+        ['groupJoinRequest', 'nexvr.dismiss', '/notifications/group']
+    ])('%s handles %s using the active realtime payload', async (kind, action, path) => {
+        const type = kind === 'groupInvite' ? NotificationType.GROUP_INVITE : NotificationType.GROUP_JOIN_REQUEST;
+        realtime.notifications = [typed('group', type, kind, { groupId: 'g1', userId: 'stranger' })];
+        const { json } = await get('auth/user/notifications');
+        expect(json[0]).toMatchObject({
+            type: kind === 'groupInvite' ? 'group.invite' : 'group.joinRequest',
+            details: { groupId: 'g1', groupName: 'Crew' },
+            responses: expect.arrayContaining([expect.objectContaining({ type: action })])
+        });
+        requested = [];
+        expect((await respond('group', action)).status).toBe(200);
+        expect(requested).toEqual([path]);
+    });
+
+    test('a response for another account is rejected without changing group membership', async () => {
+        realtime.notifications = [
+            {
+                ...typed('group', NotificationType.GROUP_INVITE, 'groupInvite', { groupId: 'g1' }),
+                to: 'different-user'
+            }
+        ];
+        expect((await respond('group', 'nexvr.accept')).status).toBe(404);
+        expect(requested).toEqual([]);
     });
 
     test("an invite is filled in with the world's name and thumbnail", async () => {

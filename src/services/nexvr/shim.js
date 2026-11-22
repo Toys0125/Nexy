@@ -31,6 +31,7 @@ import { clearTokens, getAccessToken, refreshTokens, setTokens } from './session
 import { AppDebug } from '../appConfig';
 import { clearAvatarResponses, keepRawResponse } from './rawResponses';
 import { realtime } from './realtime';
+import { NotificationType } from './realtimeSchema';
 import { getRequestSession } from '../requestSession';
 
 const SNAPSHOT_TIMEOUT = 8000;
@@ -423,7 +424,64 @@ export async function describeNotification(notification) {
     if (image) {
         details.imageUrl = image;
     }
+    const payload = notification.payload;
+    if (payload?.case === 'groupInvite' && payload.value.groupId) {
+        mapped.responses = [
+            { type: 'nexvr.accept', icon: 'check', text: 'Accept', data: '' },
+            { type: 'nexvr.decline', icon: 'cancel', text: 'Decline', data: '' }
+        ];
+    } else if (payload?.case === 'groupJoinRequest' && payload.value.groupId && mapped.senderUserId) {
+        mapped.responses = [
+            { type: 'nexvr.accept', icon: 'check', text: 'Approve', data: '' },
+            { type: 'nexvr.decline', icon: 'cancel', text: 'Decline', data: '' }
+        ];
+    }
+    if (payload?.case && mapped.type !== 'message' && notification.type >= NotificationType.FRIEND_REQUEST_RESPONSE) {
+        (mapped.responses ??= []).push({ type: 'nexvr.dismiss', icon: 'bell-slash', text: 'Dismiss', data: '' });
+    }
     return mapped;
+}
+
+/**
+ * Answer a group notification using the current realtime payload. The renderer
+ * supplies the notification ID and choice; the socket supplies the group and user.
+ *
+ * @param {string} id
+ * @param {string} response
+ */
+async function respondToNexVRNotification(id, response) {
+    const notification = realtime.notifications.find((item) => item.id === id);
+    if (!realtime.userId || !notification || (notification.to && notification.to !== realtime.userId)) {
+        throw new ShimError(404, 'This notification is no longer available.');
+    }
+    if (response === 'nexvr.dismiss') {
+        await nexvr(`/notifications/${encodeURIComponent(id)}`, { method: 'DELETE' });
+        return 'Notification dismissed.';
+    }
+    if (response !== 'nexvr.accept' && response !== 'nexvr.decline') {
+        throw new ShimError(400, 'Invalid notification response.');
+    }
+
+    const payload = notification.payload;
+    const groupId = payload?.value?.groupId;
+    const accept = response === 'nexvr.accept';
+    if (!groupId || (payload.case !== 'groupInvite' && payload.case !== 'groupJoinRequest')) {
+        throw new ShimError(400, 'This notification does not support that response.');
+    }
+    const groupPath = `/groups/${encodeURIComponent(groupId)}`;
+    if (payload.case === 'groupInvite') {
+        await nexvr(`${groupPath}/${accept ? 'accept' : 'leave'}`, { method: 'POST', body: {} });
+        memberLists.delete(groupId);
+        return accept ? 'Group invite accepted.' : 'Group invite declined.';
+    }
+    const requester = payload.value.userId || notification.from;
+    if (!requester) throw new ShimError(400, 'This notification has no requester.');
+    await nexvr(`${groupPath}/members/${encodeURIComponent(requester)}/${accept ? 'approve' : 'decline'}`, {
+        method: 'POST',
+        body: {}
+    });
+    memberLists.delete(groupId);
+    return accept ? 'Group join request approved.' : 'Group join request declined.';
 }
 
 /**
@@ -738,6 +796,11 @@ const routes = [
     ['PUT', /^auth\/user\/notifications\/([^/]+)\/hide$/, (m) => answerNotification(m[1], false)],
     ['PUT', /^auth\/user\/notifications\/([^/]+)\/see$/, (m) => ({ id: m[1], seen: true })],
     ['GET', /^notifications$/, () => []],
+    [
+        'POST',
+        /^notifications\/([^/]+)\/respond$/,
+        (m, q, body) => respondToNexVRNotification(decodeURIComponent(m[1]), body.responseType)
+    ],
     [
         'GET',
         /^auth\/user\/playermoderations$/,

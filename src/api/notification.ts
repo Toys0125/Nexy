@@ -240,11 +240,10 @@ const notificationReq = {
         });
     },
 
-    // Not available on NexVR: the shim answers 501
     sendNotificationResponse(
         params: { notificationId: string } & RespondNotificationV2Request
     ): Promise<{ json: string; params: { notificationId: string } & RespondNotificationV2Request }> {
-        return request(`notifications/${params.notificationId}/respond`, {
+        return request(`notifications/${encodeURIComponent(params.notificationId)}/respond`, {
             method: 'POST',
             params
         }).then((json) => {

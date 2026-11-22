@@ -799,24 +799,67 @@ const NOTIFICATION_TYPES = {
     [NotificationType.INVITE_RESPONSE]: 'inviteResponse',
     [NotificationType.INVITE_REQUEST]: 'requestInvite',
     [NotificationType.FRIEND_REQUEST_RESPONSE]: 'friendRequestResponse',
-    [NotificationType.GROUP_INVITE]: 'message',
-    [NotificationType.GROUP_JOIN_REQUEST]: 'message',
-    [NotificationType.GROUP_JOIN_REQUEST_RESPONSE]: 'message',
-    [NotificationType.COALITION_INVITE]: 'message',
-    [NotificationType.COALITION_INVITE_RESPONSE]: 'message',
-    [NotificationType.CALENDAR_EVENT_RSVP]: 'message',
-    [NotificationType.CALENDAR_EVENT_UPDATED]: 'message',
-    [NotificationType.CALENDAR_EVENT_CANCELLED]: 'message',
-    [NotificationType.INSTANCE_WARNING]: 'message',
-    [NotificationType.MODERATION_NOTICE]: 'message',
-    [NotificationType.CASHOUT_RESOLVED]: 'message'
+    [NotificationType.GROUP_INVITE]: 'group.invite',
+    [NotificationType.GROUP_JOIN_REQUEST]: 'group.joinRequest',
+    [NotificationType.GROUP_JOIN_REQUEST_RESPONSE]: 'groupJoinRequestResponse',
+    [NotificationType.COALITION_INVITE]: 'coalitionInvite',
+    [NotificationType.COALITION_INVITE_RESPONSE]: 'coalitionInviteResponse',
+    [NotificationType.CALENDAR_EVENT_RSVP]: 'calendarEventRsvp',
+    [NotificationType.CALENDAR_EVENT_UPDATED]: 'calendarEventUpdated',
+    [NotificationType.CALENDAR_EVENT_CANCELLED]: 'calendarEventCancelled',
+    [NotificationType.INSTANCE_WARNING]: 'instanceWarning',
+    [NotificationType.MODERATION_NOTICE]: 'moderationNotice',
+    [NotificationType.CASHOUT_RESOLVED]: 'cashoutResolved',
+    [NotificationType.GIFT_RECEIVED]: 'giftReceived',
+    [NotificationType.GIFT_RETURNED]: 'giftReturned',
+    [NotificationType.GIFT_REVOKED]: 'giftRevoked',
+    [NotificationType.GROUP_WARNING]: 'groupWarning'
 };
+
+/**
+ * @param {any} kind NexVR moderation notice oneof
+ */
+function describeModerationNotice(kind) {
+    const notice = kind?.value;
+    const reason = notice?.reason ? ` Reason: ${notice.reason}` : '';
+    switch (kind?.case) {
+        case 'suspension': {
+            const target = notice.targetLabel || notice.targetType || 'account';
+            const duration = notice.expiresAt ? ` until ${notice.expiresAt}` : ' permanently';
+            return `Your ${target === 'user' ? 'account' : target} was suspended${duration}.${reason}`;
+        }
+        case 'contentRemoved':
+            return `Moderators removed your ${notice.targetName || notice.targetType || 'content'}.${reason}`;
+        case 'profileModerated':
+            return notice.fields?.length
+                ? `Moderators changed your profile: ${notice.fields.join(', ')}.`
+                : 'Moderators changed your profile.';
+        case 'listingRemoved':
+            return [
+                `Moderators removed your listing${notice.listingTitle ? ` “${notice.listingTitle}”` : ''}.${reason}`,
+                notice.refundedPurchases > 0 ? `Purchases refunded: ${notice.refundedPurchases}.` : ''
+            ]
+                .filter(Boolean)
+                .join(' ');
+        case 'appealResolved':
+            return [
+                notice.outcome === 'reversed' ? 'Your appeal was accepted.' : 'Your appeal was reviewed.',
+                notice.resolutionNote
+            ]
+                .filter(Boolean)
+                .join(' ');
+        default:
+            return 'Received a moderation notice.';
+    }
+}
 
 /**
  * @param {any} payload NexVR notification payload (protobuf oneof)
  * @returns {string} Text for notifications without legacy title or message
  */
 function describeNotificationPayload(payload) {
+    const details = payload?.value;
+    const event = details?.eventTitle ? `“${details.eventTitle}”` : 'a calendar event';
     switch (payload?.case) {
         case 'invite':
             return 'Invited you to an instance.';
@@ -837,31 +880,44 @@ function describeNotificationPayload(payload) {
                 ? 'Your group join request was approved.'
                 : 'Your group join request was declined.';
         case 'coalitionInvite':
-            return 'Invited your group to a coalition.';
+            return details.coalitionName
+                ? `Invited your group to the “${details.coalitionName}” coalition.`
+                : 'Invited your group to a coalition.';
         case 'coalitionInviteResponse':
             return payload.value.accepted
                 ? 'Your coalition invite was accepted.'
                 : 'Your coalition invite was declined.';
         case 'calendarEventRsvp':
-            return 'Responded to a calendar event.';
+            return `Responded to ${event}${details.rsvpStatus ? ` (${details.rsvpStatus})` : ''}.`;
         case 'calendarEventUpdated':
-            return 'Updated a calendar event.';
+            return `Updated ${event}.`;
         case 'calendarEventCancelled':
-            return 'Cancelled a calendar event.';
+            return `Cancelled ${event}.`;
         case 'instanceWarning':
             return payload.value.text || 'A moderator warned you in an instance.';
         case 'groupWarning':
             return payload.value.text || 'A moderator warned you in a group.';
         case 'moderationNotice':
-            return 'Received a moderation notice.';
-        case 'cashoutResolved':
-            return payload.value.note || 'Your cashout status changed.';
-        case 'giftReceived':
-            return 'Sent you a gift.';
+            return describeModerationNotice(details.kind);
+        case 'cashoutResolved': {
+            let outcome = 'Your cashout status changed.';
+            if (details.outcome === 'paid') outcome = 'Your cashout was paid.';
+            if (details.outcome === 'rejected') outcome = 'Your cashout was declined.';
+            if (details.outcome === 'failed') outcome = 'Your cashout could not be paid.';
+            return [outcome, details.note].filter(Boolean).join(' ');
+        }
+        case 'giftReceived': {
+            const plan = details.tierName || details.tierId;
+            if (!plan) return 'Sent you a gift.';
+            const term = details.months ? ` (${details.months} ${details.months === 1 ? 'month' : 'months'})` : '';
+            return `Sent you a gift of ${plan}${term}.`;
+        }
         case 'giftReturned':
             return 'Your gift was returned.';
-        case 'giftRevoked':
-            return 'A gift on your account ended.';
+        case 'giftRevoked': {
+            const plan = details.tierName || details.tierId;
+            return `A gift${plan ? ` of ${plan}` : ''} on your account ${details.queuedStart ? 'was cancelled' : 'ended'}.`;
+        }
         default:
             return '';
     }
@@ -876,7 +932,10 @@ export function toNexVRNotification(notification) {
     const details = { ...data };
     const payload = notification.payload;
     const typedDetails = payload?.value;
-    const groupId = typedDetails?.groupId || typedDetails?.targetGroupId;
+    const groupId =
+        typedDetails?.groupId ||
+        typedDetails?.targetGroupId ||
+        (typedDetails?.ownerType === 'group' ? typedDetails.ownerId : '');
     if (groupId) {
         details.groupId = groupId;
     }

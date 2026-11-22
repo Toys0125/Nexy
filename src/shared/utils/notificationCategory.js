@@ -3,6 +3,9 @@ import dayjs from 'dayjs';
 const FRIEND_TYPES = new Set([
     'friendRequest',
     'friendRequestResponse',
+    'partyInvite',
+    'partyJoinRequest',
+    'cameraOffer',
     'ignoredFriendRequest',
     'invite',
     'requestInvite',
@@ -11,7 +14,15 @@ const FRIEND_TYPES = new Set([
     'boop'
 ]);
 const GROUP_TYPES_PREFIX = ['group.', 'moderation.'];
-const GROUP_EXACT_TYPES = new Set(['groupChange', 'event.announcement']);
+const GROUP_EXACT_TYPES = new Set([
+    'groupChange',
+    'event.announcement',
+    'groupJoinRequestResponse',
+    'coalitionInvite',
+    'coalitionInviteResponse',
+    'groupWarning',
+    'moderationNotice'
+]);
 
 /**
  * Determine the category of a notification type.

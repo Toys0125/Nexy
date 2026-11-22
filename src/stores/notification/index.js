@@ -36,6 +36,7 @@ import {
 import { database, dbVars } from '../../services/database';
 import { getNotificationCategory, getNotificationTs } from '../../shared/utils/notificationCategory';
 import { AppDebug } from '../../services/appConfig';
+import { getRequestSession } from '../../services/requestSession';
 import { createOverlayDispatch } from './overlayDispatch';
 import { useAdvancedSettingsStore } from '../settings/advanced';
 import { useFavoriteStore } from '../favorite';
@@ -94,6 +95,7 @@ export const useNotificationStore = defineStore('Notification', () => {
         }
     });
     const unseenNotifications = ref([]);
+    const pendingNexVRResponses = new Set();
     const isNotificationsLoading = ref(false);
     const isNotificationCenterOpen = ref(false);
     const inventoryBundleDialog = ref({
@@ -211,7 +213,10 @@ export const useNotificationStore = defineStore('Notification', () => {
         }
         if (ref.senderUserId !== userStore.currentUser.id) {
             const isExcludedType =
-                ref.type === 'friendRequest' || ref.type === 'ignoredFriendRequest' || ref.type.includes('.');
+                ref.$localParty ||
+                ref.type === 'friendRequest' ||
+                ref.type === 'ignoredFriendRequest' ||
+                ref.type.includes('.');
             const isNotificationInitReady = !notificationInitStatus.value || !isNotificationsLoading.value;
             const matchesNotificationTypeFilter =
                 notificationTable.value.filters[0].value.length === 0 ||
@@ -231,10 +236,15 @@ export const useNotificationStore = defineStore('Notification', () => {
                         });
                     }
                 }
-                queueNotificationNoty(ref);
-                sharedFeedStore.addEntry(ref);
+                if (!ref.$localParty) {
+                    queueNotificationNoty(ref);
+                    sharedFeedStore.addEntry(ref);
+                }
             }
-            if (matchesNotificationTypeFilter && !isExcludedType) {
+            if (
+                matchesNotificationTypeFilter &&
+                (!isExcludedType || ref.$localParty || (ref.$nexvrType && ref.responses?.length))
+            ) {
                 uiStore.notifyMenu('notification');
             }
         }
@@ -254,7 +264,12 @@ export const useNotificationStore = defineStore('Notification', () => {
         if (typeof ref === 'undefined') {
             return;
         }
-        if (ref.type === 'friendRequest' || ref.type === 'ignoredFriendRequest' || ref.type.includes('.')) {
+        if (
+            ref.$localParty ||
+            ref.type === 'friendRequest' ||
+            ref.type === 'ignoredFriendRequest' ||
+            ref.type.includes('.')
+        ) {
             removeFromArray(notificationTable.value.data, ref);
         } else {
             ref.$isExpired = true;
@@ -430,7 +445,9 @@ export const useNotificationStore = defineStore('Notification', () => {
         if (ref) {
             ref.seen = true;
         }
-        database.seenNotificationV2(notificationId);
+        if (!notificationId.startsWith('local:')) {
+            database.seenNotificationV2(notificationId);
+        }
     }
 
     const seeQueue = [];
@@ -485,6 +502,10 @@ export const useNotificationStore = defineStore('Notification', () => {
      */
     function queueMarkAsSeen(notificationId, version = 1) {
         if (seenIds.has(notificationId)) return;
+        if (notificationTable.value.data.find((row) => row.id === notificationId)?.$localParty) {
+            handleNotificationSee(notificationId);
+            return;
+        }
         seenIds.add(notificationId);
         seeQueue.push({ id: notificationId, version });
         processSeeQueue();
@@ -1343,7 +1364,11 @@ export const useNotificationStore = defineStore('Notification', () => {
      * @param responseType
      */
     function sendNotificationResponse(notificationId, responses, responseType) {
-        if (!Array.isArray(responses) || responses.length === 0) return;
+        if (!Array.isArray(responses) || responses.length === 0 || typeof responseType !== 'string') return;
+        if (responseType.startsWith('nexvr.')) {
+            if (!responses.some((response) => response.type === responseType)) return;
+            return sendNexVRNotificationResponse(notificationId, responseType);
+        }
         let responseData = '';
         for (let i = 0; i < responses.length; i++) {
             if (responses[i].type === responseType) {
@@ -1364,6 +1389,35 @@ export const useNotificationStore = defineStore('Notification', () => {
                 handleNotificationV2Hide(notificationId);
                 notificationRequest.hideNotificationV2(notificationId);
             });
+    }
+
+    /**
+     * @param {string} notificationId
+     * @param {string} responseType
+     */
+    async function sendNexVRNotificationResponse(notificationId, responseType) {
+        const session = getRequestSession();
+        const key = `${session}:${notificationId}`;
+        if (pendingNexVRResponses.has(key)) return;
+        pendingNexVRResponses.add(key);
+        try {
+            const { json } = await notificationRequest.sendNotificationResponse({
+                notificationId,
+                responseType,
+                responseData: ''
+            });
+            if (session === getRequestSession()) {
+                handleNotificationHide(notificationId);
+                handleNotificationSee(notificationId);
+                toast.success(json);
+            }
+        } catch {
+            if (session === getRequestSession()) {
+                toast.error(t('view.notification.actions.response_failed'));
+            }
+        } finally {
+            pendingNexVRResponses.delete(key);
+        }
     }
 
     /**

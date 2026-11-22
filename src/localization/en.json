@@ -489,7 +489,8 @@
                 "invite": "Invite",
                 "decline": "Decline",
                 "delete_log": "Delete log",
-                "decline_with_message": "Decline with message"
+                "decline_with_message": "Decline with message",
+                "response_failed": "Could not respond to this notification."
             },
             "filters": {
                 "requestInvite": "Request Invite",
@@ -498,10 +499,26 @@
                 "inviteResponse": "Invite Response",
                 "friendRequest": "Friend Request",
                 "friendRequestResponse": "Friend Request Response",
+                "partyInvite": "Party Invite",
+                "partyJoinRequest": "Party Join Request",
+                "cameraOffer": "Camera Offer",
                 "ignoredFriendRequest": "Ignored Friend Request",
                 "message": "Message",
                 "boop": "Boop",
                 "groupChange": "Group Change",
+                "groupJoinRequestResponse": "Group Join Request Response",
+                "coalitionInvite": "Coalition Invite",
+                "coalitionInviteResponse": "Coalition Invite Response",
+                "calendarEventRsvp": "Calendar Event RSVP",
+                "calendarEventUpdated": "Calendar Event Updated",
+                "calendarEventCancelled": "Calendar Event Cancelled",
+                "instanceWarning": "Instance Warning",
+                "groupWarning": "Group Warning",
+                "moderationNotice": "Moderation Notice",
+                "cashoutResolved": "Cashout Update",
+                "giftReceived": "Gift Received",
+                "giftReturned": "Gift Returned",
+                "giftRevoked": "Gift Ended",
                 "event": {
                     "announcement": "Event Announcement"
                 },
