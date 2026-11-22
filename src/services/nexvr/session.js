@@ -1,4 +1,5 @@
 import configRepository from '../config';
+import { StaleRequestError } from '../requestSession';
 
 const STORAGE_KEY = 'NexVR_session';
 
@@ -9,8 +10,20 @@ const STORAGE_KEY = 'NexVR_session';
 /** @type {NexvrTokens | null} */
 let tokens = null;
 let loaded = false;
-/** @type {Promise<boolean> | null} */
+let tokenSession = 0;
+/** @type {{ session: number; promise: Promise<boolean> } | null} */
 let refreshing = null;
+
+export function getTokenSession() {
+    return tokenSession;
+}
+
+/** @param {number} expected */
+export function assertTokenSession(expected) {
+    if (expected !== tokenSession) {
+        throw new StaleRequestError('NexVR request belongs to a previous login session.');
+    }
+}
 
 /**
  * Loads the persisted session once, so a restart keeps the user signed in the
@@ -20,10 +33,11 @@ let refreshing = null;
  */
 async function load() {
     if (!loaded) {
+        const session = tokenSession;
         loaded = true;
         try {
             const raw = await configRepository.getString(STORAGE_KEY, '');
-            if (raw) {
+            if (raw && session === tokenSession) {
                 tokens = JSON.parse(raw);
             }
         } catch (err) {
@@ -57,6 +71,12 @@ export async function getAccessToken() {
  * @param {NexvrTokens | null} next
  */
 export async function setTokens(next) {
+    tokenSession++;
+    await updateTokens(next);
+}
+
+/** @param {NexvrTokens | null} next */
+async function updateTokens(next) {
     loaded = true;
     tokens = next?.accessToken ? { accessToken: next.accessToken, refreshToken: next.refreshToken } : null;
     await persist();
@@ -96,15 +116,17 @@ export async function restoreTokens(blob) {
  *
  * @param {(refreshToken: string) => Promise<NexvrTokens | null>} exchange
  * @param {string} [staleToken] Access token the rejected request was sent with
+ * @param {number} [session] Token session captured before the rejected request
  * @returns {Promise<boolean>} True when a new access token is in place
  */
-export async function refreshTokens(exchange, staleToken) {
+export async function refreshTokens(exchange, staleToken, session = tokenSession) {
     await load();
+    assertTokenSession(session);
     if (staleToken !== undefined && tokens?.accessToken && tokens.accessToken !== staleToken) {
         return true;
     }
-    if (!refreshing) {
-        refreshing = (async () => {
+    if (refreshing?.session !== session) {
+        const promise = (async () => {
             const refreshToken = tokens?.refreshToken;
             if (!refreshToken) {
                 return false;
@@ -119,15 +141,17 @@ export async function refreshTokens(exchange, staleToken) {
                     return false;
                 }
             }
+            assertTokenSession(session);
             if (!next?.accessToken) {
-                await clearTokens();
+                await updateTokens(null);
                 return false;
             }
-            await setTokens(next);
+            await updateTokens(next);
             return true;
         })().finally(() => {
-            refreshing = null;
+            if (refreshing?.promise === promise) refreshing = null;
         });
+        refreshing = { session, promise };
     }
-    return refreshing;
+    return refreshing.promise;
 }

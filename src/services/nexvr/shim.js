@@ -27,12 +27,12 @@ import {
     toNexVRUser,
     toNexVRWorld
 } from './mappers';
-import { clearTokens, getAccessToken, refreshTokens, setTokens } from './session';
+import { assertTokenSession, clearTokens, getAccessToken, getTokenSession, refreshTokens, setTokens } from './session';
 import { AppDebug } from '../appConfig';
 import { clearAvatarResponses, keepRawResponse } from './rawResponses';
 import { realtime } from './realtime';
 import { NotificationType } from './realtimeSchema';
-import { getRequestSession } from '../requestSession';
+import { assertRequestSession, getRequestSession } from '../requestSession';
 
 const SNAPSHOT_TIMEOUT = 8000;
 const LOOKUP_TIMEOUT = 2000;
@@ -81,8 +81,13 @@ function rememberTags(user) {
  * @returns {Promise<any>}
  */
 async function nexvr(path, { method = 'GET', body, query, auth = true } = {}) {
+    const requestSession = getRequestSession();
+    const tokenSession = getTokenSession();
+    const assertSession = () => {
+        assertRequestSession(requestSession);
+        assertTokenSession(tokenSession);
+    };
     const isAvatarRequest = path.startsWith('/avatars/');
-    const avatarSession = isAvatarRequest ? getRequestSession() : null;
     const url = new URL(`${AppDebug.endpointDomain}${path}`);
     for (const [key, value] of Object.entries(query || {})) {
         if (value !== undefined && value !== null && value !== '') {
@@ -94,6 +99,7 @@ async function nexvr(path, { method = 'GET', body, query, auth = true } = {}) {
         const headers = {};
         if (auth) {
             sentToken = await getAccessToken();
+            assertSession();
             if (!sentToken) {
                 // the session is gone; VRCX re-logs in on this message rather
                 // than retrying every call without credentials
@@ -110,12 +116,18 @@ async function nexvr(path, { method = 'GET', body, query, auth = true } = {}) {
     };
     let res = await send();
     if (res.status === 401 && auth) {
-        if (await refreshTokens(exchangeRefreshToken, sentToken)) {
+        assertSession();
+        const refreshed = await refreshTokens(exchangeRefreshToken, sentToken, tokenSession);
+        assertSession();
+        if (refreshed) {
             res = await send();
-        } else if (!(await getAccessToken())) {
-            throw new ShimError(401, '"Missing Credentials"');
+        } else {
+            const remainingToken = await getAccessToken();
+            assertSession();
+            if (!remainingToken) throw new ShimError(401, '"Missing Credentials"');
         }
     }
+    if (path === '/auth/me') assertSession();
     let data = null;
     try {
         data = res.data ? JSON.parse(res.data) : null;
@@ -141,7 +153,10 @@ async function nexvr(path, { method = 'GET', body, query, auth = true } = {}) {
         const message = data?.message || data?.error || `HTTP ${res.status}`;
         throw new ShimError(res.status, typeof message === 'string' ? message : JSON.stringify(message));
     }
-    if (method === 'GET' && (!isAvatarRequest || avatarSession === getRequestSession())) {
+    if (
+        method === 'GET' &&
+        (!isAvatarRequest || (requestSession === getRequestSession() && tokenSession === getTokenSession()))
+    ) {
         keepRawResponse(path, data, isAvatarRequest ? realtime.userId : undefined);
     }
     return data;
@@ -262,15 +277,19 @@ function displayNameOf(userId) {
  * @param {string} userId
  */
 async function ensureRealtime(userId) {
+    const session = getTokenSession();
     let token = await getAccessToken();
+    assertTokenSession(session);
     let ok = await realtime.connect(token, userId);
-    if (!ok && realtime.authFailed && (await refreshTokens(exchangeRefreshToken, token))) {
+    if (!ok && realtime.authFailed && (await refreshTokens(exchangeRefreshToken, token, session))) {
         token = await getAccessToken();
+        assertTokenSession(session);
         ok = await realtime.connect(token, userId);
     }
     if (ok) {
         await realtime.waitForSnapshot(SNAPSHOT_TIMEOUT);
     }
+    assertTokenSession(session);
 }
 
 /**
@@ -285,7 +304,10 @@ async function acceptSession(loginResponse) {
 }
 
 async function currentUser() {
-    if (!(await getAccessToken())) {
+    const session = getTokenSession();
+    const token = await getAccessToken();
+    assertTokenSession(session);
+    if (!token) {
         throw new ShimError(401, '"Missing Credentials"');
     }
     let me;
@@ -293,12 +315,14 @@ async function currentUser() {
         me = await nexvr('/auth/me');
     } catch (err) {
         if (err.status === 401) {
+            assertTokenSession(session);
             // refresh already failed inside nexvr(); let VRCX re-login
             await clearTokens();
             throw new ShimError(401, '"Missing Credentials"');
         }
         throw err;
     }
+    assertTokenSession(session);
     await ensureRealtime(me.id);
     return toNexVRCurrentUser(me, realtime.friends, realtime.hasSnapshot);
 }

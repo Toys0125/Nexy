@@ -14,6 +14,7 @@ import { create, fromBinary, toBinary } from '@bufbuild/protobuf';
 import { handleShimRequest } from '../shim';
 import { NotificationSchema, NotificationType, PresenceStatus, ServerMessageSchema } from '../realtimeSchema';
 import { realtime } from '../realtime';
+import { getAccessToken, setTokens } from '../session';
 import { watchState } from '../../watchState';
 
 const avatar = (id, publicity, versions = []) => ({
@@ -199,14 +200,14 @@ describe('NexVR notifications', () => {
         payload: { case: kind, value }
     });
 
-    async function respond(id, responseType) {
+    async function respond(id, responseType, execute = native) {
         const result = await handleShimRequest(
             {
                 url: `https://nexvr.net/api/notifications/${id}/respond`,
                 method: 'POST',
                 body: JSON.stringify({ responseType, responseData: 'untrusted' })
             },
-            native
+            execute
         );
         return { status: result.status, json: JSON.parse(result.data) };
     }
@@ -318,6 +319,50 @@ describe('NexVR notifications', () => {
         expect((await respond('group', 'nexvr.accept')).status).toBe(404);
         expect(requested).toEqual([]);
     });
+
+    test.each(['before refresh', 'during refresh', 'same session'])(
+        'group action 401 recovery: %s',
+        async (scenario) => {
+            const first = { accessToken: 'access', refreshToken: 'refresh' };
+            const second = { accessToken: 'new-account', refreshToken: 'new-refresh' };
+            await setTokens(first);
+            const action = typed('group', NotificationType.GROUP_INVITE, 'groupInvite', { groupId: 'g1' });
+            realtime.notifications = [action];
+            const requests = [];
+            const execute = async ({ url, headers }) => {
+                const path = new URL(url).pathname;
+                requests.push([path, headers.Authorization]);
+                if (path === '/api/auth/refresh') {
+                    if (scenario === 'during refresh') await setTokens(second);
+                    return {
+                        status: 200,
+                        data: JSON.stringify({ accessToken: 'refreshed-access', refreshToken: 'rotated-refresh' })
+                    };
+                }
+                if (headers.Authorization === 'Bearer access') {
+                    if (scenario === 'before refresh') await setTokens(second);
+                    return { status: 401, data: '{}' };
+                }
+                return { status: 204, data: '' };
+            };
+            try {
+                const result = respond(action.id, 'nexvr.accept', execute);
+                if (scenario === 'same session') {
+                    expect((await result).status).toBe(200);
+                } else {
+                    await expect(result).rejects.toHaveProperty('name', 'StaleRequestError');
+                    expect(await getAccessToken()).toBe(second.accessToken);
+                }
+                expect(requests).toEqual([
+                    ['/api/groups/g1/accept', 'Bearer access'],
+                    ...(scenario !== 'before refresh' ? [['/api/auth/refresh', undefined]] : []),
+                    ...(scenario === 'same session' ? [['/api/groups/g1/accept', 'Bearer refreshed-access']] : [])
+                ]);
+            } finally {
+                await setTokens(first);
+            }
+        }
+    );
 
     test("an invite is filled in with the world's name and thumbnail", async () => {
         realtime.notifications = [
