@@ -315,11 +315,12 @@
 
     const typeLabel = computed(() => {
         const typeKey = `view.notification.filters.${props.notification.type}`;
-        return te(typeKey) ? t(typeKey) : props.notification.type;
+        return te(typeKey) || te(typeKey, 'en') ? t(typeKey) : props.notification.type;
     });
 
     const TYPE_ICON_MAP = {
         friendRequest: UserPlus,
+        friendRequestResponse: UserPlus,
         ignoredFriendRequest: UserPlus,
         invite: Send,
         requestInvite: Send,
@@ -364,6 +365,7 @@
         return (
             type !== 'requestInviteResponse' &&
             type !== 'inviteResponse' &&
+            type !== 'friendRequestResponse' &&
             type !== 'message' &&
             type !== 'boop' &&
             type !== 'groupChange' &&
@@ -396,6 +398,7 @@
             'inviteResponse',
             'requestInviteResponse',
             'friendRequest',
+            'friendRequestResponse',
             'ignoredFriendRequest',
             'boop'
         ].includes(type);

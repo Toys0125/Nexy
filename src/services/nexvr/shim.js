@@ -7,6 +7,7 @@
 import {
     VRC_STATUS_TO_PREFERENCE,
     instanceIdFromLocation,
+    makeLocation,
     presenceState,
     presenceToUser,
     toNexvrEventBody,
@@ -58,7 +59,7 @@ let native;
 let challenge = null;
 /** @type {Map<string, any>} realtime notification by id, for accept/hide */
 const notificationsById = new Map();
-/** @type {Map<string, Promise<{ name: string; image: string }>>} users, groups and worlds by `kind:id` */
+/** @type {Map<string, Promise<{ name: string; image: string; worldId?: string }>>} by `kind:id` */
 let summaryCache = new Map();
 let summaryContext = '';
 /** @type {Map<string, string[]>} tags from full profiles, kept across presence-only refreshes */
@@ -172,7 +173,7 @@ function fetchUser(userId) {
     return pending;
 }
 
-/** @type {Record<string, (id: string) => Promise<{ name: string; image: string }>>} */
+/** @type {Record<string, (id: string) => Promise<{ name: string; image: string; worldId?: string }>>} */
 const SUMMARY_LOOKUPS = {
     user: (id) =>
         nexvr(`/users/${id}`).then((user) => ({
@@ -181,7 +182,16 @@ const SUMMARY_LOOKUPS = {
         })),
     group: (id) => nexvr(`/groups/${id}`).then((group) => ({ name: group.name || '', image: group.iconUrl || '' })),
     world: (id) =>
-        nexvr(`/worlds/${id}`).then((world) => ({ name: world.name || '', image: world.images?.primary || '' }))
+        nexvr(`/worlds/${id}`).then((world) => ({ name: world.name || '', image: world.images?.primary || '' })),
+    instance: (id) =>
+        nexvr(`/instances/${id}`).then((instance) => {
+            const world = typeof instance.world === 'object' ? instance.world : null;
+            return {
+                name: world?.name || '',
+                image: world?.images?.primary || '',
+                worldId: world?._id || (typeof instance.world === 'string' ? instance.world : '')
+            };
+        })
 };
 
 /**
@@ -189,9 +199,9 @@ const SUMMARY_LOOKUPS = {
  * Missing or slow lookups fall back to empty strings so callers can display the ID.
  * Keep the native lookup cached until it settles, so a caller timeout cannot spawn duplicates.
  *
- * @param {'user' | 'group' | 'world'} kind
+ * @param {'user' | 'group' | 'world' | 'instance'} kind
  * @param {string} id
- * @returns {Promise<{ name: string; image: string }>}
+ * @returns {Promise<{ name: string; image: string; worldId?: string }>}
  */
 function summaryOf(kind, id) {
     const none = { name: '', image: '' };
@@ -217,7 +227,8 @@ function summaryOf(kind, id) {
             .then((summary) => {
                 if (cache !== summaryCache || session !== getRequestSession() || endpoint !== AppDebug.endpointDomain)
                     return none;
-                if (!summary.name && !summary.image && cache.get(key) === pending) cache.delete(key);
+                if (!summary.name && !summary.image && !summary.worldId && cache.get(key) === pending)
+                    cache.delete(key);
                 return summary;
             })
             .catch(() => {
@@ -388,23 +399,27 @@ export async function describeNotification(notification) {
     const mapped = toNexVRNotification(notification);
     const data = notification.data || {};
     const details = mapped.details;
-    const [sender, world, group] = await Promise.all([
+    const [sender, world, group, instance] = await Promise.all([
         summaryOf('user', mapped.senderUserId),
         summaryOf('world', data.worldId || data.world),
-        summaryOf('group', data.groupId || data.group)
+        summaryOf('group', details.groupId || data.group),
+        summaryOf('instance', mapped.type === 'invite' && !details.worldId ? details.instanceId : '')
     ]);
+    if (instance.worldId && details.instanceId) {
+        details.worldId = makeLocation(instance.worldId, details.instanceId);
+    }
     mapped.senderUsername ||= sender.name;
     if (sender.image) {
         mapped.senderUserIcon = sender.image;
     }
-    if (world.name && !details.worldName) {
-        details.worldName = world.name;
+    if ((world.name || instance.name) && !details.worldName) {
+        details.worldName = world.name || instance.name;
     }
     if (group.name && !details.groupName) {
         details.groupName = group.name;
     }
     // a picture the notification carries wins, then the world's, then the group's
-    const image = details.imageUrl || world.image || group.image;
+    const image = details.imageUrl || world.image || instance.image || group.image;
     if (image) {
         details.imageUrl = image;
     }

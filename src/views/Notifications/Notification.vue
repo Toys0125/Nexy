@@ -29,6 +29,7 @@
                                         'requestInviteResponse',
                                         'inviteResponse',
                                         'friendRequest',
+                                        'friendRequestResponse',
                                         'ignoredFriendRequest',
                                         'message',
                                         'boop',

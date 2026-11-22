@@ -10,8 +10,9 @@ vi.mock('../../config', () => ({
     }
 }));
 
+import { create, fromBinary, toBinary } from '@bufbuild/protobuf';
 import { handleShimRequest } from '../shim';
-import { NotificationType, PresenceStatus } from '../realtimeSchema';
+import { NotificationSchema, NotificationType, PresenceStatus, ServerMessageSchema } from '../realtimeSchema';
 import { realtime } from '../realtime';
 import { watchState } from '../../watchState';
 
@@ -45,6 +46,7 @@ const responses = {
     '/avatars/a1': avatar('a1', 'public'),
     '/worlds/': [{ _id: 'w1', name: 'Club', owner: 'me', visibility: 'public', stats: {} }],
     '/worlds/w1': { _id: 'w1', name: 'Club', owner: 'me', images: { primary: 'https://cdn/w1.png' } },
+    '/instances/123': { _id: '123', world: { _id: 'w1', name: 'Club', images: { primary: 'https://cdn/w1.png' } } },
     '/users/stranger': { id: 'stranger', displayName: 'Stranger', profileImageUrl: 'https://cdn/stranger.png' },
     '/groups/g1': { id: 'g1', name: 'Crew', iconUrl: 'https://cdn/g1.png' }
 };
@@ -195,6 +197,45 @@ describe('NexVR notifications', () => {
             senderUsername: 'Stranger',
             senderUserIcon: 'https://cdn/stranger.png'
         });
+    });
+
+    test('the current NexVR wire format supplies readable requests and responses to the notification list', async () => {
+        // Encoded with the NexVR web descriptor, independent of Nexy's decoder.
+        const wire = Buffer.from(
+            'EoMCCgJtZSL8AQoxCgdyZXF1ZXN0GgJtZSACQhQyMDI2LTExLTAxVDAwOjAwOjAwWloKCghzdHJhbmdlcgoyCghhY2NlcHRlZBoCbWUgBUIUMjAyNi0xMS0wMVQwMDowMDowMFpyCgoGZnJpZW5kEAEKMAoIZGVjbGluZWQaAm1lIAVCFDIwMjYtMTEtMDFUMDA6MDA6MDBacggKBmZyaWVuZAosCgRqb2luGgJtZSAEQhQyMDI2LTExLTAxVDAwOjAwOjAwWmoICgZmcmllbmQKMwoGaW52aXRlGgJtZSABQhQyMDI2LTExLTAxVDAwOjAwOjAwWlINCgZmcmllbmQSAzEyMw==',
+            'base64'
+        );
+        realtime.handleServerMessage(fromBinary(ServerMessageSchema, wire));
+
+        const { json } = await get('auth/user/notifications?n=100&offset=0');
+        expect(json).toMatchObject([
+            {
+                id: 'request',
+                type: 'friendRequest',
+                senderUserId: 'stranger',
+                senderUsername: 'Stranger',
+                message: 'Sent you a friend request.'
+            },
+            { id: 'accepted', type: 'friendRequestResponse', message: 'Accepted your friend request.' },
+            { id: 'declined', type: 'friendRequestResponse', message: 'Declined your friend request.' },
+            { id: 'join', type: 'requestInvite', message: 'Requested an invite to your instance.' },
+            { id: 'invite', type: 'invite', details: { worldId: 'w1:123', worldName: 'Club' } }
+        ]);
+    });
+
+    test('a legacy wire notification keeps its server text when decoded', async () => {
+        const legacyWire = toBinary(
+            NotificationSchema,
+            create(NotificationSchema, {
+                ...notification('old', NotificationType.INVITE_REQUEST, 'friend'),
+                title: 'Invite request',
+                message: 'Can I join?'
+            })
+        );
+        realtime.notifications = [fromBinary(NotificationSchema, legacyWire)];
+
+        const { json } = await get('auth/user/notifications?n=100&offset=0');
+        expect(json[0]).toMatchObject({ type: 'requestInvite', message: 'Invite request: Can I join?' });
     });
 
     test("an invite is filled in with the world's name and thumbnail", async () => {

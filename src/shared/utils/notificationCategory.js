@@ -2,6 +2,7 @@ import dayjs from 'dayjs';
 
 const FRIEND_TYPES = new Set([
     'friendRequest',
+    'friendRequestResponse',
     'ignoredFriendRequest',
     'invite',
     'requestInvite',

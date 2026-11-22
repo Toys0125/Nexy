@@ -798,7 +798,7 @@ const NOTIFICATION_TYPES = {
     [NotificationType.FRIEND_REQUEST]: 'friendRequest',
     [NotificationType.INVITE_RESPONSE]: 'inviteResponse',
     [NotificationType.INVITE_REQUEST]: 'requestInvite',
-    [NotificationType.FRIEND_REQUEST_RESPONSE]: 'message',
+    [NotificationType.FRIEND_REQUEST_RESPONSE]: 'friendRequestResponse',
     [NotificationType.GROUP_INVITE]: 'message',
     [NotificationType.GROUP_JOIN_REQUEST]: 'message',
     [NotificationType.GROUP_JOIN_REQUEST_RESPONSE]: 'message',
@@ -813,26 +813,93 @@ const NOTIFICATION_TYPES = {
 };
 
 /**
+ * @param {any} payload NexVR notification payload (protobuf oneof)
+ * @returns {string} Text for notifications without legacy title or message
+ */
+function describeNotificationPayload(payload) {
+    switch (payload?.case) {
+        case 'invite':
+            return 'Invited you to an instance.';
+        case 'inviteRequest':
+            return 'Requested an invite to your instance.';
+        case 'inviteResponse':
+            return 'Responded to your instance invite.';
+        case 'friendRequest':
+            return 'Sent you a friend request.';
+        case 'friendRequestResponse':
+            return payload.value.accepted ? 'Accepted your friend request.' : 'Declined your friend request.';
+        case 'groupInvite':
+            return 'Invited you to join a group.';
+        case 'groupJoinRequest':
+            return 'Requested to join your group.';
+        case 'groupJoinRequestResponse':
+            return payload.value.approved
+                ? 'Your group join request was approved.'
+                : 'Your group join request was declined.';
+        case 'coalitionInvite':
+            return 'Invited your group to a coalition.';
+        case 'coalitionInviteResponse':
+            return payload.value.accepted
+                ? 'Your coalition invite was accepted.'
+                : 'Your coalition invite was declined.';
+        case 'calendarEventRsvp':
+            return 'Responded to a calendar event.';
+        case 'calendarEventUpdated':
+            return 'Updated a calendar event.';
+        case 'calendarEventCancelled':
+            return 'Cancelled a calendar event.';
+        case 'instanceWarning':
+            return payload.value.text || 'A moderator warned you in an instance.';
+        case 'groupWarning':
+            return payload.value.text || 'A moderator warned you in a group.';
+        case 'moderationNotice':
+            return 'Received a moderation notice.';
+        case 'cashoutResolved':
+            return payload.value.note || 'Your cashout status changed.';
+        case 'giftReceived':
+            return 'Sent you a gift.';
+        case 'giftReturned':
+            return 'Your gift was returned.';
+        case 'giftRevoked':
+            return 'A gift on your account ended.';
+        default:
+            return '';
+    }
+}
+
+/**
  * @param {any} notification Notification from the realtime socket
  * @returns {object} VRChat Notification (v1)
  */
 export function toNexVRNotification(notification) {
     const data = { ...(notification.data || {}) };
     const details = { ...data };
+    const payload = notification.payload;
+    const typedDetails = payload?.value;
+    const groupId = typedDetails?.groupId || typedDetails?.targetGroupId;
+    if (groupId) {
+        details.groupId = groupId;
+    }
     const worldId = data.worldId || data.world;
-    const instanceId = data.instanceId || data.instance || data.toInstance;
+    const instanceId = typedDetails?.instanceId || data.instanceId || data.instance || data.toInstance;
+    if (payload?.case === 'invite' && instanceId) {
+        details.instanceId = instanceId;
+    }
     if (worldId && instanceId) {
         details.worldId = makeLocation(worldId, instanceId);
         details.worldName = data.worldName || data.instanceName || '';
     }
-    const message = [notification.title, notification.message].filter(Boolean).join(': ');
+    const legacyMessage = [notification.title, notification.message]
+        .map((part) => part?.trim())
+        .filter(Boolean)
+        .join(': ');
     return {
         id: notification.id,
         type: NOTIFICATION_TYPES[notification.type] || 'message',
-        senderUserId: notification.from,
+        senderUserId: notification.from || typedDetails?.userId,
         senderUsername: data.fromDisplayName || data.displayName || data.fromUsername || '',
         receiverUserId: notification.to,
-        message,
+        message: legacyMessage || describeNotificationPayload(payload),
         details,
         seen: false,
         created_at: notification.createdAt || new Date().toISOString(),

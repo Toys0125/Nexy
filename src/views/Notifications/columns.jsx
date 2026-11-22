@@ -147,7 +147,7 @@ export const createColumns = ({
             cell: ({ row }) => {
                 const original = row.original;
                 const typeKey = `view.notification.filters.${original.type}`;
-                const label = te(typeKey) ? t(typeKey) : original.type;
+                const label = te(typeKey) || te(typeKey, 'en') ? t(typeKey) : original.type;
 
                 if (original.type === 'invite') {
                     return (
@@ -449,6 +449,20 @@ export const createColumns = ({
                                 <span class="block w-full min-w-0 truncate">{original.details.responseMessage}</span>
                             </TooltipWrapper>
                         ) : null}
+                        {(original.type === 'message' || original.type === 'requestInvite') &&
+                        !original.message &&
+                        !original.title &&
+                        !original.details?.inviteMessage &&
+                        !original.details?.requestMessage &&
+                        !original.details?.responseMessage ? (
+                            <span class="text-muted-foreground">
+                                {t(
+                                    original.type === 'message'
+                                        ? 'view.notification.message_unavailable'
+                                        : 'view.notification.request_invite_message'
+                                )}
+                            </span>
+                        ) : null}
                     </div>
                 );
             }
@@ -470,6 +484,7 @@ export const createColumns = ({
                 const showDecline =
                     original.type !== 'requestInviteResponse' &&
                     original.type !== 'inviteResponse' &&
+                    original.type !== 'friendRequestResponse' &&
                     original.type !== 'message' &&
                     original.type !== 'boop' &&
                     original.type !== 'groupChange' &&

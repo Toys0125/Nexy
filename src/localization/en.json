@@ -482,6 +482,8 @@
             "filter_placeholder": "Filter",
             "search_placeholder": "Search",
             "refresh_tooltip": "Refresh",
+            "message_unavailable": "Message unavailable",
+            "request_invite_message": "Requested an invite to your instance.",
             "actions": {
                 "accept": "Accept",
                 "invite": "Invite",
@@ -495,6 +497,7 @@
                 "requestInviteResponse": "Request Invite Response",
                 "inviteResponse": "Invite Response",
                 "friendRequest": "Friend Request",
+                "friendRequestResponse": "Friend Request Response",
                 "ignoredFriendRequest": "Ignored Friend Request",
                 "message": "Message",
                 "boop": "Boop",
