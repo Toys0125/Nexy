@@ -258,6 +258,7 @@
     import { TooltipWrapper } from '@/components/ui/tooltip';
     import { storeToRefs } from 'pinia';
     import { useI18n } from 'vue-i18n';
+    import { canDeclineNotification } from '../../../shared/utils/notificationCategory';
 
     import dayjs from 'dayjs';
 
@@ -359,23 +360,7 @@
         return dayjs(createdAtValue.value).format('YYYY-MM-DD HH:mm:ss');
     });
 
-    const showDecline = computed(() => {
-        const type = props.notification.type;
-        const link = props.notification.link;
-        return (
-            !(props.notification.$nexvrType && hasResponses.value) &&
-            type !== 'requestInviteResponse' &&
-            type !== 'inviteResponse' &&
-            type !== 'friendRequestResponse' &&
-            type !== 'message' &&
-            type !== 'boop' &&
-            type !== 'groupChange' &&
-            !type?.includes('group.') &&
-            !type?.includes('moderation.') &&
-            !type?.includes('instance.') &&
-            !link?.startsWith('economy.')
-        );
-    });
+    const showDecline = computed(() => canDeclineNotification(props.notification));
 
     const hasResponses = computed(() => Array.isArray(props.notification.responses));
 

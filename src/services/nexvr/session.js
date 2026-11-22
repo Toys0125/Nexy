@@ -1,3 +1,5 @@
+import { ref } from 'vue';
+
 import configRepository from '../config';
 import { StaleRequestError } from '../requestSession';
 
@@ -10,17 +12,17 @@ const STORAGE_KEY = 'NexVR_session';
 /** @type {NexvrTokens | null} */
 let tokens = null;
 let loaded = false;
-let tokenSession = 0;
+const tokenSession = ref(0);
 /** @type {{ session: number; promise: Promise<boolean> } | null} */
 let refreshing = null;
 
 export function getTokenSession() {
-    return tokenSession;
+    return tokenSession.value;
 }
 
 /** @param {number} expected */
 export function assertTokenSession(expected) {
-    if (expected !== tokenSession) {
+    if (expected !== tokenSession.value) {
         throw new StaleRequestError('NexVR request belongs to a previous login session.');
     }
 }
@@ -33,11 +35,11 @@ export function assertTokenSession(expected) {
  */
 async function load() {
     if (!loaded) {
-        const session = tokenSession;
+        const session = getTokenSession();
         loaded = true;
         try {
             const raw = await configRepository.getString(STORAGE_KEY, '');
-            if (raw && session === tokenSession) {
+            if (raw && session === getTokenSession()) {
                 tokens = JSON.parse(raw);
             }
         } catch (err) {
@@ -71,8 +73,9 @@ export async function getAccessToken() {
  * @param {NexvrTokens | null} next
  */
 export async function setTokens(next) {
-    tokenSession++;
-    await updateTokens(next);
+    const saved = updateTokens(next);
+    tokenSession.value++;
+    await saved;
 }
 
 /** @param {NexvrTokens | null} next */
@@ -119,7 +122,7 @@ export async function restoreTokens(blob) {
  * @param {number} [session] Token session captured before the rejected request
  * @returns {Promise<boolean>} True when a new access token is in place
  */
-export async function refreshTokens(exchange, staleToken, session = tokenSession) {
+export async function refreshTokens(exchange, staleToken, session = getTokenSession()) {
     await load();
     assertTokenSession(session);
     if (staleToken !== undefined && tokens?.accessToken && tokens.accessToken !== staleToken) {

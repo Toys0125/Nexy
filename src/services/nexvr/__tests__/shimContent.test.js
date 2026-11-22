@@ -16,6 +16,10 @@ import { NotificationSchema, NotificationType, PresenceStatus, ServerMessageSche
 import { realtime } from '../realtime';
 import { getAccessToken, setTokens } from '../session';
 import { watchState } from '../../watchState';
+import { i18n } from '../../../plugins/i18n';
+import en from '../../../localization/en.json';
+
+beforeAll(() => i18n.global.setLocaleMessage('en', en));
 
 const avatar = (id, publicity, versions = []) => ({
     id,
@@ -49,7 +53,8 @@ const responses = {
     '/worlds/w1': { _id: 'w1', name: 'Club', owner: 'me', images: { primary: 'https://cdn/w1.png' } },
     '/instances/123': { _id: '123', world: { _id: 'w1', name: 'Club', images: { primary: 'https://cdn/w1.png' } } },
     '/users/stranger': { id: 'stranger', displayName: 'Stranger', profileImageUrl: 'https://cdn/stranger.png' },
-    '/groups/g1': { id: 'g1', name: 'Crew', iconUrl: 'https://cdn/g1.png' }
+    '/groups/g1': { id: 'g1', name: 'Crew', iconUrl: 'https://cdn/g1.png' },
+    '/groups/g1/membership': { status: 'invited' }
 };
 
 const groupActions = new Set([
@@ -274,6 +279,9 @@ describe('NexVR notifications', () => {
             typed('notice', NotificationType.MODERATION_NOTICE, 'moderationNotice', {
                 kind: { case: 'contentRemoved', value: { targetName: 'Example avatar', reason: 'Test reason' } }
             }),
+            typed('group-notice', NotificationType.MODERATION_NOTICE, 'moderationNotice', {
+                kind: { case: 'suspension', value: { targetType: 'group', targetId: 'g1' } }
+            }),
             typed('gift', NotificationType.GIFT_RECEIVED, 'giftReceived', { tierName: 'Plus', months: 3 }),
             typed('cashout', NotificationType.CASHOUT_RESOLVED, 'cashoutResolved', {
                 outcome: 'paid',
@@ -284,6 +292,7 @@ describe('NexVR notifications', () => {
         expect(json).toMatchObject([
             { type: 'calendarEventUpdated', message: 'Updated “Game Night”.' },
             { type: 'moderationNotice', message: 'Moderators removed your Example avatar. Reason: Test reason' },
+            { type: 'groupModerationNotice', details: { groupId: 'g1' } },
             { type: 'giftReceived', message: 'Sent you a gift of Plus (3 months).' },
             { type: 'cashoutResolved', message: 'Your cashout was paid. Payment sent' }
         ]);
@@ -306,7 +315,18 @@ describe('NexVR notifications', () => {
         });
         requested = [];
         expect((await respond('group', action)).status).toBe(200);
-        expect(requested).toEqual([path]);
+        expect(requested).toEqual(path.endsWith('/leave') ? ['/groups/g1/membership', path] : [path]);
+    });
+
+    test('declining an old invitation cannot leave a group the user already joined', async () => {
+        realtime.notifications = [typed('group', NotificationType.GROUP_INVITE, 'groupInvite', { groupId: 'g1' })];
+        const execute = vi.fn(async () => ({ status: 200, data: JSON.stringify({ status: 'active' }) }));
+        expect((await respond('group', 'nexvr.decline', execute)).status).toBe(409);
+        expect(execute).toHaveBeenCalledTimes(1);
+        expect(execute.mock.calls[0][0]).toMatchObject({
+            method: 'GET',
+            url: 'https://nexvr.net/api/groups/g1/membership'
+        });
     });
 
     test('a response for another account is rejected without changing group membership', async () => {

@@ -239,6 +239,16 @@ describe('NotificationItem.vue', () => {
         expect(mocks.notificationStore.openNotificationLink).toHaveBeenCalledWith('group:grp_123');
     });
 
+    test.each(['moderationNotice', 'cashoutResolved'])('legacy %s has no Decline action', (type) => {
+        const wrapper = mount(NotificationItem, {
+            props: { notification: makeNotification({ type, message: 'An informational notice' }) }
+        });
+
+        expect(wrapper.find('[data-icon="X"]').exists()).toBe(false);
+        expect(wrapper.find('[data-icon="Trash2"]').exists()).toBe(true);
+        wrapper.unmount();
+    });
+
     test('unmount queues mark-as-seen for unseen notification', () => {
         const wrapper = mount(NotificationItem, {
             props: {

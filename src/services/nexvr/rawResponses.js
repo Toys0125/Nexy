@@ -8,6 +8,7 @@ import { shallowReactive, watch } from 'vue';
 import { FriendPresenceSchema } from './realtimeSchema';
 import { maskEmail } from './mappers';
 import { realtime } from './realtime';
+import { getTokenSession } from './session';
 import { watchState } from '../watchState';
 
 const MAX_ENTRIES = 300;
@@ -23,16 +24,15 @@ const AVATAR_DETAIL = /^\/avatars\/[^/]+$/;
  */
 const responses = shallowReactive(new Map());
 
-export function clearAvatarResponses() {
-    for (const path of responses.keys()) {
-        if (AVATAR_DETAIL.test(path)) responses.delete(path);
-    }
+export function clearRawResponses() {
+    responses.clear();
 }
 
+watch(getTokenSession, clearRawResponses, { flush: 'sync' });
 watch(
     () => watchState.isLoggedIn,
     (loggedIn) => {
-        if (!loggedIn) clearAvatarResponses();
+        if (!loggedIn) clearRawResponses();
     },
     { flush: 'sync' }
 );

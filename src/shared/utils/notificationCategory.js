@@ -18,7 +18,7 @@ const GROUP_EXACT_TYPES = new Set([
     'coalitionInvite',
     'coalitionInviteResponse',
     'groupWarning',
-    'moderationNotice'
+    'groupModerationNotice'
 ]);
 
 /**
@@ -32,6 +32,42 @@ function getNotificationCategory(type) {
     if (FRIEND_TYPES.has(type)) return 'friend';
     if (GROUP_EXACT_TYPES.has(type) || GROUP_TYPES_PREFIX.some((p) => type.startsWith(p))) return 'group';
     return 'other';
+}
+
+const NO_GENERIC_DECLINE = new Set([
+    'requestInviteResponse',
+    'inviteResponse',
+    'friendRequestResponse',
+    'message',
+    'boop',
+    'groupChange',
+    'groupJoinRequestResponse',
+    'coalitionInvite',
+    'coalitionInviteResponse',
+    'calendarEventRsvp',
+    'calendarEventUpdated',
+    'calendarEventCancelled',
+    'instanceWarning',
+    'groupWarning',
+    'moderationNotice',
+    'groupModerationNotice',
+    'cashoutResolved',
+    'giftReceived',
+    'giftReturned',
+    'giftRevoked'
+]);
+
+/** @param {{ type?: string; link?: string; $nexvrType?: number; responses?: unknown }} notification */
+export function canDeclineNotification({ type, link, $nexvrType, responses }) {
+    return Boolean(
+        type &&
+        !NO_GENERIC_DECLINE.has(type) &&
+        !($nexvrType && Array.isArray(responses)) &&
+        !type.includes('group.') &&
+        !type.includes('moderation.') &&
+        !type.includes('instance.') &&
+        !link?.startsWith('economy.')
+    );
 }
 
 /**

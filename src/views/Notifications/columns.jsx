@@ -8,6 +8,7 @@ import { storeToRefs } from 'pinia';
 
 import { formatDateFilter } from '../../shared/utils';
 import { checkCanInvite } from '../../shared/utils/invite';
+import { canDeclineNotification } from '../../shared/utils/notificationCategory';
 import { i18n } from '../../plugins';
 import {
     useGameStore,
@@ -464,7 +465,7 @@ export const createColumns = ({
                                 {t(
                                     original.type === 'message'
                                         ? 'view.notification.message_unavailable'
-                                        : 'view.notification.request_invite_message'
+                                        : 'view.notification.nexvr.inviteRequest'
                                 )}
                             </span>
                         ) : null}
@@ -486,18 +487,7 @@ export const createColumns = ({
             cell: ({ row }) => {
                 const original = row.original;
                 const hasResponses = Array.isArray(original.responses);
-                const showDecline =
-                    !(original.$nexvrType && hasResponses) &&
-                    original.type !== 'requestInviteResponse' &&
-                    original.type !== 'inviteResponse' &&
-                    original.type !== 'friendRequestResponse' &&
-                    original.type !== 'message' &&
-                    original.type !== 'boop' &&
-                    original.type !== 'groupChange' &&
-                    !original.type?.includes('group.') &&
-                    !original.type?.includes('moderation.') &&
-                    !original.type?.includes('instance.') &&
-                    !original.link?.startsWith('economy.');
+                const showDecline = canDeclineNotification(original);
                 const showDeleteLog = original.type !== 'friendRequest' && original.type !== 'ignoredFriendRequest';
 
                 return (

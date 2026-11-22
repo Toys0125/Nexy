@@ -3,6 +3,7 @@
 // shim. Keep these pure: no stores, no requests.
 
 import { NotificationType, PresenceStatus, SocialRank } from './realtimeSchema';
+import { nexvrNotificationText as text } from './notificationText';
 
 const PRESENCE_STATUS = {
     [PresenceStatus.ONLINE]: 'active',
@@ -821,35 +822,41 @@ const NOTIFICATION_TYPES = {
  */
 function describeModerationNotice(kind) {
     const notice = kind?.value;
-    const reason = notice?.reason ? ` Reason: ${notice.reason}` : '';
+    const reason = notice?.reason ? ` ${text('moderationReason', { reason: notice.reason })}` : '';
     switch (kind?.case) {
         case 'suspension': {
-            const target = notice.targetLabel || notice.targetType || 'account';
-            const duration = notice.expiresAt ? ` until ${notice.expiresAt}` : ' permanently';
-            return `Your ${target === 'user' ? 'account' : target} was suspended${duration}.${reason}`;
+            const target =
+                notice.targetLabel ||
+                (notice.targetType && notice.targetType !== 'user' ? notice.targetType : text('suspensionAccount'));
+            const description = notice.expiresAt
+                ? text('suspendedUntil', { target, date: notice.expiresAt })
+                : text('suspended', { target });
+            return description + reason;
         }
         case 'contentRemoved':
-            return `Moderators removed your ${notice.targetName || notice.targetType || 'content'}.${reason}`;
+            return (
+                text('contentRemoved', { target: notice.targetName || notice.targetType || text('removedContent') }) +
+                reason
+            );
         case 'profileModerated':
             return notice.fields?.length
-                ? `Moderators changed your profile: ${notice.fields.join(', ')}.`
-                : 'Moderators changed your profile.';
+                ? text('profileChangedFields', { fields: notice.fields.join(', ') })
+                : text('profileChanged');
         case 'listingRemoved':
             return [
-                `Moderators removed your listing${notice.listingTitle ? ` “${notice.listingTitle}”` : ''}.${reason}`,
-                notice.refundedPurchases > 0 ? `Purchases refunded: ${notice.refundedPurchases}.` : ''
+                (notice.listingTitle
+                    ? text('listingRemovedNamed', { name: notice.listingTitle })
+                    : text('listingRemoved')) + reason,
+                notice.refundedPurchases > 0 ? text('purchasesRefunded', { count: notice.refundedPurchases }) : ''
             ]
                 .filter(Boolean)
                 .join(' ');
         case 'appealResolved':
-            return [
-                notice.outcome === 'reversed' ? 'Your appeal was accepted.' : 'Your appeal was reviewed.',
-                notice.resolutionNote
-            ]
+            return [text(notice.outcome === 'reversed' ? 'appealAccepted' : 'appealReviewed'), notice.resolutionNote]
                 .filter(Boolean)
                 .join(' ');
         default:
-            return 'Received a moderation notice.';
+            return text('moderationNotice');
     }
 }
 
@@ -859,64 +866,56 @@ function describeModerationNotice(kind) {
  */
 function describeNotificationPayload(payload) {
     const details = payload?.value;
-    const event = details?.eventTitle ? `“${details.eventTitle}”` : 'a calendar event';
     switch (payload?.case) {
         case 'invite':
-            return 'Invited you to an instance.';
         case 'inviteRequest':
-            return 'Requested an invite to your instance.';
         case 'inviteResponse':
-            return 'Responded to your instance invite.';
         case 'friendRequest':
-            return 'Sent you a friend request.';
-        case 'friendRequestResponse':
-            return payload.value.accepted ? 'Accepted your friend request.' : 'Declined your friend request.';
         case 'groupInvite':
-            return 'Invited you to join a group.';
         case 'groupJoinRequest':
-            return 'Requested to join your group.';
+        case 'giftReturned':
+            return text(payload.case);
+        case 'friendRequestResponse':
+            return text(details.accepted ? 'friendAccepted' : 'friendDeclined');
         case 'groupJoinRequestResponse':
-            return payload.value.approved
-                ? 'Your group join request was approved.'
-                : 'Your group join request was declined.';
+            return text(details.approved ? 'groupJoinApproved' : 'groupJoinDeclined');
         case 'coalitionInvite':
             return details.coalitionName
-                ? `Invited your group to the “${details.coalitionName}” coalition.`
-                : 'Invited your group to a coalition.';
+                ? text('coalitionInviteNamed', { name: details.coalitionName })
+                : text('coalitionInvite');
         case 'coalitionInviteResponse':
-            return payload.value.accepted
-                ? 'Your coalition invite was accepted.'
-                : 'Your coalition invite was declined.';
+            return text(details.accepted ? 'coalitionAccepted' : 'coalitionDeclined');
         case 'calendarEventRsvp':
-            return `Responded to ${event}${details.rsvpStatus ? ` (${details.rsvpStatus})` : ''}.`;
         case 'calendarEventUpdated':
-            return `Updated ${event}.`;
-        case 'calendarEventCancelled':
-            return `Cancelled ${event}.`;
+        case 'calendarEventCancelled': {
+            const event = details.eventTitle ? `“${details.eventTitle}”` : text('calendarEvent');
+            return payload.case === 'calendarEventRsvp' && details.rsvpStatus
+                ? text('calendarEventRsvpStatus', { event, status: details.rsvpStatus })
+                : text(payload.case, { event });
+        }
         case 'instanceWarning':
-            return payload.value.text || 'A moderator warned you in an instance.';
         case 'groupWarning':
-            return payload.value.text || 'A moderator warned you in a group.';
+            return details.text || text(payload.case);
         case 'moderationNotice':
             return describeModerationNotice(details.kind);
         case 'cashoutResolved': {
-            let outcome = 'Your cashout status changed.';
-            if (details.outcome === 'paid') outcome = 'Your cashout was paid.';
-            if (details.outcome === 'rejected') outcome = 'Your cashout was declined.';
-            if (details.outcome === 'failed') outcome = 'Your cashout could not be paid.';
-            return [outcome, details.note].filter(Boolean).join(' ');
+            let outcome = 'cashoutChanged';
+            if (details.outcome === 'paid') outcome = 'cashoutPaid';
+            if (details.outcome === 'rejected') outcome = 'cashoutDeclined';
+            if (details.outcome === 'failed') outcome = 'cashoutFailed';
+            return [text(outcome), details.note].filter(Boolean).join(' ');
         }
         case 'giftReceived': {
             const plan = details.tierName || details.tierId;
-            if (!plan) return 'Sent you a gift.';
-            const term = details.months ? ` (${details.months} ${details.months === 1 ? 'month' : 'months'})` : '';
-            return `Sent you a gift of ${plan}${term}.`;
+            if (!plan) return text('giftReceived');
+            return details.months
+                ? text('giftReceivedTerm', { plan, count: details.months })
+                : text('giftReceivedPlan', { plan });
         }
-        case 'giftReturned':
-            return 'Your gift was returned.';
         case 'giftRevoked': {
             const plan = details.tierName || details.tierId;
-            return `A gift${plan ? ` of ${plan}` : ''} on your account ${details.queuedStart ? 'was cancelled' : 'ended'}.`;
+            const outcome = details.queuedStart ? 'giftCancelled' : 'giftEnded';
+            return plan ? text(`${outcome}Plan`, { plan }) : text(outcome);
         }
         default:
             return '';
@@ -932,10 +931,13 @@ export function toNexVRNotification(notification) {
     const details = { ...data };
     const payload = notification.payload;
     const typedDetails = payload?.value;
+    const moderationTarget = payload?.case === 'moderationNotice' ? typedDetails?.kind?.value : undefined;
+    const moderationGroupId = moderationTarget?.targetType === 'group' ? moderationTarget.targetId : '';
     const groupId =
         typedDetails?.groupId ||
         typedDetails?.targetGroupId ||
-        (typedDetails?.ownerType === 'group' ? typedDetails.ownerId : '');
+        (typedDetails?.ownerType === 'group' ? typedDetails.ownerId : '') ||
+        moderationGroupId;
     if (groupId) {
         details.groupId = groupId;
     }
@@ -954,7 +956,10 @@ export function toNexVRNotification(notification) {
         .join(': ');
     return {
         id: notification.id,
-        type: NOTIFICATION_TYPES[notification.type] || 'message',
+        type:
+            notification.type === NotificationType.MODERATION_NOTICE && details.groupId
+                ? 'groupModerationNotice'
+                : NOTIFICATION_TYPES[notification.type] || 'message',
         senderUserId: notification.from || typedDetails?.userId,
         senderUsername: data.fromDisplayName || data.displayName || data.fromUsername || '',
         receiverUserId: notification.to,

@@ -48,6 +48,7 @@
                                         'instanceWarning',
                                         'groupWarning',
                                         'moderationNotice',
+                                        'groupModerationNotice',
                                         'cashoutResolved',
                                         'giftReceived',
                                         'giftReturned',

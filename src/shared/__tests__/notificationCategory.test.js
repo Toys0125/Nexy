@@ -35,6 +35,8 @@ describe('getNotificationCategory', () => {
         expect(getNotificationCategory('OnPlayerJoined')).toBe('other');
         expect(getNotificationCategory('GPS')).toBe('other');
         expect(getNotificationCategory('VideoPlay')).toBe('other');
+        expect(getNotificationCategory('moderationNotice')).toBe('other');
+        expect(getNotificationCategory('groupModerationNotice')).toBe('group');
     });
 });
 

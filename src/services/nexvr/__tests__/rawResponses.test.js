@@ -22,6 +22,7 @@ import {
 } from '../rawResponses';
 import { handleShimRequest } from '../shim';
 import { realtime } from '../realtime';
+import { setTokens } from '../session';
 import { maskEmail, toNexVRCurrentUser, toNexVRUser } from '../mappers';
 import { watchState } from '../../watchState';
 
@@ -133,9 +134,30 @@ describe('raw NexVR responses for the JSON tabs', () => {
             return native(init);
         });
 
-        await request;
+        await expect(request).rejects.toHaveProperty('name', 'StaleRequestError');
         expect(getRawResponse('/avatars/a1')).toBeUndefined();
         expect(getAvatarFileDetails('a1', 'u1')).toBeUndefined();
+    });
+
+    test('a successful private group response cannot return or refill the cache after an account switch', async () => {
+        const first = { accessToken: 'first', refreshToken: 'refresh-first' };
+        const second = { accessToken: 'second', refreshToken: 'refresh-second' };
+        await setTokens(first);
+        keepRawResponse('/auth/me', { id: 'first' });
+        const pending = Promise.withResolvers();
+        const started = Promise.withResolvers();
+        const path = '/groups/g1/members';
+        const request = handleShimRequest({ url: `https://nexvr.net/api${path}`, method: 'GET' }, () => {
+            started.resolve();
+            return pending.promise;
+        });
+        await started.promise;
+        await setTokens(second);
+        expect(getRawResponse('/auth/me')).toBeUndefined();
+        pending.resolve({ status: 200, data: JSON.stringify([{ status: 'active', permissions: ['private'] }]) });
+        await expect(request).rejects.toHaveProperty('name', 'StaleRequestError');
+        expect(getRawResponse(path)).toBeUndefined();
+        await setTokens({ accessToken: 'access', refreshToken: 'refresh' });
     });
 
     test('world JSON keeps the NexVR BEE location and omits the decryption key', async () => {

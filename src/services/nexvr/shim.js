@@ -29,9 +29,11 @@ import {
 } from './mappers';
 import { assertTokenSession, clearTokens, getAccessToken, getTokenSession, refreshTokens, setTokens } from './session';
 import { AppDebug } from '../appConfig';
-import { clearAvatarResponses, keepRawResponse } from './rawResponses';
+import { clearRawResponses, keepRawResponse } from './rawResponses';
 import { realtime } from './realtime';
 import { NotificationType } from './realtimeSchema';
+import { nexvrNotificationText } from './notificationText';
+import { i18n } from '../../plugins/i18n';
 import { assertRequestSession, getRequestSession } from '../requestSession';
 
 const SNAPSHOT_TIMEOUT = 8000;
@@ -75,18 +77,23 @@ function rememberTags(user) {
     return user;
 }
 
+/** @param {number} [tokenSession] */
+function captureLoginGuard(tokenSession = getTokenSession()) {
+    const requestSession = getRequestSession();
+    return () => {
+        assertRequestSession(requestSession);
+        assertTokenSession(tokenSession);
+    };
+}
+
 /**
  * @param {string} path NexVR gateway path, e.g. '/users/123'
  * @param {{ method?: string; body?: object; query?: Record<string, any>; auth?: boolean }} [opts]
  * @returns {Promise<any>}
  */
 async function nexvr(path, { method = 'GET', body, query, auth = true } = {}) {
-    const requestSession = getRequestSession();
     const tokenSession = getTokenSession();
-    const assertSession = () => {
-        assertRequestSession(requestSession);
-        assertTokenSession(tokenSession);
-    };
+    const assertSession = captureLoginGuard(tokenSession);
     const isAvatarRequest = path.startsWith('/avatars/');
     const url = new URL(`${AppDebug.endpointDomain}${path}`);
     for (const [key, value] of Object.entries(query || {})) {
@@ -115,19 +122,19 @@ async function nexvr(path, { method = 'GET', body, query, auth = true } = {}) {
         return native(init);
     };
     let res = await send();
+    if (auth) assertSession();
     if (res.status === 401 && auth) {
-        assertSession();
         const refreshed = await refreshTokens(exchangeRefreshToken, sentToken, tokenSession);
         assertSession();
         if (refreshed) {
             res = await send();
+            assertSession();
         } else {
             const remainingToken = await getAccessToken();
             assertSession();
             if (!remainingToken) throw new ShimError(401, '"Missing Credentials"');
         }
     }
-    if (path === '/auth/me') assertSession();
     let data = null;
     try {
         data = res.data ? JSON.parse(res.data) : null;
@@ -153,10 +160,7 @@ async function nexvr(path, { method = 'GET', body, query, auth = true } = {}) {
         const message = data?.message || data?.error || `HTTP ${res.status}`;
         throw new ShimError(res.status, typeof message === 'string' ? message : JSON.stringify(message));
     }
-    if (
-        method === 'GET' &&
-        (!isAvatarRequest || (requestSession === getRequestSession() && tokenSession === getTokenSession()))
-    ) {
+    if (auth && method === 'GET') {
         keepRawResponse(path, data, isAvatarRequest ? realtime.userId : undefined);
     }
     return data;
@@ -230,7 +234,7 @@ function summaryOf(kind, id) {
     }
     const session = getRequestSession();
     const endpoint = AppDebug.endpointDomain;
-    const context = `${session}:${endpoint}`;
+    const context = `${session}:${getTokenSession()}:${endpoint}`;
     if (summaryContext !== context) {
         summaryContext = context;
         summaryCache = new Map();
@@ -449,19 +453,25 @@ export async function describeNotification(notification) {
         details.imageUrl = image;
     }
     const payload = notification.payload;
+    const { t } = i18n.global;
     if (payload?.case === 'groupInvite' && payload.value.groupId) {
         mapped.responses = [
-            { type: 'nexvr.accept', icon: 'check', text: 'Accept', data: '' },
-            { type: 'nexvr.decline', icon: 'cancel', text: 'Decline', data: '' }
+            { type: 'nexvr.accept', icon: 'check', text: t('view.notification.actions.accept'), data: '' },
+            { type: 'nexvr.decline', icon: 'cancel', text: t('view.notification.actions.decline'), data: '' }
         ];
     } else if (payload?.case === 'groupJoinRequest' && payload.value.groupId && mapped.senderUserId) {
         mapped.responses = [
-            { type: 'nexvr.accept', icon: 'check', text: 'Approve', data: '' },
-            { type: 'nexvr.decline', icon: 'cancel', text: 'Decline', data: '' }
+            { type: 'nexvr.accept', icon: 'check', text: nexvrNotificationText('approve'), data: '' },
+            { type: 'nexvr.decline', icon: 'cancel', text: t('view.notification.actions.decline'), data: '' }
         ];
     }
     if (payload?.case && mapped.type !== 'message' && notification.type >= NotificationType.FRIEND_REQUEST_RESPONSE) {
-        (mapped.responses ??= []).push({ type: 'nexvr.dismiss', icon: 'bell-slash', text: 'Dismiss', data: '' });
+        (mapped.responses ??= []).push({
+            type: 'nexvr.dismiss',
+            icon: 'bell-slash',
+            text: nexvrNotificationText('dismiss'),
+            data: ''
+        });
     }
     return mapped;
 }
@@ -480,7 +490,7 @@ async function respondToNexVRNotification(id, response) {
     }
     if (response === 'nexvr.dismiss') {
         await nexvr(`/notifications/${encodeURIComponent(id)}`, { method: 'DELETE' });
-        return 'Notification dismissed.';
+        return nexvrNotificationText('dismissed');
     }
     if (response !== 'nexvr.accept' && response !== 'nexvr.decline') {
         throw new ShimError(400, 'Invalid notification response.');
@@ -494,9 +504,19 @@ async function respondToNexVRNotification(id, response) {
     }
     const groupPath = `/groups/${encodeURIComponent(groupId)}`;
     if (payload.case === 'groupInvite') {
+        if (!accept) {
+            const assertSession = captureLoginGuard();
+            // The web client declines through /leave as well. A stale invitation
+            // must not cause a member to leave their group.
+            const membership = await nexvr(`${groupPath}/membership`);
+            assertSession();
+            if (membership?.status !== 'invited') {
+                throw new ShimError(409, nexvrNotificationText('groupInviteNotPending'));
+            }
+        }
         await nexvr(`${groupPath}/${accept ? 'accept' : 'leave'}`, { method: 'POST', body: {} });
         memberLists.delete(groupId);
-        return accept ? 'Group invite accepted.' : 'Group invite declined.';
+        return nexvrNotificationText(accept ? 'groupInviteAccepted' : 'groupInviteDeclined');
     }
     const requester = payload.value.userId || notification.from;
     if (!requester) throw new ShimError(400, 'This notification has no requester.');
@@ -505,7 +525,7 @@ async function respondToNexVRNotification(id, response) {
         body: {}
     });
     memberLists.delete(groupId);
-    return accept ? 'Group join request approved.' : 'Group join request declined.';
+    return nexvrNotificationText(accept ? 'groupJoinRequestApproved' : 'groupJoinRequestDeclined');
 }
 
 /**
@@ -552,7 +572,7 @@ async function answerNotification(id, accept) {
 }
 
 const MEMBER_LIST_TTL = 30000;
-/** @type {Map<string, { at: number; members: Promise<any[]> }>} groupId → VRChat-shaped members */
+/** @type {Map<string, { at: number; session: string; members: Promise<any[]> }>} groupId → VRChat-shaped members */
 const memberLists = new Map();
 
 /**
@@ -598,7 +618,8 @@ function memberListOf(groupId, res) {
  */
 function groupMembers(groupId) {
     const cached = memberLists.get(groupId);
-    if (cached && Date.now() - cached.at < MEMBER_LIST_TTL) {
+    const session = `${getRequestSession()}:${getTokenSession()}:${AppDebug.endpointDomain}`;
+    if (cached?.session === session && Date.now() - cached.at < MEMBER_LIST_TTL) {
         return cached.members;
     }
     const members = nexvr(`/groups/${encodeURIComponent(groupId)}/members`)
@@ -609,10 +630,10 @@ function groupMembers(groupId) {
                 .map((member) => toNexVRGroupMember(groupId, member))
         )
         .catch((err) => {
-            memberLists.delete(groupId);
+            if (memberLists.get(groupId)?.members === members) memberLists.delete(groupId);
             throw err;
         });
-    memberLists.set(groupId, { at: Date.now(), members });
+    memberLists.set(groupId, { at: Date.now(), session, members });
     return members;
 }
 
@@ -642,6 +663,7 @@ async function groupMembersPage(groupId, query) {
  * @param {string} groupId
  */
 async function groupDetails(groupId) {
+    const assertSession = captureLoginGuard();
     const id = encodeURIComponent(groupId);
     const [group, membership, rules, members] = await Promise.all([
         nexvr(`/groups/${id}`),
@@ -649,6 +671,7 @@ async function groupDetails(groupId) {
         nexvr(`/groups/${id}/rules`).catch(() => null),
         groupMembers(groupId).catch(() => [])
     ]);
+    assertSession();
     const listed = members.find((member) => member.userId === realtime.userId);
     // NexVR has no online count; this counts the members whose presence Nexy
     // can see, which is the caller and their friends
@@ -1265,7 +1288,7 @@ export async function endSession() {
     notificationsById.clear();
     summaryCache = new Map();
     summaryContext = '';
-    clearAvatarResponses();
+    clearRawResponses();
     realtime.reset();
     await clearTokens();
 }
