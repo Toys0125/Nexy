@@ -3,9 +3,6 @@ import dayjs from 'dayjs';
 const FRIEND_TYPES = new Set([
     'friendRequest',
     'friendRequestResponse',
-    'partyInvite',
-    'partyJoinRequest',
-    'cameraOffer',
     'ignoredFriendRequest',
     'invite',
     'requestInvite',

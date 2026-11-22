@@ -213,10 +213,7 @@ export const useNotificationStore = defineStore('Notification', () => {
         }
         if (ref.senderUserId !== userStore.currentUser.id) {
             const isExcludedType =
-                ref.$localParty ||
-                ref.type === 'friendRequest' ||
-                ref.type === 'ignoredFriendRequest' ||
-                ref.type.includes('.');
+                ref.type === 'friendRequest' || ref.type === 'ignoredFriendRequest' || ref.type.includes('.');
             const isNotificationInitReady = !notificationInitStatus.value || !isNotificationsLoading.value;
             const matchesNotificationTypeFilter =
                 notificationTable.value.filters[0].value.length === 0 ||
@@ -236,15 +233,10 @@ export const useNotificationStore = defineStore('Notification', () => {
                         });
                     }
                 }
-                if (!ref.$localParty) {
-                    queueNotificationNoty(ref);
-                    sharedFeedStore.addEntry(ref);
-                }
+                queueNotificationNoty(ref);
+                sharedFeedStore.addEntry(ref);
             }
-            if (
-                matchesNotificationTypeFilter &&
-                (!isExcludedType || ref.$localParty || (ref.$nexvrType && ref.responses?.length))
-            ) {
+            if (matchesNotificationTypeFilter && (!isExcludedType || (ref.$nexvrType && ref.responses?.length))) {
                 uiStore.notifyMenu('notification');
             }
         }
@@ -264,12 +256,7 @@ export const useNotificationStore = defineStore('Notification', () => {
         if (typeof ref === 'undefined') {
             return;
         }
-        if (
-            ref.$localParty ||
-            ref.type === 'friendRequest' ||
-            ref.type === 'ignoredFriendRequest' ||
-            ref.type.includes('.')
-        ) {
+        if (ref.type === 'friendRequest' || ref.type === 'ignoredFriendRequest' || ref.type.includes('.')) {
             removeFromArray(notificationTable.value.data, ref);
         } else {
             ref.$isExpired = true;
@@ -445,9 +432,7 @@ export const useNotificationStore = defineStore('Notification', () => {
         if (ref) {
             ref.seen = true;
         }
-        if (!notificationId.startsWith('local:')) {
-            database.seenNotificationV2(notificationId);
-        }
+        database.seenNotificationV2(notificationId);
     }
 
     const seeQueue = [];
@@ -502,10 +487,6 @@ export const useNotificationStore = defineStore('Notification', () => {
      */
     function queueMarkAsSeen(notificationId, version = 1) {
         if (seenIds.has(notificationId)) return;
-        if (notificationTable.value.data.find((row) => row.id === notificationId)?.$localParty) {
-            handleNotificationSee(notificationId);
-            return;
-        }
         seenIds.add(notificationId);
         seeQueue.push({ id: notificationId, version });
         processSeeQueue();

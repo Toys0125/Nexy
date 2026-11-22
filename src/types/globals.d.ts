@@ -213,7 +213,6 @@ declare global {
         OpenVrcScreenshotsFolder(): Promise<boolean>;
         OpenCrashVrcCrashDumps(): Promise<boolean>;
         HasNexvrLauncherInstall(): Promise<boolean>;
-        GetNexVRPartyRequests(): Promise<string>;
         HasNexvrSteamInstall(): Promise<boolean>;
         OpenNexvrLauncherFolder(): Promise<boolean>;
         OpenNexvrSteamFolder(): Promise<boolean>;

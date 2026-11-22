@@ -363,7 +363,6 @@
         const type = props.notification.type;
         const link = props.notification.link;
         return (
-            !props.notification.$localParty &&
             !(props.notification.$nexvrType && hasResponses.value) &&
             type !== 'requestInviteResponse' &&
             type !== 'inviteResponse' &&
@@ -381,9 +380,8 @@
     const hasResponses = computed(() => Array.isArray(props.notification.responses));
 
     const showDeleteLog = computed(() => {
-        const n = props.notification;
-        const type = n.type;
-        if (n.$localParty || type === 'friendRequest' || type === 'ignoredFriendRequest') return false;
+        const type = props.notification.type;
+        if (type === 'friendRequest' || type === 'ignoredFriendRequest') return false;
         return true;
     });
 

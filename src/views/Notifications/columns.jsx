@@ -487,7 +487,6 @@ export const createColumns = ({
                 const original = row.original;
                 const hasResponses = Array.isArray(original.responses);
                 const showDecline =
-                    !original.$localParty &&
                     !(original.$nexvrType && hasResponses) &&
                     original.type !== 'requestInviteResponse' &&
                     original.type !== 'inviteResponse' &&
@@ -499,10 +498,7 @@ export const createColumns = ({
                     !original.type?.includes('moderation.') &&
                     !original.type?.includes('instance.') &&
                     !original.link?.startsWith('economy.');
-                const showDeleteLog =
-                    !original.$localParty &&
-                    original.type !== 'friendRequest' &&
-                    original.type !== 'ignoredFriendRequest';
+                const showDeleteLog = original.type !== 'friendRequest' && original.type !== 'ignoredFriendRequest';
 
                 return (
                     <div class="flex items-center justify-end gap-2">

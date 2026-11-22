@@ -19,7 +19,6 @@ import { describeNotification } from './nexvr/shim';
 import { realtime } from './nexvr/realtime';
 import { startGameSession } from './nexvr/gameSession';
 import { startGroupInstances } from './nexvr/groupInstances';
-import { startPartyRequests } from './nexvr/partyRequests';
 import { groupRequest } from '../api';
 import { request } from './request';
 import { runUpdateFriendFlow } from '../coordinators/friendPresenceCoordinator';
@@ -129,16 +128,6 @@ async function connectWebSocket(token) {
     // Game Log and Player List from the NexVR session; stopped with the other listeners
     detachRealtime.push(startGameSession());
     detachRealtime.push(startGroupInstances());
-    detachRealtime.push(
-        startPartyRequests(
-            userStore.currentUser.id,
-            (json) => notificationStore.handleNotification({ json }),
-            (id) => {
-                notificationStore.handleNotificationHide(id);
-                notificationStore.handleNotificationSee(id);
-            }
-        )
-    );
     if (!webSocketClosedGracefully && watchState.isLoggedIn && watchState.isFriendsLoaded) {
         console.warn('WebSocket reconnected after unexpected closure');
         webSocketClosedGracefully = true;
